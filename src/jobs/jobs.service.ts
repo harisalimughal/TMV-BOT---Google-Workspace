@@ -71,6 +71,14 @@ export function markSynced(): void {
 export interface NextJobOptions {
   /** Only the explicit "jobs" entry point needs fresh Calendar data. */
   sync?: boolean;
+  /**
+   * Bypasses the Bookings read cache. Every mid-workflow read-modify-write (a card
+   * click, a photo upload) must set this — otherwise it can start from a snapshot
+   * cached before an action just seconds earlier finished writing, and silently
+   * clobber that write when it saves. Only a plain "jobs"/"resume" listing, which
+   * never mutates anything, can afford the cached read.
+   */
+  fresh?: boolean;
 }
 
 export async function getNextJobForDriver(
@@ -79,7 +87,7 @@ export async function getNextJobForDriver(
 ): Promise<{ job: Job | null; driver: DriverProfile }> {
   if (options.sync) await syncIfStale();
 
-  const [driver, jobs] = await Promise.all([resolveDriver(identifier), listJobs()]);
+  const [driver, jobs] = await Promise.all([resolveDriver(identifier), listJobs(options.fresh ? 0 : undefined)]);
 
   const active = jobs
     .filter(j => j.status === JobStatus.IN_PROGRESS && j.driverInitials === driver.initials)
@@ -204,7 +212,7 @@ function delayStatus(bookedFinish: string, actualFinish: string): string {
 }
 
 export async function completeJob(jobId: string, identifier: string): Promise<Job> {
-  const { job, driver } = await getJobForDriver(jobId, identifier);
+  const { job, driver } = await getJobForDriver(jobId, identifier, { fresh: true });
   if (job.status === JobStatus.COMPLETED) return job;
 
   const from = job.currentState;

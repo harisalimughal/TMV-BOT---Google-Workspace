@@ -1,7 +1,7 @@
 import { env } from "../config/env";
 import {
-  activityWrite, commitWrites, driverFlowWrite, evidenceWrite, listEvidenceForJob, paymentWrite,
-  readEvidenceSummary, signatureWrite, SheetWrite
+  activityWrite, commitWrites, driverFlowWrite, evidenceWrite, getJob, jobWrite, listEvidenceForJob, paymentWrite,
+  readEvidenceSummary, signatureWrite, SheetWrite, workflowWrite
 } from "../google/sheets";
 import {
   ChatAttachment, EvidenceRecord, EvidenceStatus, EvidenceType, ExtraChargeType, Job
@@ -12,7 +12,7 @@ import { enqueueAll } from "../queue/queue.service";
 import { ProcessJobImageTask } from "../queue/queue.types";
 import { WorkflowState, nextAfterPhoto, PHOTO_STATES } from "./workflow.states";
 import {
-  assertState, validateClientConfirmation, validateClientDetails, validateCurrency,
+  assertState, validateClientDetails, validateCurrency,
   validateExtraCharges, validateMinutes, validatePaymentMethod, ValidationError
 } from "./validation.engine";
 import { log, setContext } from "../utils/logger";
@@ -121,7 +121,7 @@ export async function handlePhotoStep(
  * Used by the RETRY button on the failure card.
  */
 export async function retryFailedEvidence(jobId: string, identifier: string): Promise<Job> {
-  const { job, driver } = await getJobForDriver(jobId, identifier);
+  const { job, driver } = await getJobForDriver(jobId, identifier, { fresh: true });
   const failed = (await listEvidenceForJob(jobId)).filter(record => record.status === EvidenceStatus.FAILED);
   if (!failed.length) throw new ValidationError("There is no failed photo to retry on this job.");
 
@@ -157,7 +157,7 @@ export async function retryFailedEvidence(jobId: string, identifier: string): Pr
  * as an audit record of the attempt.
  */
 export async function reopenPhotoStep(jobId: string, identifier: string, evidenceType: EvidenceType): Promise<Job> {
-  const { job, driver } = await getJobForDriver(jobId, identifier);
+  const { job, driver } = await getJobForDriver(jobId, identifier, { fresh: true });
   const target = Object.entries(PHOTO_FOLDER).find(([, type]) => type === evidenceType)?.[0];
   if (!target) throw new ValidationError(`Unknown evidence type: ${evidenceType}`);
 
@@ -168,10 +168,12 @@ export async function reopenPhotoStep(jobId: string, identifier: string, evidenc
 
 export async function getActiveJob(identifier: string) {
   // No Calendar sync here: mid-workflow steps only ever read state that Sheets
-  // already holds.
-  const { job, driver } = await getNextJobForDriver(identifier);
+  // already holds. fresh: true because a photo upload is a read-modify-write, exactly
+  // like a card click — a cached snapshot could predate a step the driver just did
+  // seconds earlier and silently overwrite it on save.
+  const { job, driver } = await getNextJobForDriver(identifier, { fresh: true });
   if (!job || job.status !== "IN_PROGRESS") {
-    throw new ValidationError("You do not have an active job. Type 'jobs' to get your next job.");
+    throw new ValidationError("You do not have an active job. Type 'Next Job' to get your next job.");
   }
   return { job, driver };
 }
@@ -185,7 +187,11 @@ export async function handleAction(
   setContext({ jobId });
   if (action === "START_JOB") return beginJob(jobId, identifier);
 
-  const { job, driver } = await getJobForDriver(jobId, identifier);
+  // fresh: true — every case below reads job, mutates a few fields, and writes the
+  // whole row back. A cached read here can start from a snapshot taken before the
+  // driver's previous step (seconds earlier, well inside the Sheets cache TTL)
+  // finished writing, and silently clobber that step's change when this one saves.
+  const { job, driver } = await getJobForDriver(jobId, identifier, { fresh: true });
   const actor = driver.email || driver.chatUserName;
 
   switch (action) {
@@ -281,21 +287,6 @@ export async function handleAction(
       ]);
     }
 
-    case "SUBMIT_CLIENT_CONFIRMATION": {
-      assertState(job.currentState, WorkflowState.WAITING_CLIENT_CONFIRMATION);
-      const confirmed = (input.client_confirmed ?? []).includes("YES");
-      const name = validateClientConfirmation(input.client_signature_name?.[0] ?? "", confirmed);
-      job.clientConfirmedBy = name;
-      const from = job.currentState;
-      job.currentState = WorkflowState.WAITING_ORGANIZED_PHOTO;
-      return saveJob(job, driver, action, from, name, [
-        signatureWrite({ jobId, driver: actor, customerName: name, confirmationText: CUSTOMER_CONFIRMATION_TEXT }),
-        driverFlowWrite({
-          jobId, driver: actor, field: "Client Signature", value: `${name} — confirmed`, state: job.currentState
-        })
-      ]);
-    }
-
     case "COMPLETE_JOB": {
       assertState(job.currentState, WorkflowState.READY_TO_COMPLETE);
       await assertCompletionGate(jobId, job);
@@ -305,6 +296,57 @@ export async function handleAction(
     default:
       throw new ValidationError(`Unknown action: ${action}`);
   }
+}
+
+export class SignatureAlreadyCapturedError extends Error {
+  constructor() {
+    super("This job's signature has already been captured.");
+    this.name = "SignatureAlreadyCapturedError";
+  }
+}
+
+/**
+ * Records a customer's hand-drawn signature, submitted from their own device via the
+ * signature-pad link (see chat/signature.routes.ts) rather than from the driver's Chat
+ * session. There is no Chat identity here — the "driver" for the audit trail is whoever
+ * the job is assigned to.
+ */
+export async function submitDrawnSignature(
+  jobId: string,
+  customerName: string,
+  signature: { fileId: string; fileUrl: string }
+): Promise<Job> {
+  const job = await getJob(jobId, 0);
+  if (!job) throw new ValidationError(`Job ${jobId} was not found.`);
+  if (job.currentState !== WorkflowState.WAITING_CLIENT_CONFIRMATION) {
+    // The customer's device double-submitted, or the link was reopened after the driver
+    // already moved on. Treat as already-done rather than erroring.
+    throw new SignatureAlreadyCapturedError();
+  }
+
+  const name = customerName.trim() || "Customer";
+  const actor = job.driverInitials || "customer device";
+  job.clientConfirmedBy = name;
+  job.updatedAt = new Date().toISOString();
+  const from = job.currentState;
+  job.currentState = WorkflowState.WAITING_ORGANIZED_PHOTO;
+
+  await commitWrites([
+    jobWrite(job),
+    workflowWrite(job.jobId, actor, job.currentState),
+    signatureWrite({
+      jobId, driver: actor, customerName: name, confirmationText: signature.fileUrl,
+      mode: "Drawn signature (customer device)"
+    }),
+    driverFlowWrite({
+      jobId, driver: actor, field: "Client Signature", value: `${name} — signed`, state: job.currentState
+    }),
+    activityWrite({
+      jobId, driver: actor, action: "SUBMIT_CLIENT_CONFIRMATION", fromState: from, toState: job.currentState, detail: name
+    })
+  ]);
+
+  return job;
 }
 
 /**

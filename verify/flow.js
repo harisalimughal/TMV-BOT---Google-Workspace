@@ -106,6 +106,7 @@ gal.JWT.prototype.getAccessToken = async () => ({ token: "fake" });
 const { handleChatEvent } = require(BOT + "/chat/chat.controller");
 const { registerInlineDispatcher, drainInlineQueue } = require(BOT + "/queue/queue.service");
 const { dispatchTask } = require(BOT + "/queue/dispatch");
+const { submitDrawnSignature } = require(BOT + "/workflow/workflow.engine");
 /*
  * Background tasks are captured rather than executed immediately, so the test decides
  * exactly when the worker runs. Timing-based draining made assertions race the worker,
@@ -231,7 +232,10 @@ const title = r => JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1] ?? 
   await click("SUBMIT_CLIENT_DETAILS", { client_name_postcode: si("Barry, N15 6UQ") });
   check("client details", state(), "WAITING_CLIENT_CONFIRMATION");
 
-  await click("SUBMIT_CLIENT_CONFIRMATION", { client_signature_name: si("Barry Smith"), client_confirmed: si("YES") });
+  // Signature capture now happens on the customer's own device (see
+  // chat/signature.routes.ts), not as a Chat form submission. Simulating the upload +
+  // state transition directly is the equivalent of a real /sign/:jobId POST.
+  await submitDrawnSignature(JOB, "Barry Smith", { fileId: "sig1", fileUrl: "https://drive.test/sig1" });
   check("client confirmation", state(), "WAITING_ORGANIZED_PHOTO");
   check("signature row written", tabs.Signatures.length - 1, 1);
 

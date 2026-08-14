@@ -12,6 +12,7 @@ import { PhaseTimer } from "./utils/timing";
 import { WORKER_MOUNT_PATH, workerRouter } from "./queue/worker.routes";
 import { dispatchTask } from "./queue/dispatch";
 import { drainInlineQueue, registerInlineDispatcher } from "./queue/queue.service";
+import { signatureRouter } from "./chat/signature.routes";
 
 const app = express();
 app.disable("x-powered-by");
@@ -61,6 +62,10 @@ app.get("/readyz", (_req, res) =>
 // Background worker endpoints, behind their own OIDC/shared-secret auth.
 app.use(WORKER_MOUNT_PATH, workerRouter());
 
+// Customer-facing signature pad. Auth is a signed, time-limited link (see
+// chat/signature.link.ts), not Chat/OIDC — the customer has no Google Chat session.
+app.use("/sign", signatureRouter());
+
 app.post("/chat", verifyGoogleChatRequest, async (req, res) => {
   const requestId = req.header("x-cloud-trace-context")?.split("/")[0] || randomUUID();
 
@@ -95,7 +100,7 @@ app.post("/chat", verifyGoogleChatRequest, async (req, res) => {
       // Always 200: a non-200 makes Google Chat show a generic failure with no detail.
       return res.status(200).json(
         wrapCreateMessage({
-          text: "TMV could not complete that action. Please type *jobs* to reload your current step, or try again."
+          text: "TMV could not complete that action. Please type *Next Job* to reload your current step, or try again."
         })
       );
     }
@@ -143,6 +148,11 @@ function assertRuntimeConfig(): void {
     }
     if (!env.syncSecret || env.syncSecret === "change-me") {
       throw new Error("SYNC_SECRET must be set to a non-default value in production.");
+    }
+    if (!env.signatureLinkSecret) {
+      throw new Error(
+        "TMV_SIGNATURE_LINK_SECRET is required in production to sign the customer signature-pad link."
+      );
     }
   }
 

@@ -112,7 +112,13 @@ export const env = {
   /** How long evidence may sit in RECEIVED/PROCESSING before the reaper re-drives it. */
   evidenceStaleMs: numberEnv("TMV_EVIDENCE_STALE_MS", 300_000),
   /** Upper bound on background Drive work per task, so a task cannot run forever. */
-  imageTaskTimeoutMs: numberEnv("TMV_IMAGE_TASK_TIMEOUT_MS", 120_000)
+  imageTaskTimeoutMs: numberEnv("TMV_IMAGE_TASK_TIMEOUT_MS", 120_000),
+
+  /**
+   * Signs the customer-facing signature-pad link (/sign/:jobId). Required in production;
+   * without it anyone who guessed a live job id could submit a bogus signature.
+   */
+  signatureLinkSecret: process.env.TMV_SIGNATURE_LINK_SECRET?.trim() || ""
 };
 
 function originOf(url: string): string {

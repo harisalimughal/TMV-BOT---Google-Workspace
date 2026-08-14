@@ -697,7 +697,7 @@ export function photoWrite(data: {
 }
 
 export function signatureWrite(data: {
-  jobId: string; driver: string; customerName: string; confirmationText: string;
+  jobId: string; driver: string; customerName: string; confirmationText: string; mode?: string;
 }): SheetWrite {
   return {
     sheet: SHEETS.SIGNATURES,
@@ -706,7 +706,7 @@ export function signatureWrite(data: {
       "Job ID": data.jobId,
       "Driver": data.driver,
       "Customer Name": data.customerName,
-      "Mode": "Typed confirmation in Google Chat",
+      "Mode": data.mode ?? "Typed confirmation in Google Chat",
       "Confirmation Text": data.confirmationText
     }
   };
@@ -784,8 +784,8 @@ export async function getJob(jobId: string, ttlMs?: number): Promise<Job | null>
   return row ? bookingRowToJob(row) : null;
 }
 
-export async function listJobs(): Promise<Job[]> {
-  return (await listObjects(SHEETS.BOOKINGS)).map(bookingRowToJob);
+export async function listJobs(ttlMs?: number): Promise<Job[]> {
+  return (await listObjects(SHEETS.BOOKINGS, ttlMs)).map(bookingRowToJob);
 }
 
 export async function getDriver(identifier: string): Promise<DriverProfile | null> {

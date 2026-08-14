@@ -4,6 +4,7 @@ import { formatPounds } from "../utils/money";
 import { EvidenceRecord, EvidenceType, ExtraChargeType, Job, PaymentMethod } from "../jobs/job.types";
 import { suggestedTotal, CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
 import { WorkflowState } from "../workflow/workflow.states";
+import { signatureLinkFor } from "./signature.link";
 
 export type ChatResponse = Record<string, unknown>;
 
@@ -41,6 +42,15 @@ function button(text: string, functionName: string, jobId: string) {
     type: "FILLED",
     onClick: {
       action: action(functionName, jobId)
+    }
+  };
+}
+function linkButton(text: string, url: string) {
+  return {
+    text,
+    type: "FILLED",
+    onClick: {
+      openLink: { url }
     }
   };
 }
@@ -169,7 +179,7 @@ export function errorResponse(message: string, jobId = ""): ChatResponse {
 
 export function helpCard(): ChatResponse {
   return card("tmv-help", "TMV Driver Bot", "Google Chat operations workflow", [
-    { textParagraph: { text: "Type <b>jobs</b> to receive your active or next unfinished job." } },
+    { textParagraph: { text: "Type <b>Next Job</b> to receive your active or next unfinished job." } },
     { textParagraph: { text: "The bot saves each answer immediately. Photo steps require images uploaded directly into this Chat conversation." } }
   ]);
 }
@@ -279,9 +289,10 @@ export function workflowCard(job: Job): ChatResponse {
     case WorkflowState.WAITING_CLIENT_CONFIRMATION:
       return card(id, "9. Client Signature", "Customer completion confirmation", [
         { textParagraph: { text: escapeHtml(CUSTOMER_CONFIRMATION_TEXT) } },
-        { textInput: { name: "client_signature_name", label: "Customer full name", type: "SINGLE_LINE" } },
-        { selectionInput: { name: "client_confirmed", label: "Confirmation", type: "CHECK_BOX", items: [{ text: "I confirm the statement above", value: "YES" }] } },
-        { buttonList: { buttons: [{ text: "CONFIRM & CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_CLIENT_CONFIRMATION", job.jobId, ["client_signature_name", "client_confirmed"]) } }] } }
+        { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
+        { buttonList: { buttons: [linkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } },
+        { textParagraph: { text: "Once they've signed, tap below to continue." } },
+        { buttonList: { buttons: [button("CHECK AGAIN", "RESUME_JOB", job.jobId)] } }
       ]);
 
     case WorkflowState.WAITING_ORGANIZED_PHOTO:

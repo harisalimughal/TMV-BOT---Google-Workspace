@@ -58,9 +58,3 @@ export function validateClientDetails(raw: string): string {
   return value;
 }
 
-export function validateClientConfirmation(name: string, confirmed: boolean): string {
-  const value = name.trim();
-  if (!confirmed) throw new ValidationError("Customer confirmation must be checked before continuing.");
-  if (value.length < 2) throw new ValidationError("Enter the customer's name for confirmation.");
-  return value;
-}
