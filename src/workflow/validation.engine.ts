@@ -29,6 +29,11 @@ export function validateExtraCharges(values: string[]): string[] {
 
 export function validateMinutes(raw: string): number {
   const cleaned = raw.trim().toLowerCase().replace(/minutes?|mins?|min/g, "").trim();
+  // Number("") is 0, not NaN — an empty/missing submission must not silently become
+  // "the driver entered 0 minutes overtime".
+  if (!cleaned) {
+    throw new ValidationError("Overtime must be a whole number of minutes, for example 30.");
+  }
   const value = Number(cleaned);
   if (!Number.isInteger(value) || value < 0 || value > 24 * 60) {
     throw new ValidationError("Overtime must be a whole number of minutes, for example 30.");
@@ -38,6 +43,11 @@ export function validateMinutes(raw: string): number {
 
 export function validateCurrency(raw: string): number {
   const cleaned = raw.replace(/[£,$\s]/g, "");
+  // Number("") is 0, not NaN — an empty/missing submission must not silently become
+  // "the driver entered £0.00". §total-charges-zero.
+  if (!cleaned) {
+    throw new ValidationError("Enter a valid total charge amount in GBP, for example 196 or 196.00.");
+  }
   const value = Number(cleaned);
   if (!Number.isFinite(value) || value < 0 || value > 100000) {
     throw new ValidationError("Enter a valid total charge amount in GBP, for example 196 or 196.00.");
