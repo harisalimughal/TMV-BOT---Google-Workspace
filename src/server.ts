@@ -18,7 +18,6 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "2mb" }));
 
 const verifier = new OAuth2Client();
-const CHAT_ISSUER = "chat@system.gserviceaccount.com";
 
 /** Flipped once the Sheets structure has been verified. */
 let bootstrapComplete = !env.bootstrapOnStart;
@@ -37,7 +36,7 @@ async function verifyGoogleChatRequest(req: Request, res: Response, next: NextFu
   try {
     const ticket = await verifier.verifyIdToken({ idToken: match[1], audience: env.chatAudience });
     const payload = ticket.getPayload();
-    if (!payload?.email_verified || payload.email !== CHAT_ISSUER) {
+    if (!payload?.email_verified || payload.email !== env.chatIssuer) {
       return res.status(401).json({ error: "Invalid Google Chat issuer." });
     }
     return next();

@@ -45,6 +45,13 @@ export const env = {
   // to COMPLETED with fabricated charges. Opting out is explicit and dev-only.
   verifyChatRequests: boolEnv("VERIFY_CHAT_REQUESTS", true),
   chatAudience: process.env.GOOGLE_CHAT_AUDIENCE?.trim() || "",
+  /**
+   * Expected signer of the Chat request's bearer token. A classic Chat app signs as
+   * chat@system.gserviceaccount.com; a Chat app built on the Workspace Add-ons
+   * framework signs as service-<project-number>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com
+   * instead (shown on the Chat API Configuration page as "Service Account Email").
+   */
+  chatIssuer: process.env.GOOGLE_CHAT_ISSUER?.trim() || "chat@system.gserviceaccount.com",
 
   // Public HTTPS endpoint Google Chat calls back for card actions. Previously hard-coded
   // to a dev ngrok tunnel in cards.ts, which broke every button outside that tunnel.
