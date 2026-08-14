@@ -548,8 +548,16 @@ function boolFromSheet(value: string): boolean {
   return ["TRUE", "true", "1", "yes", "Y"].includes(value);
 }
 
+/**
+ * Sheets' default read mode returns a cell's FORMATTED display string, not its raw
+ * value — a numeric cell that ever picked up currency formatting (e.g. someone
+ * manually formatting it in the Sheets UI) reads back as "£141.00", not "141". Strip
+ * the formatting chars before parsing, the same way fromPounds()/validateCurrency()
+ * already do for driver-typed amounts, so a formatted cell doesn't silently become 0.
+ */
 function num(value: string): number {
-  const parsed = Number(value || 0);
+  const cleaned = String(value ?? "").replace(/[£$,\s]/g, "");
+  const parsed = Number(cleaned || 0);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
