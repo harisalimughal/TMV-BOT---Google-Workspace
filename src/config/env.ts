@@ -79,6 +79,14 @@ export const env = {
    * exits, which is precisely what Cloud Tasks exists to prevent.
    */
   queueDriver: enumEnv("TMV_QUEUE_DRIVER", ["cloud-tasks", "inline"] as const, "inline"),
+  /**
+   * Explicit opt-in for running the inline driver in production. Cloud Run recycles
+   * instances routinely, which is why inline is refused there by default. A single
+   * long-lived host (e.g. a VPS container that only restarts on crash/redeploy) doesn't
+   * have that problem as long as the SWEEP_STALE_EVIDENCE reaper is cron-triggered to
+   * recover anything lost on the restarts it does have.
+   */
+  allowInlineInProduction: boolEnv("TMV_ALLOW_INLINE_IN_PRODUCTION", false),
   gcpProject: process.env.GOOGLE_CLOUD_PROJECT?.trim() || process.env.GCP_PROJECT?.trim() || "",
   tasksLocation: process.env.TMV_TASKS_LOCATION?.trim() || "europe-west2",
   tasksQueue: process.env.TMV_TASKS_QUEUE?.trim() || "tmv-bot-tasks",

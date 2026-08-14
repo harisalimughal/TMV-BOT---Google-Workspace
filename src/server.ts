@@ -158,11 +158,21 @@ function assertRuntimeConfig(): void {
       throw new Error(`TMV_QUEUE_DRIVER=cloud-tasks requires: ${missing.join(", ")}`);
     }
   }
-  if (env.nodeEnv === "production" && env.queueDriver === "inline") {
+  if (env.nodeEnv === "production" && env.queueDriver === "inline" && !env.allowInlineInProduction) {
     // The inline driver loses work when the instance is recycled, which on Cloud Run is
-    // routine. Refusing to start is better than silently dropping evidence.
+    // routine. Refusing to start is better than silently dropping evidence. A single
+    // persistent host can opt in explicitly (see TMV_ALLOW_INLINE_IN_PRODUCTION) as long
+    // as it cron-triggers SWEEP_STALE_EVIDENCE to recover work lost across restarts.
     throw new Error(
-      "TMV_QUEUE_DRIVER=inline is not safe in production. Set TMV_QUEUE_DRIVER=cloud-tasks."
+      "TMV_QUEUE_DRIVER=inline is not safe in production. Set TMV_QUEUE_DRIVER=cloud-tasks, or set " +
+        "TMV_ALLOW_INLINE_IN_PRODUCTION=true if this is a single persistent host with a cron-triggered " +
+        "evidence sweep."
+    );
+  }
+  if (env.allowInlineInProduction && env.queueDriver === "inline") {
+    log.warn(
+      "running the inline queue driver in production; background work is only durable if " +
+        "SWEEP_STALE_EVIDENCE is cron-triggered regularly"
     );
   }
   if (!env.chatActionUrl) {
