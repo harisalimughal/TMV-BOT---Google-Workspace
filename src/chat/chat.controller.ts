@@ -110,7 +110,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
                 ...timer.fields()
               });
               return {
-                result: createResponse(photoAckCard(job, accepted, degraded, workflowCard(job))),
+                result: createResponse(photoAckCard(job, accepted, workflowCard(job))),
                 outcomeState: job.currentState,
                 jobId: job.jobId
               };

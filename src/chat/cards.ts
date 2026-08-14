@@ -45,12 +45,19 @@ function button(text: string, functionName: string, jobId: string) {
     }
   };
 }
-function linkButton(text: string, url: string) {
+/**
+ * Opens as a layered overlay window rather than a full new browser tab — the closest
+ * thing Chat's platform has to "a pop-up in the same window", since cards themselves
+ * cannot embed arbitrary content like a signature canvas. onClose: RELOAD asks Chat to
+ * re-render this card once the overlay closes, so the driver's "CHECK AGAIN" tap below
+ * is a fallback, not the only way forward.
+ */
+function overlayLinkButton(text: string, url: string) {
   return {
     text,
     type: "FILLED",
     onClick: {
-      openLink: { url }
+      openLink: { url, openAs: "OVERLAY", onClose: "RELOAD" }
     }
   };
 }
@@ -94,17 +101,10 @@ export function textResponse(text: string): ChatResponse {
  * Google Chat and the Drive upload has not started. Telling the driver otherwise would
  * be exactly the fake-success this architecture is meant to avoid.
  */
-export function photoAckCard(job: Job, accepted: EvidenceRecord[], degraded: boolean, next: ChatResponse): ChatResponse {
+export function photoAckCard(job: Job, accepted: EvidenceRecord[], next: ChatResponse): ChatResponse {
   const count = accepted.length;
   const lines = [
-    { textParagraph: { text: `<b>${count} photo${count > 1 ? "s" : ""} received ✓</b>` } },
-    {
-      textParagraph: {
-        text: degraded
-          ? "Saving to Drive is queued and will complete shortly. You can carry on."
-          : "We're storing them now in the background. You can carry on."
-      }
-    }
+    { textParagraph: { text: `<b>${count} photo${count > 1 ? "s" : ""} received ✓</b>` } }
   ];
 
   // The acknowledgement and the next step arrive as one card so the driver never waits
@@ -290,7 +290,7 @@ export function workflowCard(job: Job): ChatResponse {
       return card(id, "9. Client Signature", "Customer completion confirmation", [
         { textParagraph: { text: escapeHtml(CUSTOMER_CONFIRMATION_TEXT) } },
         { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
-        { buttonList: { buttons: [linkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } },
+        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } },
         { textParagraph: { text: "Once they've signed, tap below to continue." } },
         { buttonList: { buttons: [button("CHECK AGAIN", "RESUME_JOB", job.jobId)] } }
       ]);

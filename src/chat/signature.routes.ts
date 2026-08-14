@@ -64,7 +64,7 @@ function signPad(job: { jobId: string; customerName: string }, exp: string, sig:
     </div>
     <div id="done">
       <h1>Thanks — signed</h1>
-      <p>Please hand the device back to your driver.</p>
+      <p>Please hand the device back to your driver. This window will close automatically — if it doesn't, you can close it now.</p>
     </div>
   </div>
   <script>
@@ -134,6 +134,10 @@ function signPad(job: { jobId: string; customerName: string }, exp: string, sig:
         if (!res.ok) return res.json().then(function (b) { throw new Error(b.error || 'Something went wrong.'); });
         document.getElementById('form').style.display = 'none';
         document.getElementById('done').style.display = 'block';
+        // Best-effort: browsers only allow script-closing a window they didn't open
+        // themselves in some contexts (e.g. Chat's overlay), so this silently no-ops
+        // where it isn't permitted — the on-screen message above is the real fallback.
+        setTimeout(function () { window.close(); }, 1200);
       }).catch(function (err) {
         document.getElementById('status').textContent = err.message;
         submitBtn.disabled = false;
