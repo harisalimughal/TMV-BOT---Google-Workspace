@@ -1,0 +1,13 @@
+node_modules
+dist
+verify
+tests
+.git
+.gitignore
+.github
+.env
+.env.*
+*.md
+vitest.config.ts
+tsconfig.verify.json
+deploy

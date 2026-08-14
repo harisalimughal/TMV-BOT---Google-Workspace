@@ -1,0 +1,38 @@
+export enum WorkflowState {
+  READY = "READY",
+  WAITING_ARRIVAL_PHOTO = "WAITING_ARRIVAL_PHOTO",
+  WAITING_LOADED_PHOTO = "WAITING_LOADED_PHOTO",
+  IN_PROGRESS = "IN_PROGRESS",
+  WAITING_EXTRA_CHARGES = "WAITING_EXTRA_CHARGES",
+  WAITING_OVERTIME = "WAITING_OVERTIME",
+  WAITING_TOTAL_CHARGES = "WAITING_TOTAL_CHARGES",
+  WAITING_PAYMENT = "WAITING_PAYMENT",
+  WAITING_EMPTY_VAN_PHOTO = "WAITING_EMPTY_VAN_PHOTO",
+  WAITING_CLIENT_DETAILS = "WAITING_CLIENT_DETAILS",
+  WAITING_CLIENT_CONFIRMATION = "WAITING_CLIENT_CONFIRMATION",
+  WAITING_ORGANIZED_PHOTO = "WAITING_ORGANIZED_PHOTO",
+  READY_TO_COMPLETE = "READY_TO_COMPLETE",
+  COMPLETED = "COMPLETED"
+}
+
+export const PHOTO_STATES = new Set<WorkflowState>([
+  WorkflowState.WAITING_ARRIVAL_PHOTO,
+  WorkflowState.WAITING_LOADED_PHOTO,
+  WorkflowState.WAITING_EMPTY_VAN_PHOTO,
+  WorkflowState.WAITING_ORGANIZED_PHOTO
+]);
+
+export function nextAfterPhoto(state: WorkflowState): WorkflowState {
+  switch (state) {
+    case WorkflowState.WAITING_ARRIVAL_PHOTO:
+      return WorkflowState.WAITING_LOADED_PHOTO;
+    case WorkflowState.WAITING_LOADED_PHOTO:
+      return WorkflowState.IN_PROGRESS;
+    case WorkflowState.WAITING_EMPTY_VAN_PHOTO:
+      return WorkflowState.WAITING_CLIENT_DETAILS;
+    case WorkflowState.WAITING_ORGANIZED_PHOTO:
+      return WorkflowState.READY_TO_COMPLETE;
+    default:
+      throw new Error(`State ${state} is not a photo state`);
+  }
+}
