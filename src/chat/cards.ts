@@ -167,7 +167,7 @@ export function evidenceFailedCard(jobId: string, message: string, failedTypes: 
 export function errorResponse(message: string, jobId = ""): ChatResponse {
   const widgets: any[] = [
     { textParagraph: { text: `<b>${escapeHtml(message)}</b>` } },
-    { textParagraph: { text: "Type <b>jobs</b> at any time to reload your active or next job." } }
+    { textParagraph: { text: "Type <b>Next Job</b> at any time to reload your active or next job." } }
   ];
   if (jobId) {
     widgets.push({
@@ -314,7 +314,7 @@ export function workflowCard(job: Job): ChatResponse {
         { decoratedText: { topLabel: "Finished", text: formatTime(job.actualFinish) } },
         { decoratedText: { topLabel: "Actual duration", text: `${job.actualMinutes} minutes` } },
         { decoratedText: { topLabel: "Total", text: formatPounds(job.totalCharges) } },
-        { textParagraph: { text: "Type <b>jobs</b> to receive the next unfinished job." } }
+        { textParagraph: { text: "Type <b>Next Job</b> to receive the next unfinished job." } }
       ]);
 
     default:
