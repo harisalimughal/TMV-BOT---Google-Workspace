@@ -8,8 +8,27 @@ import { Job, JobStatus, ParsedCalendarBooking } from "./job.types";
 import { WorkflowState } from "../workflow/workflow.states";
 import { log } from "../utils/logger";
 
+/**
+ * Google Calendar's rich-text description editor (the Bold/Italic/link toolbar) saves
+ * line breaks as HTML <br>/<div> tags and auto-linkifies emails into <a> tags instead of
+ * plain "\n"-separated text. Normalise back to plain lines before parsing, so a
+ * rich-text description parses the same as a plain-text one.
+ */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
 function field(description: string, labels: string[]): string {
-  const lines = description.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const lines = htmlToText(description).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   for (const label of labels) {
     const regex = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[:=-]\\s*(.+)$`, "i");
     const found = lines.find(line => regex.test(line));
