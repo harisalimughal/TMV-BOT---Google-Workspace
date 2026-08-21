@@ -430,6 +430,24 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("LiabilityReport stores the selected category", tabs.LiabilityReport[1][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
 
   console.log("\n" + "-".repeat(74));
+  console.log("Add Job refuses to silently fall back to the broken direct-share behavior");
+  console.log("-".repeat(74));
+  // Calendar won't grant a service account write access directly (confirmed live) --
+  // event creation must impersonate a real user via domain-wide delegation instead.
+  // This test process never sets GOOGLE_WORKSPACE_IMPERSONATED_USER, so this checks
+  // the guard fires with a clear error instead of quietly reusing the un-impersonated
+  // client and hitting the exact "no writer access" error this was built to avoid.
+  const { createCalendarEvent } = require(BOT + "/google/calendar");
+  let createEventError = null;
+  try {
+    await createCalendarEvent({ summary: "test", start: { dateTime: new Date().toISOString() }, end: { dateTime: new Date().toISOString() } });
+  } catch (error) {
+    createEventError = error;
+  }
+  check("createCalendarEvent refuses to run without an impersonated user configured",
+    createEventError && createEventError.message.includes("GOOGLE_WORKSPACE_IMPERSONATED_USER"), true);
+
+  console.log("\n" + "-".repeat(74));
   console.log("Finish Job is gone: those action names are unknown now");
   console.log("-".repeat(74));
   const unknownConfirm = await click("FINISH_JOB_CONFIRM", JOB_STANDALONE);

@@ -212,7 +212,12 @@ export async function warmupAuth(): Promise<void> {
     { scopes: SCOPES.CHAT_BOT }
   ];
   if (env.queueDriver === "cloud-tasks") sets.push({ scopes: SCOPES.CLOUD_TASKS });
-  if (env.impersonatedUser) sets.push({ scopes: SCOPES.GMAIL, options: { impersonate: true } });
+  if (env.impersonatedUser) {
+    sets.push({ scopes: SCOPES.GMAIL, options: { impersonate: true } });
+    // Calendar event creation (admin Add Job) impersonates this same user via
+    // domain-wide delegation — see google/calendar.ts's writeClient().
+    sets.push({ scopes: SCOPES.CALENDAR, options: { impersonate: true } });
+  }
 
   await Promise.all(
     sets.map(async ({ scopes, options }) => {
