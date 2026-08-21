@@ -1,18 +1,23 @@
 import {
-  ChatResponse, ChatResult, createResponse, errorResponse, finishJobConfirmCard, helpCard, jobCard,
-  jobCompletedCard, mainMenuCard, noJobsCard, openFormCard, updateResponse
+  ChatResponse, ChatResult, createResponse, errorResponse, evidenceFailedCard, evidencePendingCard,
+  finishJobConfirmCard, helpCard, jobCard, jobCompletedCard, mainMenuCard, noJobsCard, openFormCard, photoAckCard,
+  updateResponse, workflowCard
 } from "./cards";
 import { parseCommand } from "./commands";
-import { getActiveJobForDriver, getNextJobForDriver, startJob } from "../jobs/jobs.service";
-import { beginJob, finishJob } from "../workflow/workflow.engine";
+import { getActiveJobForDriver, getNextJobForDriver } from "../jobs/jobs.service";
+import {
+  EvidenceFailedError, EvidencePendingError, finishJob, handleAction, handlePhotoStep, reopenPhotoStep,
+  retryFailedEvidence
+} from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
 import { PermanentTaskError } from "../queue/queue.types";
-import { ChatAttachment, JobStatus } from "../jobs/job.types";
+import { ChatAttachment, EvidenceType } from "../jobs/job.types";
 import { setContext, log } from "../utils/logger";
 import { PhaseTimer } from "../utils/timing";
 import { eventKeyFor, runOnce } from "./replay.guard";
 import { ScenarioKey, SCENARIOS } from "./scenario.spec";
 import { scenarioLinkFor } from "./scenario.link";
+import { getJob } from "../google/sheets";
 
 export interface GoogleChatEvent {
   type?: string;
@@ -47,27 +52,42 @@ function actionParam(event: GoogleChatEvent, key: string): string {
   return event.action?.parameters?.find(p => p.key === key)?.value || "";
 }
 
+function formInputs(event: GoogleChatEvent): Record<string, string[]> {
+  const source = event.common?.formInputs || event.commonEventObject?.formInputs || {};
+  const result: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(source)) {
+    const strings = value?.stringInputs?.value;
+    if (Array.isArray(strings)) result[key] = strings.map(String);
+  }
+  return result;
+}
+
 function attachments(event: GoogleChatEvent): ChatAttachment[] {
   return event.message?.attachment ?? event.message?.attachments ?? [];
 }
 
+/**
+ * "Next Job" — resumes the classic Start Job workflow wherever the driver left off
+ * (or shows the job summary card with a Start Job button if it hasn't been started),
+ * exactly as this worked before the menu existed. This is separate from the menu:
+ * Check In / Check Out / Parking Liability / Liability Report / Finish Job are all
+ * reachable independently of this, whether or not Start Job's workflow is mid-flight.
+ */
 async function showCurrentOrNext(event: GoogleChatEvent, sync = false): Promise<ChatResponse> {
   // Only the "jobs" command and APP_COMMAND need fresh Calendar data. Resuming an
   // existing job does not — the job is already in Sheets.
   const { job } = await getNextJobForDriver(identifier(event), { sync });
   if (!job) return noJobsCard();
   setContext({ jobId: job.jobId });
-  return job.status === "IN_PROGRESS" ? mainMenuCard(job) : jobCard(job);
+  return job.status === "IN_PROGRESS" ? workflowCard(job) : jobCard(job);
 }
 
 /**
  * Shared by every MENU_* / FINISH_JOB_CONFIRM click: fresh-reads the driver's active or
- * next job and runs the requested action against it directly — no "start a job first"
- * prompt. If the job hasn't been started yet, it's started silently first (so
- * actualStart/status/the claim-on-first-tap logic in startJob() all still happen
- * correctly), then the scenario/finish flow proceeds immediately. Only genuinely having
- * no eligible job at all still short-circuits, since there's nothing to attach the data
- * to.
+ * next job and runs the requested action against it directly. Deliberately does NOT
+ * start the job first — Check In, Check Out, Parking Liability, Liability Report and
+ * Finish Job are independent, standalone flows that never require Start Job's classic
+ * workflow to have run at all.
  */
 async function withActiveJob(
   event: GoogleChatEvent,
@@ -75,8 +95,7 @@ async function withActiveJob(
 ): Promise<ChatResponse> {
   const { job } = await getActiveJobForDriver(identifier(event));
   if (!job) return noJobsCard();
-  const active = job.status === JobStatus.IN_PROGRESS ? job : await startJob(job.jobId, identifier(event));
-  return run(active);
+  return run(job);
 }
 
 function scenarioMenuAction(scenario: ScenarioKey) {
@@ -101,11 +120,45 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
       }
 
       case "MESSAGE": {
-        if (attachments(event).length) {
-          // Photos are no longer accepted as bare Chat attachments — every scenario
-          // form (Check In, Check Out, Parking Liability, Liability Report) has its
-          // own photo upload built into the form itself.
-          return createResponse({ text: "Please use the menu buttons to upload photos — open the relevant form and attach them there." });
+        const files = attachments(event);
+        if (files.length) {
+          // Replay guard: Chat redelivers a message event when the endpoint misses the
+          // deadline. Without this, the redelivery is judged against the state the
+          // first delivery already advanced to, and files the photo as the wrong
+          // evidence type.
+          const eventKey = eventKeyFor({
+            messageName: event.message?.name,
+            resourceNames: files
+              .map(f => f.attachmentDataRef?.resourceName)
+              .filter((v): v is string => Boolean(v))
+          });
+
+          return await runOnce(
+            eventKey,
+            {},
+            async () => {
+              // Fast path: validate, persist evidence as RECEIVED, advance state,
+              // enqueue. No Drive call happens before this response is written.
+              const { job, accepted, degraded } = await handlePhotoStep(identifier(event), files);
+              timer.mark("photo_accept");
+              log.info("photo accepted", {
+                job_id: job.jobId,
+                photos: accepted.length,
+                degraded,
+                ...timer.fields()
+              });
+              return {
+                result: createResponse(photoAckCard(job, accepted, workflowCard(job))),
+                outcomeState: job.currentState,
+                jobId: job.jobId
+              };
+            },
+            async replay => {
+              // Show the card the original delivery produced, not an out-of-order error.
+              const job = replay.jobId ? await getJob(replay.jobId) : null;
+              return createResponse(job ? workflowCard(job) : helpCard());
+            }
+          );
         }
 
         const command = parseCommand(event.message?.argumentText || event.message?.text || "");
@@ -136,25 +189,21 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         const jobId = actionParam(event, "jobId");
         if (!jobId) throw new Error("Missing job ID in card action.");
 
+        if (fn === "RETRY_EVIDENCE") {
+          await retryFailedEvidence(jobId, identifier(event));
+          return updateResponse(evidencePendingCard(jobId, ["your photo"]));
+        }
+        if (fn === "REOPEN_PHOTO_STEP") {
+          const evidenceType = (actionParam(event, "evidenceType") || "Arrival") as EvidenceType;
+          const job = await reopenPhotoStep(jobId, identifier(event), evidenceType);
+          return updateResponse(workflowCard(job));
+        }
+
         // Card clicks are replay-guarded too: a double-tap or a Chat retry must not
         // run a state transition twice.
         const clickKey = event.message?.name
           ? eventKeyFor({ messageName: `${event.message.name}#${fn}` })
           : null;
-
-        if (fn === "START_JOB") {
-          return await runOnce(
-            clickKey,
-            { jobId },
-            async () => {
-              const job = await beginJob(jobId, identifier(event));
-              timer.mark("action");
-              log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
-              return { result: updateResponse(mainMenuCard(job)), outcomeState: job.currentState, jobId: job.jobId };
-            },
-            async () => updateResponse(mainMenuCard(null))
-          );
-        }
 
         if (fn === "FINISH_JOB") {
           return await runOnce(
@@ -170,7 +219,23 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
           );
         }
 
-        throw new ValidationError(`Unknown action: ${fn}`);
+        // Everything else — START_JOB, FINISH_MOVE, SUBMIT_EXTRA_CHARGES, SUBMIT_OVERTIME,
+        // SUBMIT_TOTAL_CHARGES, SUBMIT_PAYMENT, SUBMIT_CLIENT_DETAILS, COMPLETE_JOB — runs
+        // through the classic Start Job workflow engine.
+        return await runOnce(
+          clickKey,
+          { jobId },
+          async () => {
+            const job = await handleAction(fn, jobId, identifier(event), formInputs(event));
+            timer.mark("action");
+            log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
+            return { result: updateResponse(workflowCard(job)), outcomeState: job.currentState, jobId: job.jobId };
+          },
+          async () => {
+            const job = await getJob(jobId);
+            return updateResponse(job ? workflowCard(job) : helpCard());
+          }
+        );
       }
 
       case "APP_COMMAND":
@@ -197,6 +262,14 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
 function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTimer): ChatResponse {
   const jobId = actionParam(event, "jobId");
 
+  if (error instanceof EvidencePendingError) {
+    log.info("completion deferred: evidence still processing", { job_id: jobId, pending: error.pending.length });
+    return evidencePendingCard(jobId, error.pending);
+  }
+  if (error instanceof EvidenceFailedError) {
+    log.warn("completion blocked: evidence failed", { job_id: jobId, failed: error.failedTypes.join(",") });
+    return evidenceFailedCard(jobId, error.message, error.failedTypes);
+  }
   if (error instanceof ValidationError || error instanceof PermanentTaskError) {
     log.info("action rejected", { job_id: jobId, event_type: event.type, reason: error.message, ...timer.fields() });
     return errorResponse(error.message, jobId);

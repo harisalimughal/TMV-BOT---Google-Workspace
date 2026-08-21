@@ -105,12 +105,11 @@ export async function getNextJobForDriver(
 }
 
 /**
- * Fresh read of the driver's current/next job, for rendering the gated menu. Always
- * bypasses the cache: the menu's enabled/disabled state must reflect a mutation
- * (Start Job, a scenario submit, Finish Job) that may have landed moments earlier,
- * well inside the Sheets cache TTL — showing the pre-mutation gating state right
- * after the mutation that was supposed to change it would be a visible correctness
- * bug, not just a staleness curiosity.
+ * Fresh read of the driver's current/next job, used by the menu and by the standalone
+ * Check In / Check Out / Parking Liability / Liability Report / Finish Job actions.
+ * Always bypasses the cache: a mutation (Start Job, a scenario submit, Finish Job) may
+ * have landed moments earlier, well inside the Sheets cache TTL — a stale read here
+ * would resolve the wrong job or miss a status change that just happened.
  */
 export async function getActiveJobForDriver(identifier: string): Promise<{ job: Job | null; driver: DriverProfile }> {
   return getNextJobForDriver(identifier, { fresh: true });
@@ -193,7 +192,7 @@ export async function startJob(jobId: string, identifier: string): Promise<Job> 
 
     job.actualStart = now;
     job.status = JobStatus.IN_PROGRESS;
-    job.currentState = WorkflowState.IN_PROGRESS;
+    job.currentState = WorkflowState.WAITING_ARRIVAL_PHOTO;
     if (!job.driverInitials) job.driverInitials = driver.initials;
 
     // §P3-3: the Drive folder is created lazily by the image worker on the first
@@ -230,6 +229,11 @@ export async function completeJob(jobId: string, identifier: string): Promise<Jo
   const from = job.currentState;
   const now = new Date().toISOString();
   job.actualFinish = now;
+  // Finish Job (the standalone menu button) can complete a job that never ran Start
+  // Job's workflow at all — e.g. one that only did Check In/Check Out — so actualStart
+  // may still be blank here. Backfill it rather than feeding an invalid ISO string into
+  // the diff below, which would silently write NaN into Actual Minutes.
+  if (!job.actualStart) job.actualStart = now;
   job.actualMinutes = Math.max(
     0,
     Math.round(DateTime.fromISO(now).diff(DateTime.fromISO(job.actualStart), "minutes").minutes)

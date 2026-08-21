@@ -1,12 +1,3 @@
-/**
- * Dormant since the menu-driven scenario forms replaced bare Chat-attachment photo
- * uploads (see chat/scenario.routes.ts) — nothing calls buildReceivedEvidence()
- * anymore, so no new EVIDENCE rows are created and the SWEEP_STALE_EVIDENCE reaper
- * that recovers them is a permanent no-op. Left in place rather than deleted: this
- * solved "Chat-attachment downloads are slow, do it in the background", a problem
- * the synchronous browser-upload pattern the new forms use doesn't have, and ripping
- * it out isn't in scope for that rearchitecture.
- */
 import { randomBytes } from "node:crypto";
 import { assertAcceptableAttachment } from "../google/drive";
 import { evidenceWrite, getEvidence, SheetWrite } from "../google/sheets";

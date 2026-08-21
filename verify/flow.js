@@ -1,4 +1,13 @@
-/** Menu-driven job flow (start -> menu -> scenario form -> finish) + idempotency checks. */
+/**
+ * Two independent flows now coexist and this checks both, plus that neither leaks into
+ * the other:
+ *   1. The classic Start Job workflow (arrival photo -> loaded photo -> charges ->
+ *      payment -> empty-van photo -> client details -> customer signature -> organized
+ *      photo -> complete), restored after being briefly replaced by a menu-only design.
+ *   2. The menu's standalone scenarios (Check In / Check Out / Parking Liability /
+ *      Liability Report / Finish Job), which must work on a job that never ran Start
+ *      Job at all -- no "start a job first" gate, no silent auto-start.
+ */
 process.env.GOOGLE_SHEETS_SPREADSHEET_ID = "sheet-test";
 process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID = "root-test";
 process.env.TMV_CHAT_ACTION_URL = "https://example.test/chat";
@@ -10,7 +19,6 @@ process.env.BOOTSTRAP_ON_START = "false";
 process.env.TMV_SHEET_CACHE_TTL_MS = "0";   // test mutates the fake sheet directly
 
 const path = require("node:path");
-const http = require("node:http");
 const BOT = path.join(__dirname, "..", "dist");
 const HEADERS = {
   Bookings: ["Job ID","Calendar Event ID","Driver Initials","Customer","Customer Email","Phone","Pickup","Dropoff","Crew Size","Base Price","Paid Online","Booked Start","Booked Finish","Actual Start","Actual Finish","Booked Minutes","Actual Minutes","Difference Minutes","Delay Status","Extra Charges","Overtime Minutes","Overtime Charge","Total Charges","Payment Method","Payment Status","Client Name/Postcode","Client Confirmed By","Status","Current State","Drive Folder ID","Drive Folder URL","Created","Updated"],
@@ -34,16 +42,21 @@ const HEADERS = {
 const tabs = {};
 for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
 
-const JOB = "TMV-FLOW0001";
-const row = new Array(HEADERS.Bookings.length).fill("");
-const set = (c, v) => { row[HEADERS.Bookings.indexOf(c)] = String(v); };
-set("Job ID", JOB); set("Calendar Event ID", "evt-flow"); set("Driver Initials", "WD");
-set("Customer", "Barry"); set("Customer Email", "barry@example.test");
-set("Pickup", "10 Example Street"); set("Dropoff", "74 Ferndale Road, N15 6UQ");
-set("Base Price", 350); set("Booked Start", new Date().toISOString());
-set("Booked Finish", new Date(Date.now() + 3600e3).toISOString()); set("Booked Minutes", 60);
-set("Status", "READY"); set("Current State", "READY");
-tabs.Bookings.push(row);
+const JOB_CLASSIC = "TMV-FLOW0001";
+const JOB_STANDALONE = "TMV-FLOW0002";
+function addBooking(jobId, eventId) {
+  const row = new Array(HEADERS.Bookings.length).fill("");
+  const set = (c, v) => { row[HEADERS.Bookings.indexOf(c)] = String(v); };
+  set("Job ID", jobId); set("Calendar Event ID", eventId); set("Driver Initials", "WD");
+  set("Customer", "Barry"); set("Customer Email", "barry@example.test");
+  set("Pickup", "10 Example Street"); set("Dropoff", "74 Ferndale Road, N15 6UQ");
+  set("Base Price", 350); set("Booked Start", new Date().toISOString());
+  set("Booked Finish", new Date(Date.now() + 3600e3).toISOString()); set("Booked Minutes", 60);
+  set("Status", "READY"); set("Current State", "READY");
+  tabs.Bookings.push(row);
+}
+addBooking(JOB_CLASSIC, "evt-flow-classic");
+addBooking(JOB_STANDALONE, "evt-flow-standalone");
 tabs.Drivers.push(["WD", "Test Driver", "driver@tmv.test", "", "TRUE", "Driver"]);
 
 const calls = {};
@@ -92,6 +105,21 @@ googleapis.google.drive = () => ({ files: {
 } });
 googleapis.google.calendar = () => ({ events: { list: async () => ({ data: { items: [] } }) } });
 googleapis.google.gmail = () => ({ users: { messages: { send: async () => { bump("email"); return { data: {} }; } } } });
+// The classic workflow's background worker downloads each Chat-attached photo before
+// uploading it to Drive -- the one bit of real network I/O the merged scripts still
+// need. The Check-In HTTP round-trip test later in this file also uses fetch, against
+// this test's own local server, so only fake the Chat-media-download shape and let
+// anything else (localhost) through to the real fetch.
+const realFetch = global.fetch;
+const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(1020)]);
+global.fetch = async (url, ...rest) => {
+  if (typeof url === "string" && url.includes("127.0.0.1")) return realFetch(url, ...rest);
+  return {
+    ok: true, status: 200,
+    headers: { get: k => (k === "content-length" ? String(jpeg.length) : "image/jpeg") },
+    arrayBuffer: async () => jpeg.buffer.slice(jpeg.byteOffset, jpeg.byteOffset + jpeg.length)
+  };
+};
 const gal = require(require.resolve("google-auth-library", { paths: [BOT + "/.."] }));
 gal.JWT.prototype.getAccessToken = async () => ({ token: "fake" });
 
@@ -99,25 +127,59 @@ const express = require("express");
 const { handleChatEvent } = require(BOT + "/chat/chat.controller");
 const { scenarioRouter } = require(BOT + "/chat/scenario.routes");
 const { scenarioLinkFor } = require(BOT + "/chat/scenario.link");
-const { registerInlineDispatcher } = require(BOT + "/queue/queue.service");
-registerInlineDispatcher(async () => {}); // nothing enqueues background tasks in the new flow
+const { submitDrawnSignature } = require(BOT + "/workflow/workflow.engine");
+const { registerInlineDispatcher, drainInlineQueue } = require(BOT + "/queue/queue.service");
+const { dispatchTask } = require(BOT + "/queue/dispatch");
+
+/*
+ * Background tasks (photo processing) are captured rather than run immediately, so the
+ * test controls exactly when the worker runs instead of racing it.
+ */
+const queued = [];
+registerInlineDispatcher(async task => { queued.push(task); });
+const drain = async () => {
+  for (let pass = 0; pass < 5 && queued.length; pass++) {
+    const batch = queued.splice(0, queued.length);
+    for (const task of batch) await dispatchTask(task);
+    await drainInlineQueue();
+  }
+};
 
 const USER = { email: "driver@tmv.test" };
-const state = () => tabs.Bookings[1][HEADERS.Bookings.indexOf("Current State")];
-const status = () => tabs.Bookings[1][HEADERS.Bookings.indexOf("Status")];
-const field = c => tabs.Bookings[1][HEADERS.Bookings.indexOf(c)];
+const row = jobId => tabs.Bookings.find(r => r[HEADERS.Bookings.indexOf("Job ID")] === jobId);
+const stateOf = jobId => row(jobId)[HEADERS.Bookings.indexOf("Current State")];
+const statusOf = jobId => row(jobId)[HEADERS.Bookings.indexOf("Status")];
+const fieldOf = (jobId, c) => row(jobId)[HEADERS.Bookings.indexOf(c)];
+const evidenceFor = jobId => tabs.Evidence.slice(1).filter(r => r[HEADERS.Evidence.indexOf("Job ID")] === jobId);
 
 const click = (fn, jobId) => handleChatEvent({
   type: "CARD_CLICKED", user: USER,
-  action: { function: fn, parameters: [{ key: "jobId", value: jobId ?? JOB }] },
+  action: { function: fn, parameters: [{ key: "jobId", value: jobId }] },
   common: { formInputs: {} }
 });
+const clickWithInputs = (fn, jobId, formInputs) => handleChatEvent({
+  type: "CARD_CLICKED", user: USER,
+  action: { function: fn, parameters: [{ key: "jobId", value: jobId }] },
+  common: { formInputs }
+});
+let mediaSeq = 0;
+const photo = () => handleChatEvent({
+  type: "MESSAGE", user: USER,
+  message: {
+    name: `spaces/S/messages/M${++mediaSeq}`,
+    attachment: [{
+      contentName: "p.jpg", contentType: "image/jpeg",
+      attachmentDataRef: { resourceName: `media/x${mediaSeq}` }
+    }]
+  }
+});
+const si = (...v) => ({ stringInputs: { value: v } });
 
 let pass = 0, fail = 0;
 function check(label, actual, expected) {
   const ok = actual === expected;
   ok ? pass++ : fail++;
-  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label.padEnd(46)} ${ok ? actual : `got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`}`);
+  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label.padEnd(52)} ${ok ? actual : `got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`}`);
 }
 const title = r => JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1] ?? "(none)";
 const buttonUrl = (r, text) => {
@@ -129,57 +191,97 @@ const buttonUrl = (r, text) => {
 };
 const disabledButtons = r => {
   const widgets = r.message?.cardsV2?.[0]?.card?.sections?.[0]?.widgets ?? [];
-  return widgets
-    .flatMap(w => w.buttonList?.buttons ?? [])
-    .filter(b => b.disabled)
-    .map(b => b.text);
+  return widgets.flatMap(w => w.buttonList?.buttons ?? []).filter(b => b.disabled).map(b => b.text);
 };
 
 (async () => {
   console.log("=".repeat(74));
-  console.log("Menu-driven job flow");
+  console.log("Main menu: every option always enabled, regardless of job status");
   console.log("=".repeat(74));
-
-  const jobCardBefore = await click("RESUME_JOB");
-  check("not started -> Next Job shows the job summary card", title(jobCardBefore), `Job ${JOB}`);
 
   const menuFromSpace = await handleChatEvent({ type: "ADDED_TO_SPACE", user: USER });
   check("bot added to space -> menu shown", title(menuFromSpace), "TMV Driver Bot");
-  check("nothing disabled before start (buttons always enabled)", disabledButtons(menuFromSpace).length, 0);
+  check("nothing disabled before either job is started", disabledButtons(menuFromSpace).length, 0);
 
-  // Tapping a menu action before Start Job no longer blocks with a "start a job
-  // first" prompt — it silently starts the job first, then runs the requested
-  // action right away.
-  const checkInBeforeStart = await click("MENU_CHECK_IN");
-  check("Check In before Start Job runs immediately, no blocking prompt", title(checkInBeforeStart), "Check In");
-  check("menu tap auto-started the job, status", status(), "IN_PROGRESS");
-  check("menu tap auto-started the job, currentState", state(), "IN_PROGRESS");
-  check("actualStart is a server timestamp", /^\d{4}-\d{2}-\d{2}T/.test(field("Actual Start")), true);
-  check("drive folder deferred (no folder created yet)", (calls.folderCreate ?? 0), 0);
+  console.log("\n" + "=".repeat(74));
+  console.log("Classic Start Job workflow (restored)");
+  console.log("=".repeat(74));
 
-  // An explicit START_JOB tap after the auto-start above must be a no-op (idempotent).
+  const jobCardBefore = await click("RESUME_JOB", JOB_CLASSIC);
+  check("Next Job, not started -> job summary card with Start Job button", title(jobCardBefore), `Job ${JOB_CLASSIC}`);
 
-  // Double-tap: must not restart or duplicate the start email.
-  const startedAt = field("Actual Start");
-  const emailsBefore = calls.email ?? 0;
-  await Promise.all([click("START_JOB"), click("START_JOB")]);
-  check("double-tap START_JOB keeps timestamp", field("Actual Start"), startedAt);
+  await click("START_JOB", JOB_CLASSIC);
+  check("Start Job begins the classic workflow at step 1", stateOf(JOB_CLASSIC), "WAITING_ARRIVAL_PHOTO");
+  check("status flips to IN_PROGRESS immediately", statusOf(JOB_CLASSIC), "IN_PROGRESS");
+  check("actualStart is a server timestamp", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_CLASSIC, "Actual Start")), true);
 
-  const menuAfter = await click("RESUME_JOB");
-  check("active job -> full menu shown", title(menuAfter), "TMV Driver Bot");
-  check("nothing disabled after start either", disabledButtons(menuAfter).length, 0);
+  // Double-tap must not restart or duplicate the start email.
+  const startedAt = fieldOf(JOB_CLASSIC, "Actual Start");
+  await Promise.all([click("START_JOB", JOB_CLASSIC), click("START_JOB", JOB_CLASSIC)]);
+  check("double-tap START_JOB keeps the same timestamp", fieldOf(JOB_CLASSIC, "Actual Start"), startedAt);
+  await drain();
+  check("exactly one start email sent", calls.email ?? 0, 1);
 
-  console.log("\n" + "-".repeat(74));
-  console.log("Scenario link generation (all 4)");
-  console.log("-".repeat(74));
-  const checkInCard = await click("MENU_CHECK_IN");
-  check("Check In opens a form card", title(checkInCard), "Check In");
+  await photo(); await drain();
+  check("arrival photo advances to loaded-photo step", stateOf(JOB_CLASSIC), "WAITING_LOADED_PHOTO");
+  check("evidence uploaded by the background worker", evidenceFor(JOB_CLASSIC).some(r => r[HEADERS.Evidence.indexOf("Status")] === "COMPLETED"), true);
+
+  await photo(); await drain();
+  check("loaded-van photo advances to move execution", stateOf(JOB_CLASSIC), "IN_PROGRESS");
+
+  await click("FINISH_MOVE", JOB_CLASSIC);
+  check("finish move asks about extra charges", stateOf(JOB_CLASSIC), "WAITING_EXTRA_CHARGES");
+
+  await clickWithInputs("SUBMIT_EXTRA_CHARGES", JOB_CLASSIC, { extra_charges: si("No Extras Time") });
+  check("no extra time skips straight to totals", stateOf(JOB_CLASSIC), "WAITING_TOTAL_CHARGES");
+
+  await clickWithInputs("SUBMIT_TOTAL_CHARGES", JOB_CLASSIC, { total_charges: si("350") });
+  check("total charges accepted", stateOf(JOB_CLASSIC), "WAITING_PAYMENT");
+  check("total stored", fieldOf(JOB_CLASSIC, "Total Charges"), "350");
+
+  await clickWithInputs("SUBMIT_PAYMENT", JOB_CLASSIC, { payment_method: si("Cash") });
+  check("payment recorded", stateOf(JOB_CLASSIC), "WAITING_EMPTY_VAN_PHOTO");
+  check("payment row written", tabs.Payments.length - 1, 1);
+
+  await photo(); await drain();
+  check("empty-van photo advances to client details", stateOf(JOB_CLASSIC), "WAITING_CLIENT_DETAILS");
+
+  await clickWithInputs("SUBMIT_CLIENT_DETAILS", JOB_CLASSIC, { client_name_postcode: si("Barry, N15 6UQ") });
+  check("client details advance to signature step", stateOf(JOB_CLASSIC), "WAITING_CLIENT_CONFIRMATION");
+
+  // The customer signature is captured on their own device (see chat/signature.routes.ts)
+  // rather than as a Chat form submission -- simulating it directly is the equivalent of
+  // a real POST to /sign/:jobId.
+  await submitDrawnSignature(JOB_CLASSIC, "Barry Smith", { fileId: "sig1", fileUrl: "https://drive.test/sig1" });
+  check("signature advances to the organized-photo step", stateOf(JOB_CLASSIC), "WAITING_ORGANIZED_PHOTO");
+  check("signature row written", tabs.Signatures.length - 1, 1);
+
+  await photo(); await drain();
+  check("organized photo makes the job ready to complete", stateOf(JOB_CLASSIC), "READY_TO_COMPLETE");
+
+  const doneCard = await click("COMPLETE_JOB", JOB_CLASSIC);
+  check("workflow's own last step completes the job", stateOf(JOB_CLASSIC), "COMPLETED");
+  check("status column completed", statusOf(JOB_CLASSIC), "COMPLETED");
+  check("finish timestamp set", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_CLASSIC, "Actual Finish")), true);
+  check("completion card returned", title(doneCard), "Job completed");
+
+  console.log("\n" + "=".repeat(74));
+  console.log("Menu scenarios run standalone -- no Start Job required or triggered");
+  console.log("=".repeat(74));
+
+  // JOB_CLASSIC is now COMPLETED, so the driver's only eligible job is JOB_STANDALONE --
+  // every menu action below resolves to it without an explicit jobId being trusted.
+  const checkInCard = await click("MENU_CHECK_IN", JOB_STANDALONE);
+  check("Check In runs immediately with no job ever started", title(checkInCard), "Check In");
+  check("Check In does NOT start the job -- status unchanged", statusOf(JOB_STANDALONE), "READY");
+  check("Check In does NOT touch currentState", stateOf(JOB_STANDALONE), "READY");
+  check("Check In leaves actualStart blank", fieldOf(JOB_STANDALONE, "Actual Start"), "");
+
   const checkInUrl = buttonUrl(checkInCard, "OPEN CHECK IN");
   check("Check In link generated", typeof checkInUrl === "string" && checkInUrl.includes("/forms/checkin/"), true);
-
-  check("Check Out opens a form card", title(await click("MENU_CHECK_OUT")), "Check Out");
-  check("Parking Liability opens a form card", title(await click("MENU_PARKING_LIABILITY")), "Parking Liability");
-  check("Liability Report opens a form card", title(await click("MENU_LIABILITY_REPORT")), "Liability Report");
+  check("Check Out opens a form card", title(await click("MENU_CHECK_OUT", JOB_STANDALONE)), "Check Out");
+  check("Parking Liability opens a form card", title(await click("MENU_PARKING_LIABILITY", JOB_STANDALONE)), "Parking Liability");
+  check("Liability Report opens a form card", title(await click("MENU_LIABILITY_REPORT", JOB_STANDALONE)), "Liability Report");
 
   console.log("\n" + "-".repeat(74));
   console.log("Check-In form: real HTTP GET + POST against the actual route");
@@ -191,7 +293,7 @@ const disabledButtons = r => {
   await new Promise(resolve => server.once("listening", resolve));
   const port = server.address().port;
 
-  const linkUrl = new URL(scenarioLinkFor("checkin", JOB));
+  const linkUrl = new URL(scenarioLinkFor("checkin", JOB_STANDALONE));
   const target = `http://127.0.0.1:${port}${linkUrl.pathname}${linkUrl.search}`;
 
   const getRes = await fetch(target);
@@ -216,18 +318,10 @@ const disabledButtons = r => {
   check("check-in form POST status", postRes.status, 200);
   check("check-in form POST ok", postBody.ok, true);
   check("StorageCheckIn row written", tabs.StorageCheckIn.length - 1, 1);
-  check("StorageCheckIn container number stored", tabs.StorageCheckIn[1][HEADERS.StorageCheckIn.indexOf("Container Number")], "C-123");
-  check("job still IN_PROGRESS after a scenario submit", status(), "IN_PROGRESS");
+  check("job still not started after a scenario submit", statusOf(JOB_STANDALONE), "READY");
 
   const badLinkRes = await fetch(target.replace(/sig=[^&]+/, "sig=deadbeef"));
   check("tampered signature rejected", badLinkRes.status, 410);
-
-  const missingFieldRes = await fetch(target, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: {}, photos: [png], signature: png })
-  });
-  check("missing required field rejected", missingFieldRes.status, 400);
 
   await new Promise((resolve, reject) => server.close(err => (err ? reject(err) : resolve())));
   // fetch's keep-alive pool can leave a socket to this server open past server.close()
@@ -238,33 +332,26 @@ const disabledButtons = r => {
   server.closeAllConnections?.();
 
   console.log("\n" + "-".repeat(74));
-  console.log("Finish Job");
+  console.log("Finish Job standalone (job never ran Start Job's workflow)");
   console.log("-".repeat(74));
-  const confirmCard = await click("FINISH_JOB_CONFIRM");
+  const confirmCard = await click("FINISH_JOB_CONFIRM", JOB_STANDALONE);
   check("finish confirm card shown", title(confirmCard), "Finish this job?");
-  check("job not completed yet", status(), "IN_PROGRESS");
 
-  const doneCard = await click("FINISH_JOB");
-  check("job completed", status(), "COMPLETED");
-  check("currentState completed", state(), "COMPLETED");
-  check("finish timestamp set", /^\d{4}-\d{2}-\d{2}T/.test(field("Actual Finish")), true);
-  check("completion card returned", title(doneCard), "Job completed");
-  check("card replaces clicked message", doneCard.update, true);
+  const finishedCard = await click("FINISH_JOB", JOB_STANDALONE);
+  check("job completed despite Start Job never running", statusOf(JOB_STANDALONE), "COMPLETED");
+  check("actualStart backfilled instead of NaN duration", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_STANDALONE, "Actual Start")), true);
+  check("actualMinutes is a number, not NaN", fieldOf(JOB_STANDALONE, "Actual Minutes"), "0");
+  check("completion card returned", title(finishedCard), "Job completed");
 
-  // Completed jobs are never returned by getNextJobForDriver, so with no other job
-  // left for today, this now falls back to "no eligible job" rather than a specific
-  // "already completed" message.
-  const finishAgain = await click("FINISH_JOB_CONFIRM");
-  check("no job left to run Finish Job against once completed", title(finishAgain), "No unfinished jobs");
-
-  const noMoreJobs = await click("RESUME_JOB");
+  const noMoreJobs = await click("RESUME_JOB", "");
   check("no more jobs for today", title(noMoreJobs), "No unfinished jobs");
 
   console.log("\n" + "=".repeat(74));
   console.log(`${pass} passed, ${fail} failed`);
   console.log("Audit trail: " + JSON.stringify({
     ActivityLog: tabs.ActivityLog.length - 1, DriverFlow: tabs.DriverFlow.length - 1,
-    StorageCheckIn: tabs.StorageCheckIn.length - 1
+    Photos: tabs.Photos.length - 1, Signatures: tabs.Signatures.length - 1,
+    Payments: tabs.Payments.length - 1, StorageCheckIn: tabs.StorageCheckIn.length - 1
   }));
   // Neither an immediate process.exit() nor letting the loop drain naturally works
   // here: an immediate exit() races the HTTP server's teardown on Windows and crashes
