@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import { google, drive_v3 } from "googleapis";
 import { createGoogleAuth, env, SCOPES } from "../config/env";
 import { ChatAttachment, EvidenceType, Job } from "../jobs/job.types";
+import { commitWrites, jobWrite } from "./sheets";
 import { DateTime } from "luxon";
 import { withRetry, withTimeout } from "../utils/retry";
 import { PermanentTaskError } from "../queue/queue.types";
@@ -89,7 +90,19 @@ export async function ensureJobFolder(job: Job): Promise<string> {
   const year = await findOrCreateFolder(jobsRoot, dt.toFormat("yyyy"));
   const month = await findOrCreateFolder(year, dt.toFormat("MM"));
   const day = await findOrCreateFolder(month, dt.toFormat("dd"));
-  return findOrCreateFolder(day, `Job_${job.jobId}`);
+  const folderId = await findOrCreateFolder(day, `Job_${job.jobId}`);
+
+  // Was resolved on every single upload and never written back -- the Bookings sheet's
+  // Drive Folder ID/URL columns stayed blank forever, and every future upload paid for
+  // another Drive files.list call instead of using the cheap job.driveFolderId path
+  // above. Persist it once, here, so both are fixed going forward.
+  job.driveFolderId = folderId;
+  job.driveFolderUrl = jobFolderUrl(folderId);
+  await commitWrites([jobWrite(job)]).catch(error =>
+    log.warn("failed to persist Drive folder id/url onto the booking row", { job_id: job.jobId, error: String(error) })
+  );
+
+  return folderId;
 }
 
 /** Creates the step subfolder on first use only. */

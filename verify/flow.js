@@ -300,6 +300,10 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   await photo(); await drain();
   check("arrival photo advances to loaded-photo step", stateOf(JOB_CLASSIC), "WAITING_LOADED_PHOTO");
   check("evidence uploaded by the background worker", evidenceFor(JOB_CLASSIC).some(r => r[HEADERS.Evidence.indexOf("Status")] === "COMPLETED"), true);
+  // ensureJobFolder() used to resolve the Drive folder on every upload without ever
+  // writing it back -- Drive Folder ID/URL stayed blank in the sheet forever.
+  check("first photo upload persists the Drive folder id onto the booking row", fieldOf(JOB_CLASSIC, "Drive Folder ID") !== "", true);
+  check("first photo upload persists the Drive folder url onto the booking row", fieldOf(JOB_CLASSIC, "Drive Folder URL") !== "", true);
 
   await photo(); await drain();
   check("loaded-van photo advances to move execution", stateOf(JOB_CLASSIC), "IN_PROGRESS");
