@@ -115,10 +115,14 @@ export const env = {
   imageTaskTimeoutMs: numberEnv("TMV_IMAGE_TASK_TIMEOUT_MS", 120_000),
 
   /**
-   * Signs the customer-facing signature-pad link (/sign/:jobId). Required in production;
-   * without it anyone who guessed a live job id could submit a bogus signature.
+   * Signs the driver-facing scenario form links (/forms/:scenario/:jobId). Required in
+   * production; without it anyone who guessed a live job id could submit a bogus form.
+   * Doubles as the admin panel's session-cookie signing key (see admin/admin.auth.ts) —
+   * both are "trust nothing without a valid HMAC from this process" concerns.
    */
-  signatureLinkSecret: process.env.TMV_SIGNATURE_LINK_SECRET?.trim() || ""
+  signatureLinkSecret: process.env.TMV_SIGNATURE_LINK_SECRET?.trim() || "",
+  /** Shared password for the /admin panel. Required in production. */
+  adminPassword: process.env.TMV_ADMIN_PASSWORD?.trim() || ""
 };
 
 function originOf(url: string): string {

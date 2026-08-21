@@ -13,10 +13,13 @@ import { WORKER_MOUNT_PATH, workerRouter } from "./queue/worker.routes";
 import { dispatchTask } from "./queue/dispatch";
 import { drainInlineQueue, registerInlineDispatcher } from "./queue/queue.service";
 import { scenarioRouter } from "./chat/scenario.routes";
+import { adminRouter } from "./admin/admin.routes";
 
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "2mb" }));
+// Only the admin login form needs this — it's a plain HTML <form method="post">, not fetch/JSON.
+app.use(express.urlencoded({ extended: false }));
 
 const verifier = new OAuth2Client();
 
@@ -66,6 +69,9 @@ app.use(WORKER_MOUNT_PATH, workerRouter());
 // Report). Auth is a signed, time-limited link (see chat/scenario.link.ts), not
 // Chat/OIDC — these are opened as a browser overlay, outside the Chat request cycle.
 app.use("/forms", scenarioRouter());
+
+// Admin dashboard: password-gated, session cookie issued at /admin/login.
+app.use("/admin", adminRouter());
 
 app.post("/chat", verifyGoogleChatRequest, async (req, res) => {
   const requestId = req.header("x-cloud-trace-context")?.split("/")[0] || randomUUID();
@@ -154,6 +160,9 @@ function assertRuntimeConfig(): void {
       throw new Error(
         "TMV_SIGNATURE_LINK_SECRET is required in production to sign the driver-facing scenario form links."
       );
+    }
+    if (!env.adminPassword) {
+      throw new Error("TMV_ADMIN_PASSWORD is required in production to protect the /admin dashboard.");
     }
   }
 
