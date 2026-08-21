@@ -663,6 +663,28 @@ export function jobWrite(job: Job): SheetWrite {
   return { sheet: SHEETS.BOOKINGS, data: jobToBookingRow(job), key: { column: "Job ID", value: job.jobId } };
 }
 
+/**
+ * Keyed on Email since that's the primary identifier getDriver() matches Chat users
+ * against — a resubmit with the same email updates the existing row instead of
+ * duplicating it.
+ */
+export function driverWrite(data: {
+  initials: string; fullName: string; email: string; chatUserName?: string; active: boolean; role?: string;
+}): SheetWrite {
+  return {
+    sheet: SHEETS.DRIVERS,
+    key: { column: "Email", value: data.email },
+    data: {
+      "Initials": data.initials,
+      "Full Name": data.fullName,
+      "Email": data.email,
+      "Chat User Name": data.chatUserName ?? "",
+      "Active": data.active,
+      "Role": data.role ?? "Driver"
+    }
+  };
+}
+
 export function workflowWrite(jobId: string, driver: string, state: string): SheetWrite {
   return {
     sheet: SHEETS.WORKFLOW,

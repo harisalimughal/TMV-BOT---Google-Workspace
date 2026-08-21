@@ -73,7 +73,9 @@ export function dashboardShell(): string {
   .kpi { background: #fff; border-radius: 10px; padding: 16px 20px; min-width: 140px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
   .kpi .n { font-size: 24px; font-weight: 700; }
   .kpi .l { font-size: 12px; color: #666; margin-top: 4px; }
-  .search { padding: 9px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; width: 260px; max-width: 100%; margin-bottom: 14px; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .search { padding: 9px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; width: 260px; max-width: 100%; }
+  .add-btn { padding: 9px 16px; font-size: 14px; font-weight: 600; border: none; border-radius: 8px; background: #1a73e8; color: #fff; cursor: pointer; }
   .table-wrap { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; }
   th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #eee; }
@@ -90,6 +92,13 @@ export function dashboardShell(): string {
   .modal .row .k { color: #666; }
   .modal .row .v { text-align: right; word-break: break-word; }
   .modal .close { margin-top: 16px; width: 100%; padding: 10px; border: none; border-radius: 8px; background: #eee; cursor: pointer; }
+  .form-label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; }
+  .form-input { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; }
+  .form-check { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 400; margin: 14px 0 4px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-actions .close { flex: 1; margin-top: 0; }
+  .modal-actions .primary { flex: 1; padding: 10px; border: none; border-radius: 8px; background: #1a73e8; color: #fff; font-weight: 600; cursor: pointer; }
+  .modal .error { color: #b3261e; font-size: 13px; margin-top: 10px; min-height: 16px; }
   @media (max-width: 720px) {
     #menuToggle { display: inline-block; }
     .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 20; margin-left: -220px; }
@@ -163,6 +172,36 @@ export function dashboardShell(): string {
       }).catch(showError);
     }
 
+    var ADD_FORMS = {
+      jobs: {
+        title: 'Add job', endpoint: '/admin/api/jobs',
+        fields: [
+          { name: 'customerName', label: 'Customer name', type: 'text', required: true },
+          { name: 'customerEmail', label: 'Customer email', type: 'email' },
+          { name: 'customerPhone', label: 'Customer phone', type: 'tel' },
+          { name: 'pickup', label: 'Pickup address', type: 'text', required: true },
+          { name: 'dropoff', label: 'Drop-off address', type: 'text', required: true },
+          { name: 'crewSize', label: 'Crew size', type: 'number', required: true },
+          { name: 'price', label: 'Price (£)', type: 'number', required: true },
+          { name: 'start', label: 'Start', type: 'datetime-local', required: true },
+          { name: 'finish', label: 'Finish', type: 'datetime-local', required: true },
+          { name: 'driverInitials', label: 'Driver initials (blank = unassigned, open to any driver)', type: 'text' },
+          { name: 'paidOnline', label: 'Paid online', type: 'checkbox' }
+        ]
+      },
+      drivers: {
+        title: 'Add driver', endpoint: '/admin/api/drivers',
+        fields: [
+          { name: 'initials', label: 'Initials', type: 'text', required: true },
+          { name: 'fullName', label: 'Full name', type: 'text', required: true },
+          { name: 'email', label: 'Email (used to sign in from Chat)', type: 'email', required: true },
+          { name: 'chatUserName', label: 'Chat user name (optional fallback)', type: 'text' },
+          { name: 'role', label: 'Role', type: 'text' },
+          { name: 'active', label: 'Active', type: 'checkbox', checkedByDefault: true }
+        ]
+      }
+    };
+
     function loadTable(tab) {
       fetch('/admin/api/table/' + tab).then(function (r) {
         if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || 'Failed to load.'); });
@@ -170,24 +209,68 @@ export function dashboardShell(): string {
       }).then(function (data) {
         currentRows = data.rows || [];
         var columns = data.columns || [];
+        var addForm = ADD_FORMS[tab];
+        var addBtn = addForm ? '<button class="add-btn" id="addBtn">+ ' + escapeHtml(addForm.title) + '</button>' : '';
         if (!currentRows.length) {
-          content.innerHTML = '<input class="search" placeholder="Search…" disabled><div class="table-wrap"><div class="empty">No records yet.</div></div>';
-          return;
-        }
-        content.innerHTML =
-          '<input class="search" id="searchBox" placeholder="Search…">' +
-          '<div class="table-wrap"><table><thead><tr>' +
-          columns.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') +
-          '</tr></thead><tbody id="tbody"></tbody></table></div>';
-        renderRows(columns, currentRows);
-        document.getElementById('searchBox').addEventListener('input', function (e) {
-          var q = e.target.value.trim().toLowerCase();
-          var filtered = !q ? currentRows : currentRows.filter(function (row) {
-            return columns.some(function (c) { return String(row[c] || '').toLowerCase().indexOf(q) !== -1; });
+          content.innerHTML = '<div class="toolbar"><input class="search" placeholder="Search…" disabled>' + addBtn + '</div><div class="table-wrap"><div class="empty">No records yet.</div></div>';
+        } else {
+          content.innerHTML =
+            '<div class="toolbar"><input class="search" id="searchBox" placeholder="Search…">' + addBtn + '</div>' +
+            '<div class="table-wrap"><table><thead><tr>' +
+            columns.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') +
+            '</tr></thead><tbody id="tbody"></tbody></table></div>';
+          renderRows(columns, currentRows);
+          document.getElementById('searchBox').addEventListener('input', function (e) {
+            var q = e.target.value.trim().toLowerCase();
+            var filtered = !q ? currentRows : currentRows.filter(function (row) {
+              return columns.some(function (c) { return String(row[c] || '').toLowerCase().indexOf(q) !== -1; });
+            });
+            renderRows(columns, filtered);
           });
-          renderRows(columns, filtered);
-        });
+        }
+        if (addForm) {
+          document.getElementById('addBtn').addEventListener('click', function () { openAddForm(tab, addForm); });
+        }
       }).catch(showError);
+    }
+
+    function openAddForm(tab, form) {
+      var modal = document.getElementById('modal');
+      modal.innerHTML = '<h3>' + escapeHtml(form.title) + '</h3><form id="addForm">' +
+        form.fields.map(function (f) {
+          if (f.type === 'checkbox') {
+            return '<label class="form-check"><input type="checkbox" name="' + f.name + '"' + (f.checkedByDefault ? ' checked' : '') + '> ' + escapeHtml(f.label) + '</label>';
+          }
+          return '<label class="form-label">' + escapeHtml(f.label) + (f.required ? ' *' : '') + '</label>' +
+            '<input class="form-input" type="' + f.type + '" name="' + f.name + '"' + (f.required ? ' required' : '') + '>';
+        }).join('') +
+        '<div id="formError" class="error"></div>' +
+        '<div class="modal-actions"><button type="button" class="close" id="modalCancel">Cancel</button><button type="submit" class="primary">Save</button></div>' +
+        '</form>';
+      document.getElementById('modalCancel').addEventListener('click', closeModal);
+      document.getElementById('addForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var payload = {};
+        form.fields.forEach(function (f) {
+          var el = document.querySelector('[name="' + f.name + '"]');
+          payload[f.name] = f.type === 'checkbox' ? el.checked : el.value.trim();
+        });
+        var submitBtn = e.target.querySelector('button[type=submit]');
+        submitBtn.disabled = true;
+        fetch(form.endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        }).then(function (r) {
+          if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || 'Failed to save.'); });
+          return r.json();
+        }).then(function () {
+          closeModal();
+          loadTable(tab);
+        }).catch(function (err) {
+          document.getElementById('formError').textContent = err.message;
+          submitBtn.disabled = false;
+        });
+      });
+      document.getElementById('modalBg').classList.add('open');
     }
 
     function renderRows(columns, rows) {

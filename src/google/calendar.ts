@@ -48,3 +48,18 @@ export async function getCalendarEvent(eventId: string): Promise<calendar_v3.Sch
   );
   return response.data ?? null;
 }
+
+/**
+ * Used by the admin panel's "Add Job" form. Jobs are never written straight into the
+ * Bookings sheet — the calendar sync reconciles anything not present in Calendar as
+ * cancelled (see booking.service.ts's reconcileDisappeared), so an admin-created job
+ * has to come in as a real event and flow through the same parse/sync path as every
+ * other booking.
+ */
+export async function createCalendarEvent(event: calendar_v3.Schema$Event): Promise<calendar_v3.Schema$Event> {
+  const calendar = await client();
+  const response = await withRetry("calendar.events.insert", () =>
+    calendar.events.insert({ calendarId: env.calendarId, requestBody: event })
+  );
+  return response.data;
+}

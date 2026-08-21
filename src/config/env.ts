@@ -136,7 +136,10 @@ function originOf(url: string): string {
 export const SCOPES = {
   SHEETS: ["https://www.googleapis.com/auth/spreadsheets"],
   DRIVE: ["https://www.googleapis.com/auth/drive"],
-  CALENDAR: ["https://www.googleapis.com/auth/calendar.readonly"],
+  // Read-write: the admin panel's "Add Job" creates real Calendar events so they flow
+  // through the same sync/parse path as every other booking (see admin/admin.routes.ts).
+  // Requires the service account to have edit (not just view) access on the calendar.
+  CALENDAR: ["https://www.googleapis.com/auth/calendar"],
   GMAIL: ["https://www.googleapis.com/auth/gmail.send"],
   CHAT_BOT: ["https://www.googleapis.com/auth/chat.bot"],
   CLOUD_TASKS: ["https://www.googleapis.com/auth/cloud-platform"]
