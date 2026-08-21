@@ -227,6 +227,10 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   await new Promise(resolve => server.once("listening", resolve));
   const port = server.address().port;
   const png = "data:image/png;base64," + Buffer.from("fake-photo-bytes").toString("base64");
+  // A real phone camera almost always produces image/jpeg, not image/png -- using only
+  // png data URIs here would never have caught the bug where the upload path rejected
+  // anything but PNG with "One of the photos was not a valid image."
+  const jpeg = "data:image/jpeg;base64," + Buffer.from("fake-jpeg-bytes").toString("base64");
 
   console.log("=".repeat(74));
   console.log("Main menu: every option always enabled, colorful, no Finish Job button");
@@ -369,7 +373,7 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
         container_number: "C-123", client_name: "Barry Thompson", client_phone: "07123456789",
         client_email: "barry@example.test", client_present: "Yes", date: "2026-08-15"
       },
-      photos: [png],
+      photos: [jpeg],
       signature: png
     })
   });

@@ -412,11 +412,19 @@ export function scenarioRouter(): Router {
     if (photosRaw.length < spec.photoMin || photosRaw.length > spec.photoMax) {
       return res.status(400).json({ error: `Attach between ${spec.photoMin} and ${spec.photoMax} photo(s).` });
     }
-    const photoBuffers: Buffer[] = [];
+    // A phone camera almost always produces image/jpeg, not image/png — the upload
+    // must accept whatever real image type the browser's FileReader gives it, not just
+    // the one PNG format the canvas-based signature happens to always produce.
+    const photoFiles: { buffer: Buffer; contentType: string; extension: string }[] = [];
     for (const raw of photosRaw) {
-      const match = typeof raw === "string" ? raw.match(/^data:image\/png;base64,(.+)$/) : null;
+      const match = typeof raw === "string" ? raw.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/) : null;
       if (!match) return res.status(400).json({ error: "One of the photos was not a valid image." });
-      photoBuffers.push(Buffer.from(match[1], "base64"));
+      const subtype = match[1].toLowerCase();
+      photoFiles.push({
+        buffer: Buffer.from(match[2], "base64"),
+        contentType: `image/${subtype}`,
+        extension: subtype === "jpeg" ? "jpg" : subtype
+      });
     }
 
     let signatureBuffer: Buffer | null = null;
@@ -430,8 +438,9 @@ export function scenarioRouter(): Router {
     const driver = job.driverInitials || "driver device";
 
     const photoUrls: string[] = [];
-    for (let i = 0; i < photoBuffers.length; i++) {
-      const file = await uploadEvidenceImage(job, spec.folderKey, `photo-${i + 1}`, "photo.png", photoBuffers[i], "image/png");
+    for (let i = 0; i < photoFiles.length; i++) {
+      const { buffer, contentType, extension } = photoFiles[i];
+      const file = await uploadEvidenceImage(job, spec.folderKey, `photo-${i + 1}`, `photo.${extension}`, buffer, contentType);
       photoUrls.push(file.fileUrl);
     }
     let signatureUrl = "";
