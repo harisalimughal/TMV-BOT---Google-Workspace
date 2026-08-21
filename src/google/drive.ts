@@ -72,7 +72,8 @@ function findOrCreateFolder(parentId: string, name: string): Promise<string> {
   return existing;
 }
 
-export type JobFolderKey = EvidenceType | "Signature" | "Documents";
+export type ScenarioFolderKey = "CheckIn" | "CheckOut" | "ParkingLiability" | "LiabilityReport";
+export type JobFolderKey = EvidenceType | "Signature" | "Documents" | ScenarioFolderKey;
 
 /**
  * Returns the job's root evidence folder.

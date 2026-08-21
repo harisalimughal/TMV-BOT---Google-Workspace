@@ -8,6 +8,7 @@ process.env.GOOGLE_CALENDAR_ID = "cal-test";
 process.env.TMV_CHAT_ACTION_URL = "https://example.test/chat";
 process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL = "svc@test.iam.gserviceaccount.com";
 process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\\nFAKE\\n-----END PRIVATE KEY-----\\n";
+process.env.TMV_SIGNATURE_LINK_SECRET = "test-scenario-link-secret";
 process.env.LOG_LEVEL = "error";
 process.env.BOOTSTRAP_ON_START = "false";
 
@@ -46,7 +47,11 @@ const HEADERS = {
   Dashboard: ["Metric","Value"], Customers: ["Customer ID","Name","Email","Phone","Address","Updated"],
   ProcessedEvents: ["Event Key","Job ID","Outcome State","Processed At"],
   Settings: ["Key","Value","Notes"], Reports: ["Generated","Report","Value"],
-  ExceptionReport: ["Timestamp","Job ID","Type","Detail","Resolved"], Analytics: ["Date","Metric","Value"]
+  ExceptionReport: ["Timestamp","Job ID","Type","Detail","Resolved"], Analytics: ["Date","Metric","Value"],
+  StorageCheckIn: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Phone","Client Email","Client Present","Date","Photo URLs","Signature URL"],
+  StorageCheckOut: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Email","Client Present At Dropoff","Date","Photo URLs","Signature URL"],
+  ParkingLiability: ["Timestamp","Job ID","Driver","Address","Client Full Name","Photo URLs","Signature URL"],
+  LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"]
 };
 
 const tabs = {};
@@ -64,10 +69,8 @@ function bookingRow(overrides) {
   set("Base Price", 350);
   set("Booked Start", new Date().toISOString());
   set("Booked Finish", new Date(Date.now() + 3600e3).toISOString());
-  set("Status", "IN_PROGRESS");
-  set("Current State", "WAITING_ARRIVAL_PHOTO");
-  set("Actual Start", new Date().toISOString());
-  set("Drive Folder ID", "folder-job-1");
+  set("Status", "READY");
+  set("Current State", "READY");
   for (const [k, v] of Object.entries(overrides || {})) set(k, v);
   return row;
 }
@@ -161,9 +164,6 @@ googleapis.google.gmail = () => ({
   users: { messages: { send: async () => { count("gmail.messages.send"); return { data: {} }; } } }
 });
 
-// Chat media download
-global.fetch = async () => { count("chat.media.download"); return { ok: true, arrayBuffer: async () => new ArrayBuffer(2048) }; };
-
 // Count token exchanges the way the real library would: once per client instance.
 const gal = require(require.resolve("google-auth-library", { paths: [BOT + "/.."] }));
 // The module exports JWT via a getter with no setter, so patch the prototype.
@@ -177,29 +177,22 @@ gal.JWT.prototype.getAccessToken = async function () {
 // --------------------------------------------------------------------------
 const { handleChatEvent } = require(BOT + "/chat/chat.controller");
 const { registerInlineDispatcher } = require(BOT + "/queue/queue.service");
-const { dispatchTask } = require(BOT + "/queue/dispatch");
-// Captured, then run explicitly, so "critical path" means exactly that.
-const queuedTasks = [];
-registerInlineDispatcher(async task => { queuedTasks.push(task); });
-const runQueued = async () => {
-  const batch = queuedTasks.splice(0, queuedTasks.length);
-  for (const task of batch) { try { await dispatchTask(task); } catch { /* counted, not asserted */ } }
-};
+registerInlineDispatcher(async () => {}); // nothing enqueues background tasks in the new flow
 
 const USER = { email: "driver@tmv.test", displayName: "Test Driver" };
-let mediaSeq = 0;
-const photoEvent = () => ({
-  type: "MESSAGE", user: USER,
-  message: { text: "", attachment: [{ contentName: "arrival.jpg", contentType: "image/jpeg", attachmentDataRef: { resourceName: `media/abc${++mediaSeq}` } }] }
+const click = fn => handleChatEvent({
+  type: "CARD_CLICKED", user: USER,
+  action: { function: fn, parameters: [{ key: "jobId", value: "TMV-TESTJOB01" }] }
 });
 
-function report(label, before) {
+function report(label) {
   const s = snapshot();
   console.log(`\n${label}`);
   console.log(`  Google API round trips : ${s.total}`);
   console.log(`  OAuth token exchanges  : ${s.authTokenFetches}`);
   for (const [op, n] of Object.entries(s.byOp)) console.log(`    ${op.padEnd(34)} ${n}`);
 }
+const cardTitle = r => JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1];
 
 (async () => {
   console.log("=".repeat(66));
@@ -208,33 +201,37 @@ function report(label, before) {
 
   reset();
   let r = await handleChatEvent({ type: "MESSAGE", user: USER, message: { text: "jobs" } });
-  report("COLD: type 'jobs'", null);
-  console.log(`  -> card: ${JSON.stringify(r.message).slice(0, 60)}... update=${r.update}`);
+  report("COLD: type 'jobs' (menu, job not started)");
+  console.log(`  -> card: ${cardTitle(r)}`);
 
   reset();
   await handleChatEvent({ type: "MESSAGE", user: USER, message: { text: "jobs" } });
   report("WARM: type 'jobs' again (caches + sync throttle hot)");
 
   reset();
-  r = await handleChatEvent(photoEvent());
-  report("WARM: upload arrival photo");
-  console.log(`  -> next state: ${JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1]}`);
+  r = await click("START_JOB");
+  report("WARM: click START JOB");
+  console.log(`  -> card: ${cardTitle(r)}`);
 
   reset();
-  r = await handleChatEvent(photoEvent());
-  report("WARM: upload loaded-van photo");
-  console.log(`  -> next state: ${JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1]}`);
+  r = await click("MENU_CHECK_IN");
+  report("WARM: open Check In form link");
+  console.log(`  -> card: ${cardTitle(r)}`);
 
   reset();
-  r = await handleChatEvent({
-    type: "CARD_CLICKED", user: USER,
-    action: { function: "FINISH_MOVE", parameters: [{ key: "jobId", value: "TMV-TESTJOB01" }] }
-  });
-  report("WARM: click FINISH MOVE");
+  r = await click("FINISH_JOB_CONFIRM");
+  report("WARM: tap Finish Job (confirm card)");
+  console.log(`  -> card: ${cardTitle(r)}`);
+
+  reset();
+  r = await click("FINISH_JOB");
+  report("WARM: confirm Finish Job");
   console.log(`  -> update=${r.update} (replaces the clicked card)`);
 
   console.log("\nPersisted rows written: " +
-    JSON.stringify({ Evidence: tabs.Evidence.length - 1, DriverFlow: tabs.DriverFlow.length - 1,
-      ActivityLog: tabs.ActivityLog.length - 1, WorkflowState: tabs.WorkflowState.length - 1 }));
-  console.log("Booking Current State  : " + tabs.Bookings[1][HEADERS.Bookings.indexOf("Current State")]);
+    JSON.stringify({ DriverFlow: tabs.DriverFlow.length - 1, ActivityLog: tabs.ActivityLog.length - 1,
+      WorkflowState: tabs.WorkflowState.length - 1 }));
+  console.log("Booking Status/Current State: " +
+    tabs.Bookings[1][HEADERS.Bookings.indexOf("Status")] + " / " +
+    tabs.Bookings[1][HEADERS.Bookings.indexOf("Current State")]);
 })();

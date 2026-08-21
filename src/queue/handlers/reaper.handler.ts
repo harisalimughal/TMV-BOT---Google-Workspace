@@ -13,6 +13,11 @@ export interface SweepResult {
 }
 
 /**
+ * Dormant since the menu-driven scenario forms replaced Chat-attachment photo uploads
+ * (see jobs/evidence.service.ts's header comment) — nothing writes new EVIDENCE rows
+ * anymore, so this sweep now always finds zero stale records. Left running (harmless,
+ * cheap no-op) rather than unwired, in case anything is reintroduced onto this path.
+ *
  * SWEEP_STALE_EVIDENCE — the safety net that makes the whole design durable.
  *
  * Cloud Tasks gives *timely* retry. This gives the *eventual* guarantee: any evidence

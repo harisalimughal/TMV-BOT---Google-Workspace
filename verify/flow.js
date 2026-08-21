@@ -1,14 +1,16 @@
-/** Full 12-step driver workflow + concurrency/idempotency checks. No network. */
+/** Menu-driven job flow (start -> menu -> scenario form -> finish) + idempotency checks. */
 process.env.GOOGLE_SHEETS_SPREADSHEET_ID = "sheet-test";
 process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID = "root-test";
 process.env.TMV_CHAT_ACTION_URL = "https://example.test/chat";
 process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL = "svc@test.iam.gserviceaccount.com";
 process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\\nFAKE\\n-----END PRIVATE KEY-----\\n";
+process.env.TMV_SIGNATURE_LINK_SECRET = "test-scenario-link-secret";
 process.env.LOG_LEVEL = "error";
 process.env.BOOTSTRAP_ON_START = "false";
 process.env.TMV_SHEET_CACHE_TTL_MS = "0";   // test mutates the fake sheet directly
 
 const path = require("node:path");
+const http = require("node:http");
 const BOT = path.join(__dirname, "..", "dist");
 const HEADERS = {
   Bookings: ["Job ID","Calendar Event ID","Driver Initials","Customer","Customer Email","Phone","Pickup","Dropoff","Crew Size","Base Price","Paid Online","Booked Start","Booked Finish","Actual Start","Actual Finish","Booked Minutes","Actual Minutes","Difference Minutes","Delay Status","Extra Charges","Overtime Minutes","Overtime Charge","Total Charges","Payment Method","Payment Status","Client Name/Postcode","Client Confirmed By","Status","Current State","Drive Folder ID","Drive Folder URL","Created","Updated"],
@@ -23,7 +25,11 @@ const HEADERS = {
   ProcessedEvents: ["Event Key","Job ID","Outcome State","Processed At"],
   Settings: ["Key","Value","Notes"], Reports: ["Generated","Report","Value"],
   ExceptionReport: ["Timestamp","Job ID","Type","Detail","Resolved"], Analytics: ["Date","Metric","Value"],
-  Evidence: ["Evidence ID","Job ID","Driver","Evidence Type","Attachment Ref","Content Type","File Name","Status","Received","Processing Started","Processing Completed","Drive File ID","Drive URL","Retry Count","Last Error"]
+  Evidence: ["Evidence ID","Job ID","Driver","Evidence Type","Attachment Ref","Content Type","File Name","Status","Received","Processing Started","Processing Completed","Drive File ID","Drive URL","Retry Count","Last Error"],
+  StorageCheckIn: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Phone","Client Email","Client Present","Date","Photo URLs","Signature URL"],
+  StorageCheckOut: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Email","Client Present At Dropoff","Date","Photo URLs","Signature URL"],
+  ParkingLiability: ["Timestamp","Job ID","Driver","Address","Client Full Name","Photo URLs","Signature URL"],
+  LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"]
 };
 const tabs = {};
 for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
@@ -77,212 +83,195 @@ googleapis.google.sheets = () => ({ spreadsheets: {
     return { data: {} };
   }
 } });
-// Lets a test hold the fake Drive upload open, so "evidence still processing" is a
-// deterministic state rather than a race against the inline worker.
-let uploadGate = null;
-const holdUploads = () => { let release; uploadGate = new Promise(r => (release = r)); return release; };
-
 googleapis.google.drive = () => ({ files: {
   list: async () => ({ data: { files: [] } }),
   create: async ({ media }) => {
-    if (media && uploadGate) await uploadGate; if (!media) bump("folderCreate"); return { data: { id: "f" + Math.random().toString(36).slice(2, 8), webViewLink: "https://drive.test/f", name: "n", mimeType: "image/jpeg" } }; }
+    if (!media) bump("folderCreate"); else bump("driveUpload");
+    return { data: { id: "f" + Math.random().toString(36).slice(2, 8), webViewLink: "https://drive.test/f", name: "n", mimeType: "image/jpeg" } };
+  }
 } });
 googleapis.google.calendar = () => ({ events: { list: async () => ({ data: { items: [] } }) } });
 googleapis.google.gmail = () => ({ users: { messages: { send: async () => { bump("email"); return { data: {} }; } } } });
-let mediaFailures = 0;   // set >0 to make the next N downloads fail transiently
-const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(1020)]);
-global.fetch = async () => {
-  bump("mediaDownload");
-  if (mediaFailures > 0) { mediaFailures--; return { ok: false, status: 503, text: async () => "busy", headers: { get: () => null } }; }
-  return {
-    ok: true, status: 200,
-    headers: { get: k => (k === "content-length" ? String(jpeg.length) : "image/jpeg") },
-    arrayBuffer: async () => jpeg.buffer.slice(jpeg.byteOffset, jpeg.byteOffset + jpeg.length)
-  };
-};
 const gal = require(require.resolve("google-auth-library", { paths: [BOT + "/.."] }));
 gal.JWT.prototype.getAccessToken = async () => ({ token: "fake" });
 
+const express = require("express");
 const { handleChatEvent } = require(BOT + "/chat/chat.controller");
-const { registerInlineDispatcher, drainInlineQueue } = require(BOT + "/queue/queue.service");
-const { dispatchTask } = require(BOT + "/queue/dispatch");
-const { submitDrawnSignature } = require(BOT + "/workflow/workflow.engine");
-/*
- * Background tasks are captured rather than executed immediately, so the test decides
- * exactly when the worker runs. Timing-based draining made assertions race the worker,
- * which is a property of the harness, not of the product.
- */
-const queued = [];
-registerInlineDispatcher(async task => { queued.push(task); });
+const { scenarioRouter } = require(BOT + "/chat/scenario.routes");
+const { scenarioLinkFor } = require(BOT + "/chat/scenario.link");
+const { registerInlineDispatcher } = require(BOT + "/queue/queue.service");
+registerInlineDispatcher(async () => {}); // nothing enqueues background tasks in the new flow
 
-/** Runs every task queued so far, including tasks those tasks enqueue. */
-const drain = async () => {
-  for (let pass = 0; pass < 5 && queued.length; pass++) {
-    const batch = queued.splice(0, queued.length);
-    for (const task of batch) {
-      try { await dispatchTask(task); }
-      catch (error) { lastTaskError = error; }
-    }
-    await drainInlineQueue();
-  }
-};
-let lastTaskError = null;
-const evidence = () => tabs.Evidence.slice(1);
-const statuses = () => evidence().map(r => r[HEADERS.Evidence.indexOf("Status")]);
 const USER = { email: "driver@tmv.test" };
 const state = () => tabs.Bookings[1][HEADERS.Bookings.indexOf("Current State")];
+const status = () => tabs.Bookings[1][HEADERS.Bookings.indexOf("Status")];
 const field = c => tabs.Bookings[1][HEADERS.Bookings.indexOf(c)];
 
-const click = (fn, formInputs) => handleChatEvent({
+const click = (fn, jobId) => handleChatEvent({
   type: "CARD_CLICKED", user: USER,
-  action: { function: fn, parameters: [{ key: "jobId", value: JOB }] },
-  common: { formInputs: formInputs || {} }
+  action: { function: fn, parameters: [{ key: "jobId", value: jobId ?? JOB }] },
+  common: { formInputs: {} }
 });
-// Real Chat gives every upload its own media resourceName. Reusing one across
-// distinct uploads would be indistinguishable from a redelivery, and the replay
-// guard would (correctly) suppress it.
-let mediaSeq = 0;
-const photo = (resourceName) => handleChatEvent({
-  type: "MESSAGE", user: USER,
-  message: {
-    name: resourceName ? undefined : `spaces/S/messages/M${++mediaSeq}`,
-    attachment: [{
-      contentName: "p.jpg",
-      contentType: "image/jpeg",
-      attachmentDataRef: { resourceName: resourceName ?? `media/x${mediaSeq}` }
-    }]
-  }
-});
-const si = (...v) => ({ stringInputs: { value: v } });
 
 let pass = 0, fail = 0;
 function check(label, actual, expected) {
   const ok = actual === expected;
   ok ? pass++ : fail++;
-  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label.padEnd(46)} ${ok ? actual : `got ${actual}, expected ${expected}`}`);
+  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label.padEnd(46)} ${ok ? actual : `got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`}`);
 }
 const title = r => JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1] ?? "(none)";
+const buttonUrl = (r, text) => {
+  const json = JSON.stringify(r.message);
+  const idx = json.indexOf(`"text":"${text}"`);
+  if (idx === -1) return null;
+  const after = json.slice(idx);
+  return after.match(/"url":"([^"]+)"/)?.[1]?.replace(/\\u0026/g, "&").replace(/\\\//g, "/") ?? null;
+};
+const disabledButtons = r => {
+  const widgets = r.message?.cardsV2?.[0]?.card?.sections?.[0]?.widgets ?? [];
+  return widgets
+    .flatMap(w => w.buttonList?.buttons ?? [])
+    .filter(b => b.disabled)
+    .map(b => b.text);
+};
 
 (async () => {
   console.log("=".repeat(74));
-  console.log("Full driver workflow");
+  console.log("Menu-driven job flow");
   console.log("=".repeat(74));
+
+  const jobCardBefore = await click("RESUME_JOB");
+  check("not started -> Next Job shows the job summary card", title(jobCardBefore), `Job ${JOB}`);
+
+  const menuFromSpace = await handleChatEvent({ type: "ADDED_TO_SPACE", user: USER });
+  check("bot added to space -> menu shown", title(menuFromSpace), "TMV Driver Bot");
+  check("Check In disabled before start", disabledButtons(menuFromSpace).includes("Check In"), true);
+  check("Finish Job disabled before start", disabledButtons(menuFromSpace).includes("Finish Job"), true);
+  check("Next Job stays enabled before start", disabledButtons(menuFromSpace).includes("Next Job"), false);
+
+  const blocked = await click("MENU_CHECK_IN");
+  check("scenario blocked without an active job", title(blocked), "Start a job first");
+  const blockedFinish = await click("FINISH_JOB_CONFIRM");
+  check("finish blocked without an active job", title(blockedFinish), "Start a job first");
 
   await click("START_JOB");
-  check("after START_JOB", state(), "WAITING_ARRIVAL_PHOTO");
+  check("after START_JOB, status", status(), "IN_PROGRESS");
+  check("after START_JOB, currentState", state(), "IN_PROGRESS");
   check("actualStart is a server timestamp", /^\d{4}-\d{2}-\d{2}T/.test(field("Actual Start")), true);
-  check("drive folder deferred to first photo", field("Drive Folder ID").length === 0, true);
+  check("drive folder deferred (no folder created yet)", (calls.folderCreate ?? 0), 0);
 
-  // Double-tap: must not restart, re-email, or duplicate folders.
-  await drain();
-  const foldersBefore = calls.folderCreate ?? 0, emailsBefore = calls.email ?? 0;
+  // Double-tap: must not restart or duplicate the start email.
   const startedAt = field("Actual Start");
+  const emailsBefore = calls.email ?? 0;
   await Promise.all([click("START_JOB"), click("START_JOB")]);
   check("double-tap START_JOB keeps timestamp", field("Actual Start"), startedAt);
-  check("double-tap creates no extra folders", calls.folderCreate ?? 0, foldersBefore);
-  await drain();
-  check("double-tap sends no extra email", calls.email ?? 0, emailsBefore);
-  check("exactly one start email for the job", calls.email ?? 0, 1);
 
-  // Out-of-order action must be rejected by the state machine.
-  const bad = await click("SUBMIT_PAYMENT", { payment_method: si("Cash") });
-  check("skipping to payment is blocked", title(bad), "TMV — Action blocked");
-  check("blocked action leaves state intact", state(), "WAITING_ARRIVAL_PHOTO");
+  const menuAfter = await click("RESUME_JOB");
+  check("active job -> full menu shown", title(menuAfter), "TMV Driver Bot");
+  check("Check In enabled after start", disabledButtons(menuAfter).includes("Check In"), false);
+  check("Finish Job enabled after start", disabledButtons(menuAfter).includes("Finish Job"), false);
 
-  const ack = await photo();
-  check("arrival photo advances immediately", state(), "WAITING_LOADED_PHOTO");
-  check("evidence recorded as RECEIVED", statuses().includes("RECEIVED"), true);
-  const ackText = JSON.stringify(ack.message);
-  check("ack says received, not saved", /received/i.test(ackText) && !/saved successfully/i.test(ackText), true);
-  check("no Drive upload on the critical path", calls.mediaDownload || 0, 0);
+  console.log("\n" + "-".repeat(74));
+  console.log("Scenario link generation (all 4)");
+  console.log("-".repeat(74));
+  const checkInCard = await click("MENU_CHECK_IN");
+  check("Check In opens a form card", title(checkInCard), "Check In");
+  const checkInUrl = buttonUrl(checkInCard, "OPEN CHECK IN");
+  check("Check In link generated", typeof checkInUrl === "string" && checkInUrl.includes("/forms/checkin/"), true);
 
-  await drain();
-  check("background worker completed the upload", statuses().every(s => s === "COMPLETED"), true);
-  check("Photos audit row written by worker", tabs.Photos.length - 1, 1);
+  check("Check Out opens a form card", title(await click("MENU_CHECK_OUT")), "Check Out");
+  check("Parking Liability opens a form card", title(await click("MENU_PARKING_LIABILITY")), "Parking Liability");
+  check("Liability Report opens a form card", title(await click("MENU_LIABILITY_REPORT")), "Liability Report");
 
-  await photo(); await drain(); check("loaded-van photo", state(), "IN_PROGRESS");
-  await click("FINISH_MOVE"); check("finish move", state(), "WAITING_EXTRA_CHARGES");
+  console.log("\n" + "-".repeat(74));
+  console.log("Check-In form: real HTTP GET + POST against the actual route");
+  console.log("-".repeat(74));
+  const app = express();
+  app.use(express.json({ limit: "2mb" }));
+  app.use("/forms", scenarioRouter());
+  const server = app.listen(0);
+  await new Promise(resolve => server.once("listening", resolve));
+  const port = server.address().port;
 
-  // Without an extra-time claim the overtime step is skipped entirely (§47).
-  await click("SUBMIT_EXTRA_CHARGES", { extra_charges: si("London Congestion charge", "Tunnel Charges") });
-  check("no extra time skips the overtime step", state(), "WAITING_TOTAL_CHARGES");
-  check("overtime zeroed when not claimed", field("Overtime Charge"), "0");
+  const linkUrl = new URL(scenarioLinkFor("checkin", JOB));
+  const target = `http://127.0.0.1:${port}${linkUrl.pathname}${linkUrl.search}`;
 
-  // Reopen the step and claim extra time so the overtime branch is still covered.
-  tabs.Bookings[1][HEADERS.Bookings.indexOf("Current State")] = "WAITING_EXTRA_CHARGES";
-  await click("SUBMIT_EXTRA_CHARGES", {
-    extra_charges: si("London Congestion charge", "Tunnel Charges", "Extra time / Charges")
+  const getRes = await fetch(target);
+  check("check-in form GET status", getRes.status, 200);
+  const html = await getRes.text();
+  check("check-in form contains Container Number field", html.includes("Container Number"), true);
+
+  const png = "data:image/png;base64," + Buffer.from("fake-photo-bytes").toString("base64");
+  const postRes = await fetch(target, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fields: {
+        container_number: "C-123", client_name: "Barry Thompson", client_phone: "07123456789",
+        client_email: "barry@example.test", client_present: "Yes", date: "2026-08-15"
+      },
+      photos: [png],
+      signature: png
+    })
   });
-  check("extra time claimed asks for overtime", state(), "WAITING_OVERTIME");
+  const postBody = await postRes.json();
+  check("check-in form POST status", postRes.status, 200);
+  check("check-in form POST ok", postBody.ok, true);
+  check("StorageCheckIn row written", tabs.StorageCheckIn.length - 1, 1);
+  check("StorageCheckIn container number stored", tabs.StorageCheckIn[1][HEADERS.StorageCheckIn.indexOf("Container Number")], "C-123");
+  check("job still IN_PROGRESS after a scenario submit", status(), "IN_PROGRESS");
 
-  await click("SUBMIT_OVERTIME", { overtime_minutes: si("45") });
-  check("overtime state", state(), "WAITING_TOTAL_CHARGES");
-  check("overtime rounds 45min up to 2 blocks", field("Overtime Charge"), "110");
+  const badLinkRes = await fetch(target.replace(/sig=[^&]+/, "sig=deadbeef"));
+  check("tampered signature rejected", badLinkRes.status, 410);
 
-  await click("SUBMIT_TOTAL_CHARGES", { total_charges: si("493") });
-  check("total charges", state(), "WAITING_PAYMENT");
-  check("total stored", field("Total Charges"), "493");
+  const missingFieldRes = await fetch(target, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: {}, photos: [png], signature: png })
+  });
+  check("missing required field rejected", missingFieldRes.status, 400);
 
-  await click("SUBMIT_PAYMENT", { payment_method: si("Cash") });
-  check("payment", state(), "WAITING_EMPTY_VAN_PHOTO");
-  check("payment row written", tabs.Payments.length - 1, 1);
+  await new Promise((resolve, reject) => server.close(err => (err ? reject(err) : resolve())));
+  // fetch's keep-alive pool can leave a socket to this server open past server.close()
+  // (whose callback fires once it stops accepting new connections, not once every
+  // pooled client connection is gone), which otherwise holds the event loop open
+  // indefinitely since process.exit() is deliberately not used below (see the comment
+  // there). Force them shut so the process can exit on its own.
+  server.closeAllConnections?.();
 
-  await photo(); await drain(); check("empty-van photo", state(), "WAITING_CLIENT_DETAILS");
+  console.log("\n" + "-".repeat(74));
+  console.log("Finish Job");
+  console.log("-".repeat(74));
+  const confirmCard = await click("FINISH_JOB_CONFIRM");
+  check("finish confirm card shown", title(confirmCard), "Finish this job?");
+  check("job not completed yet", status(), "IN_PROGRESS");
 
-  await click("SUBMIT_CLIENT_DETAILS", { client_name_postcode: si("Barry, N15 6UQ") });
-  check("client details", state(), "WAITING_CLIENT_CONFIRMATION");
-
-  // Signature capture now happens on the customer's own device (see
-  // chat/signature.routes.ts), not as a Chat form submission. Simulating the upload +
-  // state transition directly is the equivalent of a real /sign/:jobId POST.
-  await submitDrawnSignature(JOB, "Barry Smith", { fileId: "sig1", fileUrl: "https://drive.test/sig1" });
-  check("client confirmation", state(), "WAITING_ORGANIZED_PHOTO");
-  check("signature row written", tabs.Signatures.length - 1, 1);
-
-  // Deliberately not drained: the organized photo is still in flight while every other
-  // requirement is satisfied, which is the only state that isolates the pending path.
-  await photo();
-  check("organized photo", state(), "READY_TO_COMPLETE");
-  const pendingGate = await click("COMPLETE_JOB");
-  check("completion deferred while evidence processing", title(pendingGate), "Still processing");
-  check("job not completed while evidence in flight", field("Status"), "IN_PROGRESS");
-  await drain();
-
-  // Idempotency: re-running a completed task must not upload a second copy.
-  const uploadsBefore = calls.mediaDownload;
-  const firstEvidenceId = evidence()[0][HEADERS.Evidence.indexOf("Evidence ID")];
-  await dispatchTask({ type: "PROCESS_JOB_IMAGE", evidenceId: firstEvidenceId, jobId: JOB });
-  check("replayed task re-uploads nothing", calls.mediaDownload, uploadsBefore);
-  check("no duplicate Photos row", tabs.Photos.length - 1, 4);
-
-  const done = await click("COMPLETE_JOB");
-  check("completion", state(), "COMPLETED");
-  check("status column", field("Status"), "COMPLETED");
+  const doneCard = await click("FINISH_JOB");
+  check("job completed", status(), "COMPLETED");
+  check("currentState completed", state(), "COMPLETED");
   check("finish timestamp set", /^\d{4}-\d{2}-\d{2}T/.test(field("Actual Finish")), true);
-  check("completion card returned", title(done), "Job completed");
-  check("card replaces clicked message", done.update, true);
+  check("completion card returned", title(doneCard), "Job completed");
+  check("card replaces clicked message", doneCard.update, true);
 
-  console.log("\n" + "=".repeat(74));
-  console.log("Completion gate (evidence deliberately removed)");
-  console.log("=".repeat(74));
-  tabs.Bookings[1][HEADERS.Bookings.indexOf("Current State")] = "READY_TO_COMPLETE";
-  tabs.Bookings[1][HEADERS.Bookings.indexOf("Status")] = "IN_PROGRESS";
-  tabs.Signatures = [HEADERS.Signatures.slice()];
-  tabs.Photos = [HEADERS.Photos.slice()];
-  tabs.Evidence = [HEADERS.Evidence.slice()];
-  const before = calls.batchGet;
-  const gated = await click("COMPLETE_JOB");
-  const text = JSON.stringify(gated.message);
-  check("completion blocked", title(gated), "TMV — Action blocked");
-  check("names arrival photo as missing", text.includes("arrival photo"), true);
-  check("names organized photo as missing", text.includes("organized-van photo"), true);
-  check("evidence gate costs <= 2 reads", calls.batchGet - before <= 2, true);
+  const finishAgain = await click("FINISH_JOB_CONFIRM");
+  check("finish blocked once already completed", title(finishAgain), "Start a job first");
+
+  const noMoreJobs = await click("RESUME_JOB");
+  check("no more jobs for today", title(noMoreJobs), "No unfinished jobs");
 
   console.log("\n" + "=".repeat(74));
   console.log(`${pass} passed, ${fail} failed`);
   console.log("Audit trail: " + JSON.stringify({
     ActivityLog: tabs.ActivityLog.length - 1, DriverFlow: tabs.DriverFlow.length - 1,
-    Signatures: tabs.Signatures.length - 1, Payments: tabs.Payments.length - 1
+    StorageCheckIn: tabs.StorageCheckIn.length - 1
   }));
-  process.exit(fail ? 1 : 0);
+  // Neither an immediate process.exit() nor letting the loop drain naturally works
+  // here: an immediate exit() races the HTTP server's teardown on Windows and crashes
+  // at the libuv layer (UV_HANDLE_CLOSING assertion) even after server.close()'s
+  // callback already fired, while waiting for a natural drain hangs indefinitely —
+  // fetch's keep-alive pool holds a socket open past both server.close() and
+  // closeAllConnections(). A short bounded delay clears both failure modes: it's long
+  // enough to dodge the immediate-exit race, short enough not to matter for a test run.
+  process.exitCode = fail ? 1 : 0;
+  setTimeout(() => process.exit(process.exitCode), 300).unref();
 })();

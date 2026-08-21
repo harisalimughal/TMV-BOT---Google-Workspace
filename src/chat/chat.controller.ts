@@ -1,19 +1,18 @@
 import {
-  ChatResponse, ChatResult, createResponse, errorResponse, evidenceFailedCard, evidencePendingCard, helpCard,
-  jobCard, noJobsCard, photoAckCard, updateResponse, workflowCard
+  ChatResponse, ChatResult, createResponse, errorResponse, finishJobConfirmCard, helpCard, jobCard,
+  jobCompletedCard, mainMenuCard, noActiveJobCard, noJobsCard, openFormCard, updateResponse
 } from "./cards";
 import { parseCommand } from "./commands";
-import { getNextJobForDriver } from "../jobs/jobs.service";
-import {
-  EvidenceFailedError, EvidencePendingError, handleAction, handlePhotoStep, reopenPhotoStep, retryFailedEvidence
-} from "../workflow/workflow.engine";
+import { getActiveJobForDriver, getNextJobForDriver } from "../jobs/jobs.service";
+import { beginJob, finishJob } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
 import { PermanentTaskError } from "../queue/queue.types";
-import { ChatAttachment, EvidenceType } from "../jobs/job.types";
+import { ChatAttachment } from "../jobs/job.types";
 import { setContext, log } from "../utils/logger";
 import { PhaseTimer } from "../utils/timing";
 import { eventKeyFor, runOnce } from "./replay.guard";
-import { getJob } from "../google/sheets";
+import { ScenarioKey, SCENARIOS } from "./scenario.spec";
+import { scenarioLinkFor } from "./scenario.link";
 
 export interface GoogleChatEvent {
   type?: string;
@@ -48,16 +47,6 @@ function actionParam(event: GoogleChatEvent, key: string): string {
   return event.action?.parameters?.find(p => p.key === key)?.value || "";
 }
 
-function formInputs(event: GoogleChatEvent): Record<string, string[]> {
-  const source = event.common?.formInputs || event.commonEventObject?.formInputs || {};
-  const result: Record<string, string[]> = {};
-  for (const [key, value] of Object.entries(source)) {
-    const strings = value?.stringInputs?.value;
-    if (Array.isArray(strings)) result[key] = strings.map(String);
-  }
-  return result;
-}
-
 function attachments(event: GoogleChatEvent): ChatAttachment[] {
   return event.message?.attachment ?? event.message?.attachments ?? [];
 }
@@ -68,7 +57,32 @@ async function showCurrentOrNext(event: GoogleChatEvent, sync = false): Promise<
   const { job } = await getNextJobForDriver(identifier(event), { sync });
   if (!job) return noJobsCard();
   setContext({ jobId: job.jobId });
-  return job.status === "IN_PROGRESS" ? workflowCard(job) : jobCard(job);
+  return job.status === "IN_PROGRESS" ? mainMenuCard(job) : jobCard(job);
+}
+
+/**
+ * Shared by every MENU_* / FINISH_JOB_CONFIRM click: fresh-reads the driver's active
+ * job and, if there isn't one, replies with noActiveJobCard() instead of running the
+ * requested action. This is the server-side half of the menu-gating story — the
+ * client-side `disabled` flag on the button is the other half, but isn't trusted
+ * alone (see cards.ts's menuButton()).
+ */
+async function withActiveJob(
+  event: GoogleChatEvent,
+  run: (job: NonNullable<Awaited<ReturnType<typeof getActiveJobForDriver>>["job"]>) => Promise<ChatResponse>
+): Promise<ChatResponse> {
+  const { job } = await getActiveJobForDriver(identifier(event));
+  if (!job || job.status !== "IN_PROGRESS") return noActiveJobCard();
+  return run(job);
+}
+
+function scenarioMenuAction(scenario: ScenarioKey) {
+  return async (event: GoogleChatEvent): Promise<ChatResponse> =>
+    withActiveJob(event, async job => {
+      const spec = SCENARIOS[scenario];
+      const url = scenarioLinkFor(scenario, job.jobId);
+      return openFormCard(job.jobId, spec.title, spec.menuDescription, url);
+    });
 }
 
 export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResult> {
@@ -78,72 +92,46 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
 
   try {
     switch (event.type) {
-      case "ADDED_TO_SPACE":
-        return createResponse(helpCard());
+      case "ADDED_TO_SPACE": {
+        const { job } = await getNextJobForDriver(identifier(event));
+        return createResponse(mainMenuCard(job && job.status === "IN_PROGRESS" ? job : null));
+      }
 
       case "MESSAGE": {
-        const files = attachments(event);
-        if (files.length) {
-          // Replay guard: Chat redelivers a message event when the endpoint misses the
-          // deadline. Without this, the redelivery is judged against the state the
-          // first delivery already advanced to, and files the photo as the wrong
-          // evidence type.
-          const eventKey = eventKeyFor({
-            messageName: event.message?.name,
-            resourceNames: files
-              .map(f => f.attachmentDataRef?.resourceName)
-              .filter((v): v is string => Boolean(v))
-          });
-
-          return await runOnce(
-            eventKey,
-            {},
-            async () => {
-              // Fast path: validate, persist evidence as RECEIVED, advance state,
-              // enqueue. No Drive call happens before this response is written.
-              const { job, accepted, degraded } = await handlePhotoStep(identifier(event), files);
-              timer.mark("photo_accept");
-              log.info("photo accepted", {
-                job_id: job.jobId,
-                photos: accepted.length,
-                degraded,
-                ...timer.fields()
-              });
-              return {
-                result: createResponse(photoAckCard(job, accepted, workflowCard(job))),
-                outcomeState: job.currentState,
-                jobId: job.jobId
-              };
-            },
-            async replay => {
-              // Show the card the original delivery produced, not an out-of-order error.
-              const job = replay.jobId ? await getJob(replay.jobId) : null;
-              return createResponse(job ? workflowCard(job) : helpCard());
-            }
-          );
+        if (attachments(event).length) {
+          // Photos are no longer accepted as bare Chat attachments — every scenario
+          // form (Check In, Check Out, Parking Liability, Liability Report) has its
+          // own photo upload built into the form itself.
+          return createResponse({ text: "Please use the menu buttons to upload photos — open the relevant form and attach them there." });
         }
 
         const command = parseCommand(event.message?.argumentText || event.message?.text || "");
-        if (command === "jobs" || command === "resume") return createResponse(await showCurrentOrNext(event, true));
-        if (command === "help") return createResponse(helpCard());
+        if (command === "resume") return createResponse(await showCurrentOrNext(event, true));
+        if (command === "jobs" || command === "help") {
+          const { job } = await getNextJobForDriver(identifier(event), { sync: true });
+          return createResponse(mainMenuCard(job && job.status === "IN_PROGRESS" ? job : null));
+        }
         return createResponse({ text: "Hello from TMV Bot ✅" });
       }
 
       case "CARD_CLICKED": {
         const fn = actionName(event);
+
         if (fn === "RESUME_JOB") return updateResponse(await showCurrentOrNext(event));
+        if (fn === "MAIN_MENU") {
+          const { job } = await getActiveJobForDriver(identifier(event));
+          return updateResponse(mainMenuCard(job && job.status === "IN_PROGRESS" ? job : null));
+        }
+        if (fn === "MENU_CHECK_IN") return updateResponse(await scenarioMenuAction("checkin")(event));
+        if (fn === "MENU_CHECK_OUT") return updateResponse(await scenarioMenuAction("checkout")(event));
+        if (fn === "MENU_PARKING_LIABILITY") return updateResponse(await scenarioMenuAction("parking")(event));
+        if (fn === "MENU_LIABILITY_REPORT") return updateResponse(await scenarioMenuAction("liability")(event));
+        if (fn === "FINISH_JOB_CONFIRM") {
+          return updateResponse(await withActiveJob(event, async job => finishJobConfirmCard(job.jobId)));
+        }
+
         const jobId = actionParam(event, "jobId");
         if (!jobId) throw new Error("Missing job ID in card action.");
-
-        if (fn === "RETRY_EVIDENCE") {
-          await retryFailedEvidence(jobId, identifier(event));
-          return updateResponse(evidencePendingCard(jobId, ["your photo"]));
-        }
-        if (fn === "REOPEN_PHOTO_STEP") {
-          const evidenceType = (actionParam(event, "evidenceType") || "Arrival") as EvidenceType;
-          const job = await reopenPhotoStep(jobId, identifier(event), evidenceType);
-          return updateResponse(workflowCard(job));
-        }
 
         // Card clicks are replay-guarded too: a double-tap or a Chat retry must not
         // run a state transition twice.
@@ -151,20 +139,35 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
           ? eventKeyFor({ messageName: `${event.message.name}#${fn}` })
           : null;
 
-        return await runOnce(
-          clickKey,
-          { jobId },
-          async () => {
-            const job = await handleAction(fn, jobId, identifier(event), formInputs(event));
-            timer.mark("action");
-            log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
-            return { result: updateResponse(workflowCard(job)), outcomeState: job.currentState, jobId: job.jobId };
-          },
-          async () => {
-            const job = await getJob(jobId);
-            return updateResponse(job ? workflowCard(job) : helpCard());
-          }
-        );
+        if (fn === "START_JOB") {
+          return await runOnce(
+            clickKey,
+            { jobId },
+            async () => {
+              const job = await beginJob(jobId, identifier(event));
+              timer.mark("action");
+              log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
+              return { result: updateResponse(mainMenuCard(job)), outcomeState: job.currentState, jobId: job.jobId };
+            },
+            async () => updateResponse(mainMenuCard(null))
+          );
+        }
+
+        if (fn === "FINISH_JOB") {
+          return await runOnce(
+            clickKey,
+            { jobId },
+            async () => {
+              const job = await finishJob(jobId, identifier(event));
+              timer.mark("action");
+              log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
+              return { result: updateResponse(jobCompletedCard(job)), outcomeState: job.currentState, jobId: job.jobId };
+            },
+            async () => updateResponse(mainMenuCard(null))
+          );
+        }
+
+        throw new ValidationError(`Unknown action: ${fn}`);
       }
 
       case "APP_COMMAND":
@@ -191,14 +194,6 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
 function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTimer): ChatResponse {
   const jobId = actionParam(event, "jobId");
 
-  if (error instanceof EvidencePendingError) {
-    log.info("completion deferred: evidence still processing", { job_id: jobId, pending: error.pending.length });
-    return evidencePendingCard(jobId, error.pending);
-  }
-  if (error instanceof EvidenceFailedError) {
-    log.warn("completion blocked: evidence failed", { job_id: jobId, failed: error.failedTypes.join(",") });
-    return evidenceFailedCard(jobId, error.message, error.failedTypes);
-  }
   if (error instanceof ValidationError || error instanceof PermanentTaskError) {
     log.info("action rejected", { job_id: jobId, event_type: event.type, reason: error.message, ...timer.fields() });
     return errorResponse(error.message, jobId);

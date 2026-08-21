@@ -1,10 +1,7 @@
 import { DateTime } from "luxon";
 import { env } from "../config/env";
 import { formatPounds } from "../utils/money";
-import { EvidenceRecord, EvidenceType, ExtraChargeType, Job, PaymentMethod } from "../jobs/job.types";
-import { suggestedTotal, CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
-import { WorkflowState } from "../workflow/workflow.states";
-import { signatureLinkFor } from "./signature.link";
+import { Job } from "../jobs/job.types";
 
 export type ChatResponse = Record<string, unknown>;
 
@@ -36,21 +33,34 @@ function action(
   };
 }
 
-function button(text: string, functionName: string, jobId: string) {
+function button(text: string, functionName: string, jobId: string, type: "FILLED" | "OUTLINED" = "FILLED") {
   return {
     text,
-    type: "FILLED",
+    type,
     onClick: {
       action: action(functionName, jobId)
     }
   };
 }
+
+/**
+ * A menu option. Every button — enabled or not — keeps its onClick wired to the real
+ * action, because whether the `disabled` field is honored consistently across every
+ * Chat client isn't something verified by live testing; the handler behind each
+ * action independently re-checks job status server-side and replies with
+ * noActiveJobCard() rather than erroring or silently doing nothing if tapped while
+ * "disabled".
+ */
+function menuButton(text: string, functionName: string, jobId: string, enabled: boolean, type: "FILLED" | "OUTLINED" = "FILLED") {
+  return { ...button(text, functionName, jobId, type), disabled: !enabled };
+}
+
 /**
  * Opens as a layered overlay window rather than a full new browser tab — the closest
  * thing Chat's platform has to "a pop-up in the same window", since cards themselves
- * cannot embed arbitrary content like a signature canvas. onClose: RELOAD asks Chat to
- * re-render this card once the overlay closes, so the driver's "CHECK AGAIN" tap below
- * is a fallback, not the only way forward.
+ * cannot embed arbitrary content like a signature canvas or a photo picker. onClose:
+ * RELOAD asks Chat to re-render the card that opened it once the overlay closes, so
+ * the driver's "Back to menu" tap is a fallback, not the only way forward.
  */
 function overlayLinkButton(text: string, url: string) {
   return {
@@ -94,76 +104,6 @@ export function textResponse(text: string): ChatResponse {
   return { text };
 }
 
-/**
- * Acknowledges an accepted photo.
- *
- * Wording matters here: "received", never "saved". At this point the bytes are still in
- * Google Chat and the Drive upload has not started. Telling the driver otherwise would
- * be exactly the fake-success this architecture is meant to avoid.
- */
-export function photoAckCard(job: Job, accepted: EvidenceRecord[], next: ChatResponse): ChatResponse {
-  const count = accepted.length;
-  const lines = [
-    { textParagraph: { text: `<b>${count} photo${count > 1 ? "s" : ""} received ✓</b>` } }
-  ];
-
-  // The acknowledgement and the next step arrive as one card so the driver never waits
-  // on a second round trip to know what to do next.
-  const nextCard = (next as { cardsV2?: Array<{ card?: { header?: any; sections?: any[] } }> }).cardsV2?.[0]?.card;
-  const widgets = [...lines, { divider: {} }, ...(nextCard?.sections?.[0]?.widgets ?? [])];
-
-  return {
-    cardsV2: [
-      {
-        cardId: `ack-${job.jobId}`,
-        card: { header: nextCard?.header ?? header("Photo received", `Job ${job.jobId}`), sections: [{ widgets }] }
-      }
-    ]
-  };
-}
-
-/** Shown when required evidence is still being uploaded at completion time. */
-export function evidencePendingCard(jobId: string, pending: string[]): ChatResponse {
-  return card("tmv-evidence-pending", "Still processing", `Job ${jobId}`, [
-    {
-      textParagraph: {
-        text: `We're still processing <b>${pending.length}</b> required photo${pending.length > 1 ? "s" : ""}: ` +
-          escapeHtml(pending.join(", ")) + "."
-      }
-    },
-    { textParagraph: { text: "Please wait a moment, then tap below." } },
-    { buttonList: { buttons: [button("CHECK AGAIN & FINISH", "COMPLETE_JOB", jobId)] } }
-  ]);
-}
-
-/** Shown when evidence failed permanently and the driver must act. */
-export function evidenceFailedCard(jobId: string, message: string, failedTypes: EvidenceType[]): ChatResponse {
-  const buttons: unknown[] = [
-    { text: "RETRY UPLOAD", type: "FILLED", onClick: { action: action("RETRY_EVIDENCE", jobId) } }
-  ];
-  if (failedTypes.length) {
-    buttons.push({
-      text: "TAKE NEW PHOTO",
-      type: "OUTLINED",
-      onClick: {
-        action: {
-          ...action("REOPEN_PHOTO_STEP", jobId),
-          parameters: [
-            { key: "actionName", value: "REOPEN_PHOTO_STEP" },
-            { key: "jobId", value: jobId },
-            { key: "evidenceType", value: failedTypes[0] }
-          ]
-        }
-      }
-    });
-  }
-  return card("tmv-evidence-failed", "Photo upload failed", `Job ${jobId}`, [
-    { textParagraph: { text: `<b>${escapeHtml(message)}</b>` } },
-    { textParagraph: { text: "Retry the upload, or take a new photo if the original is no longer available." } },
-    { buttonList: { buttons } }
-  ]);
-}
-
 export function errorResponse(message: string, jobId = ""): ChatResponse {
   const widgets: any[] = [
     { textParagraph: { text: `<b>${escapeHtml(message)}</b>` } },
@@ -180,7 +120,65 @@ export function errorResponse(message: string, jobId = ""): ChatResponse {
 export function helpCard(): ChatResponse {
   return card("tmv-help", "TMV Driver Bot", "Google Chat operations workflow", [
     { textParagraph: { text: "Type <b>Next Job</b> to receive your active or next unfinished job." } },
-    { textParagraph: { text: "The bot saves each answer immediately. Photo steps require images uploaded directly into this Chat conversation." } }
+    { textParagraph: { text: "Once a job is started, use the menu buttons to check in, check out, or file a liability report — each opens a short form to fill in on your device." } }
+  ]);
+}
+
+/**
+ * Entry-point menu. Shown when the bot is added to a space, whenever a driver types
+ * "jobs" / "next job" / "help" / "start", and after every menu action completes. Only
+ * "Next Job" is enabled until a job is actually started — the other five stay
+ * disabled (see menuButton()) until `job.status === IN_PROGRESS`.
+ */
+export function mainMenuCard(job: Job | null): ChatResponse {
+  const active = job?.status === "IN_PROGRESS";
+  const jobId = job?.jobId ?? "";
+  return card("tmv-main-menu", "TMV Driver Bot", "What do you want to do?", [
+    { buttonList: { buttons: [menuButton("Next Job", "RESUME_JOB", jobId, true)] } },
+    { buttonList: { buttons: [menuButton("Check In", "MENU_CHECK_IN", jobId, active)] } },
+    { buttonList: { buttons: [menuButton("Check Out", "MENU_CHECK_OUT", jobId, active)] } },
+    { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, active)] } },
+    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, active)] } },
+    { buttonList: { buttons: [menuButton("Finish Job", "FINISH_JOB_CONFIRM", jobId, active, "OUTLINED")] } }
+  ]);
+}
+
+/** Shown when a menu button is tapped (disabled or not) with no active job behind it. */
+export function noActiveJobCard(): ChatResponse {
+  return card("tmv-no-active-job", "Start a job first", "No active job", [
+    { textParagraph: { text: "You need to start a job before you can use this. Tap <b>Next Job</b> to get started." } },
+    { buttonList: { buttons: [menuButton("Back to menu", "MAIN_MENU", "", true)] } }
+  ]);
+}
+
+/**
+ * Shown after a menu scenario is confirmed available. One button opens the actual
+ * form (see chat/scenario.routes.ts) as an overlay; the form itself handles
+ * submission and tells the driver to come back here.
+ */
+export function openFormCard(jobId: string, title: string, description: string, url: string): ChatResponse {
+  return card(`tmv-form-${jobId}-${title}`, title, "Tap to open", [
+    { textParagraph: { text: escapeHtml(description) } },
+    { buttonList: { buttons: [overlayLinkButton(`OPEN ${title.toUpperCase()}`, url)] } },
+    { textParagraph: { text: "Once you've submitted it, tap below to go back to the menu." } },
+    { buttonList: { buttons: [menuButton("Back to menu", "MAIN_MENU", jobId, true)] } }
+  ]);
+}
+
+export function finishJobConfirmCard(jobId: string): ChatResponse {
+  return card("tmv-finish-confirm", "Finish this job?", `Job ${jobId}`, [
+    { textParagraph: { text: "This marks the job as completed. Make sure every form this job needed has been submitted first." } },
+    { buttonList: { buttons: [button("YES, FINISH JOB", "FINISH_JOB", jobId)] } },
+    { buttonList: { buttons: [menuButton("Cancel", "MAIN_MENU", jobId, true)] } }
+  ]);
+}
+
+export function jobCompletedCard(job: Job): ChatResponse {
+  return card(`completed-${job.jobId}`, "Job completed", `Job ${job.jobId}`, [
+    { decoratedText: { topLabel: "Started", text: formatTime(job.actualStart) } },
+    { decoratedText: { topLabel: "Finished", text: formatTime(job.actualFinish) } },
+    { decoratedText: { topLabel: "Actual duration", text: `${job.actualMinutes} minutes` } },
+    { textParagraph: { text: "Type <b>Next Job</b> to receive the next unfinished job." } }
   ]);
 }
 
@@ -206,120 +204,6 @@ export function noJobsCard(): ChatResponse {
   return card("tmv-no-jobs", "No unfinished jobs", "You're up to date", [
     { textParagraph: { text: "No eligible unfinished jobs were found for you today." } }
   ]);
-}
-
-export function workflowCard(job: Job): ChatResponse {
-  const state = job.currentState as WorkflowState;
-  const id = `workflow-${job.jobId}`;
-
-  switch (state) {
-    case WorkflowState.WAITING_ARRIVAL_PHOTO:
-      return card(id, "1. Arrival and Start the job !", "Pictures taken as proof.", [
-        { textParagraph: { text: "Upload at least <b>1 arrival/start photo</b> directly into this Google Chat conversation." } }
-      ]);
-
-    case WorkflowState.WAITING_LOADED_PHOTO:
-      return card(id, "2. Proof Of Van Loaded", "Take a picture, 1 or 2", [
-        { textParagraph: { text: "Upload <b>1 or 2 photos</b> showing the van loaded." } }
-      ]);
-
-    case WorkflowState.IN_PROGRESS:
-      return card(id, "Move Execution", "Job is currently in progress", [
-        { decoratedText: { topLabel: "Started", text: formatTime(job.actualStart) } },
-        { textParagraph: { text: "Carry out the move. When the operational move is finished, continue to charges and completion." } },
-        { buttonList: { buttons: [button("FINISH MOVE / CONTINUE", "FINISH_MOVE", job.jobId)] } }
-      ]);
-
-    case WorkflowState.WAITING_EXTRA_CHARGES:
-      return card(id, "3. Any Extra charges", "What extra charges if any?", [
-        {
-          selectionInput: {
-            name: "extra_charges",
-            label: "Extra charges",
-            type: "CHECK_BOX",
-            items: [
-              { text: `London Congestion charge ${formatPounds(env.congestionCharge)}`, value: ExtraChargeType.CONGESTION },
-              { text: `Tunnel Charges ${formatPounds(env.tunnelCharge)}`, value: ExtraChargeType.TUNNEL },
-              { text: "Extra time / Charges", value: ExtraChargeType.EXTRA_TIME },
-              { text: "No Extras Time", value: ExtraChargeType.NONE }
-            ]
-          }
-        },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_EXTRA_CHARGES", job.jobId, ["extra_charges"]) } }] } }
-      ]);
-
-    case WorkflowState.WAITING_OVERTIME:
-      return card(id, "4. Over Time Charges ?", "Extra time charges ?", [
-        { textInput: { name: "overtime_minutes", label: "Overtime minutes", hintText: "Example: 30", type: "SINGLE_LINE" } },
-        { textParagraph: { text: `Configured charging rule: ${formatPounds(env.overtimeRatePer30Minutes)} per 30 minutes, rounded up, after ${env.overtimeGraceMinutes} minute grace.` } },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_OVERTIME", job.jobId, ["overtime_minutes"]) } }] } }
-      ]);
-
-    case WorkflowState.WAITING_TOTAL_CHARGES:
-      return card(id, "5. Total Charges ?", "Total / Tunnel / CCL / Over time ?", [
-        { decoratedText: { topLabel: "System suggested total", text: formatPounds(suggestedTotal(job)) } },
-        { textInput: { name: "total_charges", label: "Final total (£)", value: suggestedTotal(job).toFixed(2), type: "SINGLE_LINE" } },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_TOTAL_CHARGES", job.jobId, ["total_charges"]) } }] } }
-      ]);
-
-    case WorkflowState.WAITING_PAYMENT:
-      return card(id, "6. Cash / Link / Inv / Bank", "Select payment method", [
-        {
-          selectionInput: {
-            name: "payment_method",
-            label: "Payment method",
-            type: "RADIO_BUTTON",
-            items: Object.values(PaymentMethod).map(value => ({ text: value, value }))
-          }
-        },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_PAYMENT", job.jobId, ["payment_method"]) } }] } }
-      ]);
-
-    case WorkflowState.WAITING_EMPTY_VAN_PHOTO:
-      return card(id, "7. Empty Van / Unloaded ?", "Van Empty - Photo Taken", [
-        { textParagraph: { text: "Upload a photo showing the van is empty/unloaded." } }
-      ]);
-
-    case WorkflowState.WAITING_CLIENT_DETAILS:
-      return card(id, "8. Client Name Vs Postcode", "Name and Postcode from the Client ?", [
-        { textInput: { name: "client_name_postcode", label: "Client name and postcode/address", value: [job.customerName, job.dropoff].filter(Boolean).join(" — "), type: "MULTIPLE_LINE" } },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_CLIENT_DETAILS", job.jobId, ["client_name_postcode"]) } }] } }
-      ]);
-
-    case WorkflowState.WAITING_CLIENT_CONFIRMATION:
-      return card(id, "9. Client Signature", "Customer completion confirmation", [
-        { textParagraph: { text: escapeHtml(CUSTOMER_CONFIRMATION_TEXT) } },
-        { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
-        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } },
-        { textParagraph: { text: "Once they've signed, tap below to continue." } },
-        { buttonList: { buttons: [button("CHECK AGAIN", "RESUME_JOB", job.jobId)] } }
-      ]);
-
-    case WorkflowState.WAITING_ORGANIZED_PHOTO:
-      return card(id, "10. Is the van organized ?", "Final evidence photo", [
-        { textParagraph: { text: "Upload a photo showing that the van is organised." } }
-      ]);
-
-    case WorkflowState.READY_TO_COMPLETE:
-      return card(id, "Ready to finish", "All required workflow steps are recorded", [
-        { decoratedText: { topLabel: "Total charges", text: formatPounds(job.totalCharges) } },
-        { decoratedText: { topLabel: "Payment", text: escapeHtml(job.paymentMethod || "Not recorded") } },
-        { textParagraph: { text: "Photos still uploading in the background are checked when you tap below." } },
-        { buttonList: { buttons: [button("FINISH JOB", "COMPLETE_JOB", job.jobId)] } }
-      ]);
-
-    case WorkflowState.COMPLETED:
-      return card(id, "Job completed", `Job ${job.jobId}`, [
-        { decoratedText: { topLabel: "Started", text: formatTime(job.actualStart) } },
-        { decoratedText: { topLabel: "Finished", text: formatTime(job.actualFinish) } },
-        { decoratedText: { topLabel: "Actual duration", text: `${job.actualMinutes} minutes` } },
-        { decoratedText: { topLabel: "Total", text: formatPounds(job.totalCharges) } },
-        { textParagraph: { text: "Type <b>Next Job</b> to receive the next unfinished job." } }
-      ]);
-
-    default:
-      return jobCard(job);
-  }
 }
 
 function escapeHtml(value: string): string {

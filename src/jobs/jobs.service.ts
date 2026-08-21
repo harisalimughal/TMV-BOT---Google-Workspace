@@ -104,6 +104,18 @@ export async function getNextJobForDriver(
   return { job: next, driver };
 }
 
+/**
+ * Fresh read of the driver's current/next job, for rendering the gated menu. Always
+ * bypasses the cache: the menu's enabled/disabled state must reflect a mutation
+ * (Start Job, a scenario submit, Finish Job) that may have landed moments earlier,
+ * well inside the Sheets cache TTL — showing the pre-mutation gating state right
+ * after the mutation that was supposed to change it would be a visible correctness
+ * bug, not just a staleness curiosity.
+ */
+export async function getActiveJobForDriver(identifier: string): Promise<{ job: Job | null; driver: DriverProfile }> {
+  return getNextJobForDriver(identifier, { fresh: true });
+}
+
 export interface JobLookupOptions {
   /** Bypasses the read cache. Required inside a lock, where a stale read defeats the guard. */
   fresh?: boolean;
@@ -181,7 +193,7 @@ export async function startJob(jobId: string, identifier: string): Promise<Job> 
 
     job.actualStart = now;
     job.status = JobStatus.IN_PROGRESS;
-    job.currentState = WorkflowState.WAITING_ARRIVAL_PHOTO;
+    job.currentState = WorkflowState.IN_PROGRESS;
     if (!job.driverInitials) job.driverInitials = driver.initials;
 
     // §P3-3: the Drive folder is created lazily by the image worker on the first

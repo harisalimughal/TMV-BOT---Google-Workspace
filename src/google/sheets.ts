@@ -22,7 +22,11 @@ export const SHEETS = {
   EXCEPTIONS: "ExceptionReport",
   ANALYTICS: "Analytics",
   PROCESSED_EVENTS: "ProcessedEvents",
-  EVIDENCE: "Evidence"
+  EVIDENCE: "Evidence",
+  STORAGE_CHECK_IN: "StorageCheckIn",
+  STORAGE_CHECK_OUT: "StorageCheckOut",
+  PARKING_LIABILITY: "ParkingLiability",
+  LIABILITY_REPORT: "LiabilityReport"
 } as const;
 
 const BOOKING_HEADERS = [
@@ -60,7 +64,21 @@ export const SCHEMA: Record<string, string[]> = {
   [SHEETS.REPORTS]: ["Generated", "Report", "Value"],
   [SHEETS.EXCEPTIONS]: ["Timestamp", "Job ID", "Type", "Detail", "Resolved"],
   [SHEETS.ANALYTICS]: ["Date", "Metric", "Value"],
-  [SHEETS.EVIDENCE]: EVIDENCE_HEADERS
+  [SHEETS.EVIDENCE]: EVIDENCE_HEADERS,
+  [SHEETS.STORAGE_CHECK_IN]: [
+    "Timestamp", "Job ID", "Driver", "Container Number", "Client Name", "Client Phone", "Client Email",
+    "Client Present", "Date", "Photo URLs", "Signature URL"
+  ],
+  [SHEETS.STORAGE_CHECK_OUT]: [
+    "Timestamp", "Job ID", "Driver", "Container Number", "Client Name", "Client Email",
+    "Client Present At Dropoff", "Date", "Photo URLs", "Signature URL"
+  ],
+  [SHEETS.PARKING_LIABILITY]: [
+    "Timestamp", "Job ID", "Driver", "Address", "Client Full Name", "Photo URLs", "Signature URL"
+  ],
+  [SHEETS.LIABILITY_REPORT]: [
+    "Timestamp", "Job ID", "Driver", "Damage Categories", "Photo URLs", "Signature URL"
+  ]
 };
 
 // ---------------------------------------------------------------------------
@@ -743,6 +761,82 @@ export function paymentWrite(data: {
  * on every photo and every card click. A full-tab read here would reintroduce exactly
  * the unbounded-growth problem the evidence tabs were moved off.
  */
+export function storageCheckInWrite(data: {
+  jobId: string; driver: string; containerNumber: string; clientName: string; clientPhone: string;
+  clientEmail: string; clientPresent: string; date: string; photoUrls: string[]; signatureUrl: string;
+}): SheetWrite {
+  return {
+    sheet: SHEETS.STORAGE_CHECK_IN,
+    data: {
+      "Timestamp": new Date().toISOString(),
+      "Job ID": data.jobId,
+      "Driver": data.driver,
+      "Container Number": data.containerNumber,
+      "Client Name": data.clientName,
+      "Client Phone": data.clientPhone,
+      "Client Email": data.clientEmail,
+      "Client Present": data.clientPresent,
+      "Date": data.date,
+      "Photo URLs": data.photoUrls,
+      "Signature URL": data.signatureUrl
+    }
+  };
+}
+
+export function storageCheckOutWrite(data: {
+  jobId: string; driver: string; containerNumber: string; clientName: string;
+  clientEmail: string; clientPresentAtDropoff: string; date: string; photoUrls: string[]; signatureUrl: string;
+}): SheetWrite {
+  return {
+    sheet: SHEETS.STORAGE_CHECK_OUT,
+    data: {
+      "Timestamp": new Date().toISOString(),
+      "Job ID": data.jobId,
+      "Driver": data.driver,
+      "Container Number": data.containerNumber,
+      "Client Name": data.clientName,
+      "Client Email": data.clientEmail,
+      "Client Present At Dropoff": data.clientPresentAtDropoff,
+      "Date": data.date,
+      "Photo URLs": data.photoUrls,
+      "Signature URL": data.signatureUrl
+    }
+  };
+}
+
+export function parkingLiabilityWrite(data: {
+  jobId: string; driver: string; address: string; clientFullName: string; photoUrls: string[]; signatureUrl: string;
+}): SheetWrite {
+  return {
+    sheet: SHEETS.PARKING_LIABILITY,
+    data: {
+      "Timestamp": new Date().toISOString(),
+      "Job ID": data.jobId,
+      "Driver": data.driver,
+      "Address": data.address,
+      "Client Full Name": data.clientFullName,
+      "Photo URLs": data.photoUrls,
+      "Signature URL": data.signatureUrl
+    }
+  };
+}
+
+export function liabilityReportWrite(data: {
+  jobId: string; driver: string; damageCategories: string[]; photoUrls: string[]; signatureUrl: string;
+}): SheetWrite {
+  return {
+    sheet: SHEETS.LIABILITY_REPORT,
+    data: {
+      "Timestamp": new Date().toISOString(),
+      "Job ID": data.jobId,
+      "Driver": data.driver,
+      "Damage Categories": data.damageCategories,
+      "Photo URLs": data.photoUrls,
+      "Signature URL": data.signatureUrl
+    }
+  };
+}
+
 export async function findProcessedEvent(eventKey: string): Promise<Record<string, string> | null> {
   const rows = await readColumns(
     SHEETS.PROCESSED_EVENTS,

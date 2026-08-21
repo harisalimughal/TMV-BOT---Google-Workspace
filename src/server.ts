@@ -12,7 +12,7 @@ import { PhaseTimer } from "./utils/timing";
 import { WORKER_MOUNT_PATH, workerRouter } from "./queue/worker.routes";
 import { dispatchTask } from "./queue/dispatch";
 import { drainInlineQueue, registerInlineDispatcher } from "./queue/queue.service";
-import { signatureRouter } from "./chat/signature.routes";
+import { scenarioRouter } from "./chat/scenario.routes";
 
 const app = express();
 app.disable("x-powered-by");
@@ -62,9 +62,10 @@ app.get("/readyz", (_req, res) =>
 // Background worker endpoints, behind their own OIDC/shared-secret auth.
 app.use(WORKER_MOUNT_PATH, workerRouter());
 
-// Customer-facing signature pad. Auth is a signed, time-limited link (see
-// chat/signature.link.ts), not Chat/OIDC — the customer has no Google Chat session.
-app.use("/sign", signatureRouter());
+// Driver-facing scenario forms (Check In, Check Out, Parking Liability, Liability
+// Report). Auth is a signed, time-limited link (see chat/scenario.link.ts), not
+// Chat/OIDC — these are opened as a browser overlay, outside the Chat request cycle.
+app.use("/forms", scenarioRouter());
 
 app.post("/chat", verifyGoogleChatRequest, async (req, res) => {
   const requestId = req.header("x-cloud-trace-context")?.split("/")[0] || randomUUID();
@@ -151,7 +152,7 @@ function assertRuntimeConfig(): void {
     }
     if (!env.signatureLinkSecret) {
       throw new Error(
-        "TMV_SIGNATURE_LINK_SECRET is required in production to sign the customer signature-pad link."
+        "TMV_SIGNATURE_LINK_SECRET is required in production to sign the driver-facing scenario form links."
       );
     }
   }
