@@ -10,7 +10,8 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { key: "checkout", label: "Check Out" },
   { key: "parking", label: "Parking Liability" },
   { key: "liability", label: "Liability Report" },
-  { key: "drivers", label: "Drivers" }
+  { key: "drivers", label: "Drivers" },
+  { key: "settings", label: "Settings" }
 ];
 
 function escapeHtml(value: string): string {
@@ -93,6 +94,11 @@ export function dashboardShell(): string {
   .modal .row .v { text-align: right; word-break: break-word; }
   .modal .close { margin-top: 16px; width: 100%; padding: 10px; border: none; border-radius: 8px; background: #eee; cursor: pointer; }
   .form-label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; }
+  .settings-field { background: #fff; border-radius: 10px; padding: 20px; max-width: 640px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .settings-desc { font-size: 13px; color: #666; margin: 0 0 10px; }
+  .settings-textarea { width: 100%; min-height: 140px; padding: 12px; font-size: 14px; font-family: inherit; border: 1px solid #ccc; border-radius: 8px; resize: vertical; }
+  .settings-save { margin-top: 12px; }
+  .settings-status { margin-left: 10px; font-size: 13px; color: #666; }
   .form-input { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; }
   .form-check { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 400; margin: 14px 0 4px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
@@ -159,7 +165,46 @@ export function dashboardShell(): string {
       var meta = TABS.filter(function (t) { return t.key === tab; })[0];
       pageTitle.textContent = meta ? meta.label : tab;
       content.innerHTML = '<div class="loading">Loading…</div>';
-      if (tab === 'dashboard') loadDashboard(); else loadTable(tab);
+      if (tab === 'dashboard') loadDashboard();
+      else if (tab === 'settings') loadSettings();
+      else loadTable(tab);
+    }
+
+    function loadSettings() {
+      fetch('/admin/api/settings').then(function (r) { return r.json(); }).then(function (data) {
+        var settings = data.settings || [];
+        content.innerHTML = settings.map(function (s) {
+          return '<div class="settings-field">' +
+            '<label class="form-label">' + escapeHtml(s.label) + '</label>' +
+            '<p class="settings-desc">' + escapeHtml(s.description) + '</p>' +
+            '<textarea class="settings-textarea" data-key="' + escapeHtml(s.key) + '">' + escapeHtml(s.value) + '</textarea>' +
+            '<button class="add-btn settings-save" data-key="' + escapeHtml(s.key) + '">Save</button>' +
+            '<span class="settings-status" data-key="' + escapeHtml(s.key) + '"></span>' +
+            '</div>';
+        }).join('');
+        Array.prototype.forEach.call(document.querySelectorAll('.settings-save'), function (btn) {
+          btn.addEventListener('click', function () {
+            var key = btn.getAttribute('data-key');
+            var textarea = document.querySelector('.settings-textarea[data-key="' + key + '"]');
+            var status = document.querySelector('.settings-status[data-key="' + key + '"]');
+            btn.disabled = true;
+            status.textContent = 'Saving…';
+            fetch('/admin/api/settings', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key: key, value: textarea.value })
+            }).then(function (r) {
+              if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || 'Failed to save.'); });
+              return r.json();
+            }).then(function () {
+              status.textContent = 'Saved.';
+              btn.disabled = false;
+            }).catch(function (err) {
+              status.textContent = err.message;
+              btn.disabled = false;
+            });
+          });
+        });
+      }).catch(showError);
     }
 
     function loadDashboard() {

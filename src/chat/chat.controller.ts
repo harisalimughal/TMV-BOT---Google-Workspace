@@ -6,8 +6,8 @@ import {
 import { parseCommand } from "./commands";
 import { getActiveJobForDriver, getNextJobForDriver } from "../jobs/jobs.service";
 import {
-  EvidenceFailedError, EvidencePendingError, finishJob, handleAction, handlePhotoStep, reopenPhotoStep,
-  retryFailedEvidence
+  CUSTOMER_CONFIRMATION_TEXT, EvidenceFailedError, EvidencePendingError, finishJob, handleAction, handlePhotoStep,
+  reopenPhotoStep, retryFailedEvidence
 } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
 import { PermanentTaskError } from "../queue/queue.types";
@@ -17,7 +17,7 @@ import { PhaseTimer } from "../utils/timing";
 import { eventKeyFor, runOnce } from "./replay.guard";
 import { ScenarioKey, SCENARIOS } from "./scenario.spec";
 import { scenarioLinkFor } from "./scenario.link";
-import { getJob } from "../google/sheets";
+import { getJob, getSetting } from "../google/sheets";
 
 export interface GoogleChatEvent {
   type?: string;
@@ -73,13 +73,13 @@ function attachments(event: GoogleChatEvent): ChatAttachment[] {
  * Check In / Check Out / Parking Liability / Liability Report / Finish Job are all
  * reachable independently of this, whether or not Start Job's workflow is mid-flight.
  */
-async function showCurrentOrNext(event: GoogleChatEvent, sync = false): Promise<ChatResponse> {
+async function showCurrentOrNext(event: GoogleChatEvent, confirmationText: string, sync = false): Promise<ChatResponse> {
   // Only the "jobs" command and APP_COMMAND need fresh Calendar data. Resuming an
   // existing job does not — the job is already in Sheets.
   const { job } = await getNextJobForDriver(identifier(event), { sync });
   if (!job) return noJobsCard();
   setContext({ jobId: job.jobId });
-  return job.status === "IN_PROGRESS" ? workflowCard(job) : jobCard(job);
+  return job.status === "IN_PROGRESS" ? workflowCard(job, confirmationText) : jobCard(job);
 }
 
 /**
@@ -113,6 +113,10 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
   setContext({ userEmail: identifier(event) || undefined });
 
   try {
+    // Admin-editable via /admin (Settings tab) — cached, so this is a Sheets read only
+    // once every few minutes, not on every interaction.
+    const confirmationText = await getSetting("CUSTOMER_CONFIRMATION_TEXT", CUSTOMER_CONFIRMATION_TEXT);
+
     switch (event.type) {
       case "ADDED_TO_SPACE": {
         const { job } = await getNextJobForDriver(identifier(event));
@@ -148,7 +152,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
                 ...timer.fields()
               });
               return {
-                result: createResponse(photoAckCard(job, accepted, workflowCard(job))),
+                result: createResponse(photoAckCard(job, accepted, workflowCard(job, confirmationText))),
                 outcomeState: job.currentState,
                 jobId: job.jobId
               };
@@ -156,13 +160,13 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
             async replay => {
               // Show the card the original delivery produced, not an out-of-order error.
               const job = replay.jobId ? await getJob(replay.jobId) : null;
-              return createResponse(job ? workflowCard(job) : helpCard());
+              return createResponse(job ? workflowCard(job, confirmationText) : helpCard());
             }
           );
         }
 
         const command = parseCommand(event.message?.argumentText || event.message?.text || "");
-        if (command === "resume") return createResponse(await showCurrentOrNext(event, true));
+        if (command === "resume") return createResponse(await showCurrentOrNext(event, confirmationText, true));
         if (command === "jobs" || command === "help") {
           const { job } = await getNextJobForDriver(identifier(event), { sync: true });
           return createResponse(mainMenuCard(job));
@@ -173,7 +177,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
       case "CARD_CLICKED": {
         const fn = actionName(event);
 
-        if (fn === "RESUME_JOB") return updateResponse(await showCurrentOrNext(event));
+        if (fn === "RESUME_JOB") return updateResponse(await showCurrentOrNext(event, confirmationText));
         if (fn === "MAIN_MENU") {
           const { job } = await getActiveJobForDriver(identifier(event));
           return updateResponse(mainMenuCard(job));
@@ -196,7 +200,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (fn === "REOPEN_PHOTO_STEP") {
           const evidenceType = (actionParam(event, "evidenceType") || "Arrival") as EvidenceType;
           const job = await reopenPhotoStep(jobId, identifier(event), evidenceType);
-          return updateResponse(workflowCard(job));
+          return updateResponse(workflowCard(job, confirmationText));
         }
 
         // Card clicks are replay-guarded too: a double-tap or a Chat retry must not
@@ -229,17 +233,17 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
             const job = await handleAction(fn, jobId, identifier(event), formInputs(event));
             timer.mark("action");
             log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
-            return { result: updateResponse(workflowCard(job)), outcomeState: job.currentState, jobId: job.jobId };
+            return { result: updateResponse(workflowCard(job, confirmationText)), outcomeState: job.currentState, jobId: job.jobId };
           },
           async () => {
             const job = await getJob(jobId);
-            return updateResponse(job ? workflowCard(job) : helpCard());
+            return updateResponse(job ? workflowCard(job, confirmationText) : helpCard());
           }
         );
       }
 
       case "APP_COMMAND":
-        return createResponse(await showCurrentOrNext(event, true));
+        return createResponse(await showCurrentOrNext(event, confirmationText, true));
 
       case "REMOVED_FROM_SPACE":
         return createResponse({});

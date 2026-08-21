@@ -277,7 +277,7 @@ export function noJobsCard(): ChatResponse {
  * Check Out / Parking Liability / Liability Report flows, which never touch
  * job.currentState.
  */
-export function workflowCard(job: Job): ChatResponse {
+export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFIRMATION_TEXT): ChatResponse {
   const state = job.currentState as WorkflowState;
   const id = `workflow-${job.jobId}`;
 
@@ -350,18 +350,23 @@ export function workflowCard(job: Job): ChatResponse {
       ]);
 
     case WorkflowState.WAITING_CLIENT_DETAILS:
-      return card(id, "8. Client Name Vs Postcode", "Name and Postcode from the Client ?", [
-        { textInput: { name: "client_name_postcode", label: "Client name and postcode/address", value: [job.customerName, job.dropoff].filter(Boolean).join(" — "), type: "MULTIPLE_LINE" } },
+      // Client name is already known from the booking (job.customerName, asked once at
+      // booking time) — this step only confirms the postcode/address, so the driver
+      // isn't asked for the name a second time.
+      return card(id, "8. Client Postcode / Address", "Confirm the postcode or address", [
+        { textInput: { name: "client_name_postcode", label: "Postcode or address", value: job.dropoff || "", type: "MULTIPLE_LINE" } },
         { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_CLIENT_DETAILS", job.jobId, ["client_name_postcode"]) } }] } }
       ]);
 
     case WorkflowState.WAITING_CLIENT_CONFIRMATION:
+      // No "CHECK AGAIN" fallback button: the signature pad's overlay closes with
+      // onClose: RELOAD, which re-renders this card automatically once the customer
+      // finishes signing — by then the state has already moved on to the next step, so
+      // the reload shows it without the driver needing to tap anything.
       return card(id, "9. Client Signature", "Customer completion confirmation", [
-        { textParagraph: { text: escapeHtml(CUSTOMER_CONFIRMATION_TEXT) } },
+        { textParagraph: { text: escapeHtml(confirmationText) } },
         { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
-        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } },
-        { textParagraph: { text: "Once they've signed, tap below to continue." } },
-        { buttonList: { buttons: [button("CHECK AGAIN", "RESUME_JOB", job.jobId)] } }
+        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } }
       ]);
 
     case WorkflowState.WAITING_ORGANIZED_PHOTO:

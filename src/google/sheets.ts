@@ -255,6 +255,22 @@ export async function listObjects(sheetName: string, ttlMs = env.sheetCacheTtlMs
   return rowsToObjects(rows);
 }
 
+/**
+ * Admin-editable operational text (currently just the Start Job workflow's customer
+ * confirmation/signature paragraph — see admin/admin.routes.ts). Falls back to the
+ * caller-supplied default until an admin sets a Settings row for the key, so a blank
+ * spreadsheet never breaks the driver-facing card.
+ */
+export async function getSetting(key: string, fallback: string, ttlMs = env.driverCacheTtlMs): Promise<string> {
+  const row = await findObject(SHEETS.SETTINGS, "Key", key, ttlMs);
+  const value = row?.["Value"]?.trim();
+  return value || fallback;
+}
+
+export function settingWrite(key: string, value: string, notes = ""): SheetWrite {
+  return { sheet: SHEETS.SETTINGS, key: { column: "Key", value: key }, data: { "Key": key, "Value": value, "Notes": notes } };
+}
+
 export async function findObject(
   sheetName: string,
   keyColumn: string,

@@ -2,11 +2,27 @@ import { Router } from "express";
 import { DateTime } from "luxon";
 import { checkAdminPassword, clearSessionCookie, issueSessionCookie, requireAdminSession } from "./admin.auth";
 import { dashboardShell, loginPage } from "./admin.page";
-import { commitWrites, driverWrite, getDriverByInitials, listObjects, SCHEMA, SHEETS } from "../google/sheets";
+import { commitWrites, driverWrite, getDriverByInitials, getSetting, listObjects, SCHEMA, settingWrite, SHEETS } from "../google/sheets";
 import { createCalendarEvent } from "../google/calendar";
 import { parseCalendarEvent, syncBookingsForDate } from "../jobs/booking.service";
+import { CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
 import { env } from "../config/env";
 import { log } from "../utils/logger";
+
+/**
+ * Allowlist of admin-editable operational text. Each entry maps a stable UI key to the
+ * Settings-sheet row key it reads/writes and the built-in default shown until an admin
+ * overrides it (see workflow.engine.ts's CUSTOMER_CONFIRMATION_TEXT, the Start Job
+ * workflow's signature-step wording).
+ */
+const EDITABLE_SETTINGS: Record<string, { settingsKey: string; label: string; description: string; fallback: string }> = {
+  confirmationText: {
+    settingsKey: "CUSTOMER_CONFIRMATION_TEXT",
+    label: "Customer Confirmation Text",
+    description: "Shown on the Start Job workflow's signature step, and on the customer's signature-pad page.",
+    fallback: CUSTOMER_CONFIRMATION_TEXT
+  }
+};
 
 /** Allowlist: the URL only ever selects a sheet name from this map, never passes one through. */
 const TAB_SHEETS: Record<string, string> = {
@@ -210,6 +226,36 @@ export function adminRouter(): Router {
     } catch (error) {
       log.error("admin add job failed", error);
       return res.status(500).json({ error: "Failed to create job." });
+    }
+  });
+
+  router.get("/api/settings", async (_req, res) => {
+    try {
+      const settings = await Promise.all(
+        Object.entries(EDITABLE_SETTINGS).map(async ([key, meta]) => ({
+          key, label: meta.label, description: meta.description,
+          value: await getSetting(meta.settingsKey, meta.fallback, 0)
+        }))
+      );
+      res.status(200).json({ settings });
+    } catch (error) {
+      log.error("admin settings load failed", error);
+      res.status(500).json({ error: "Failed to load settings." });
+    }
+  });
+
+  router.post("/api/settings", async (req, res) => {
+    const key = String(req.body?.key ?? "");
+    const value = String(req.body?.value ?? "").trim();
+    const meta = EDITABLE_SETTINGS[key];
+    if (!meta) return res.status(404).json({ error: "Unknown setting." });
+    if (!value) return res.status(400).json({ error: "Value is required." });
+    try {
+      await commitWrites([settingWrite(meta.settingsKey, value, "Edited from /admin")]);
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      log.error("admin setting save failed", error, { key });
+      return res.status(500).json({ error: "Failed to save setting." });
     }
   });
 
