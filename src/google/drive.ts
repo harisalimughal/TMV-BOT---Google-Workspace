@@ -211,6 +211,25 @@ function looksLikeImage(buffer: Buffer): boolean {
   return false;
 }
 
+/**
+ * Streams a Drive file's raw bytes for the admin panel's photo-thumbnail proxy (see
+ * admin/admin.routes.ts). Evidence photos and signatures are never made publicly
+ * shared -- the admin browser has no Google session that could load a Drive URL
+ * directly, so the backend fetches the bytes itself with the same credentials it
+ * uploaded them with, and hands them back over its own connection.
+ */
+export async function getDriveFileMedia(fileId: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const drive = await driveClient();
+  const result = await withRetry("drive.files.get.media", () =>
+    drive.files.get(
+      { fileId, alt: "media", supportsAllDrives: true },
+      { responseType: "arraybuffer" }
+    )
+  );
+  const contentType = (result.headers as Record<string, string> | undefined)?.["content-type"] || "application/octet-stream";
+  return { buffer: Buffer.from(result.data as ArrayBuffer), contentType };
+}
+
 export interface SavedEvidence {
   fileId: string;
   fileUrl: string;

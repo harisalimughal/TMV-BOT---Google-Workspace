@@ -6,6 +6,7 @@ export interface SidebarItem {
 export const SIDEBAR_ITEMS: SidebarItem[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "jobs", label: "Jobs" },
+  { key: "finished", label: "Finished Jobs" },
   { key: "checkin", label: "Check In" },
   { key: "checkout", label: "Check Out" },
   { key: "parking", label: "Parking Liability" },
@@ -102,6 +103,9 @@ export function dashboardShell(): string {
   tr:hover td { background: #f7f9fc; }
   tr.clickable { cursor: pointer; }
   .empty { padding: 30px; text-align: center; color: #888; font-size: 14px; }
+  .thumb-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e2e2; cursor: pointer; background: #f4f4f4; }
+  .muted { color: #aaa; }
   .loading { padding: 30px; text-align: center; color: #888; font-size: 14px; }
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   .modal-bg.open { display: flex; }
@@ -185,7 +189,61 @@ export function dashboardShell(): string {
       content.innerHTML = '<div class="loading">Loading…</div>';
       if (tab === 'dashboard') loadDashboard();
       else if (tab === 'settings') loadSettings();
+      else if (tab === 'finished') loadFinishedJobs();
       else loadTable(tab);
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function loadFinishedJobs() {
+      fetch('/admin/api/finished-jobs').then(function (r) {
+        if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || 'Failed to load.'); });
+        return r.json();
+      }).then(function (data) {
+        var jobs = data.jobs || [];
+        if (!jobs.length) {
+          content.innerHTML = '<div class="table-wrap"><div class="empty">No completed jobs yet.</div></div>';
+          return;
+        }
+        content.innerHTML =
+          '<div class="table-wrap"><table><thead><tr>' +
+          '<th>#</th><th>Driver</th><th>Customer</th><th>Pickup → Drop-off</th><th>Started</th><th>Finished</th><th>Total</th><th>Photos</th><th>Signature</th><th>Folder</th>' +
+          '</tr></thead><tbody>' +
+          jobs.map(function (j, i) {
+            var photosHtml = j.photos.length
+              ? j.photos.map(function (p) {
+                  return '<img class="thumb" src="' + p.thumbUrl + '" title="' + escapeHtml(p.label) + '" data-full="' + p.thumbUrl + '">';
+                }).join('')
+              : '<span class="muted">—</span>';
+            var sigHtml = j.signature
+              ? '<img class="thumb" src="' + j.signature.thumbUrl + '" title="' + escapeHtml(j.signature.customerName || 'Signature') + '" data-full="' + j.signature.thumbUrl + '">'
+              : '<span class="muted">—</span>';
+            var folderHtml = j.driveFolderUrl
+              ? '<a href="' + escapeHtml(j.driveFolderUrl) + '" target="_blank" rel="noopener">Open</a>'
+              : '<span class="muted">—</span>';
+            return '<tr>' +
+              '<td>' + (i + 1) + '</td>' +
+              '<td>' + escapeHtml(j.driverName) + '</td>' +
+              '<td>' + escapeHtml(j.customerName) + '</td>' +
+              '<td>' + escapeHtml(j.pickup) + ' → ' + escapeHtml(j.dropoff) + '</td>' +
+              '<td>' + formatDate(j.actualStart) + '</td>' +
+              '<td>' + formatDate(j.actualFinish) + '</td>' +
+              '<td>' + (j.totalCharges ? '£' + escapeHtml(String(j.totalCharges)) : '—') + '</td>' +
+              '<td><div class="thumb-row">' + photosHtml + '</div></td>' +
+              '<td>' + sigHtml + '</td>' +
+              '<td>' + folderHtml + '</td>' +
+              '</tr>';
+          }).join('') +
+          '</tbody></table></div>';
+        Array.prototype.forEach.call(content.querySelectorAll('.thumb'), function (img) {
+          img.addEventListener('click', function () { window.open(img.getAttribute('data-full'), '_blank'); });
+        });
+      }).catch(showError);
     }
 
     function loadSettings() {

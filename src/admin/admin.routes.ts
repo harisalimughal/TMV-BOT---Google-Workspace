@@ -4,6 +4,7 @@ import { checkAdminPassword, clearSessionCookie, issueSessionCookie, requireAdmi
 import { dashboardShell, loginPage } from "./admin.page";
 import { commitWrites, driverWrite, getDriverByInitials, getSetting, listObjects, SCHEMA, settingWrite, SHEETS } from "../google/sheets";
 import { createCalendarEvent } from "../google/calendar";
+import { getDriveFileMedia } from "../google/drive";
 import { parseCalendarEvent, syncBookingsForDate } from "../jobs/booking.service";
 import { CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
 import { env } from "../config/env";
@@ -302,6 +303,112 @@ export function adminRouter(): Router {
     } catch (error) {
       log.error("admin table load failed", error, { tab: req.params.tab });
       res.status(500).json({ error: "Failed to load data." });
+    }
+  });
+
+  // Streams a Drive file's actual bytes so the admin panel can show real photo
+  // thumbnails. Evidence photos/signatures are never made publicly shared, so a plain
+  // <img src="drive.google.com/..."> would 404/redirect to a Google login in the
+  // admin's browser -- this fetches with the bot's own credentials and re-serves it.
+  router.get("/api/drive-file/:fileId", async (req, res) => {
+    const fileId = String(req.params.fileId || "");
+    if (!/^[A-Za-z0-9_-]{10,100}$/.test(fileId)) {
+      return res.status(400).json({ error: "Invalid file id." });
+    }
+    try {
+      const { buffer, contentType } = await getDriveFileMedia(fileId);
+      res.set("Content-Type", contentType);
+      res.set("Cache-Control", "private, max-age=3600");
+      return res.status(200).send(buffer);
+    } catch (error) {
+      log.error("admin drive file proxy failed", error, { file_id: fileId });
+      return res.status(404).json({ error: "File not found." });
+    }
+  });
+
+  // Classic-flow photo steps, in the order they're taken during a job, with the label
+  // shown in the UI for each.
+  const CLASSIC_PHOTO_STEPS: { type: string; label: string }[] = [
+    { type: "Arrival", label: "Arrival" },
+    { type: "VanLoaded", label: "Loaded" },
+    { type: "EmptyVan", label: "Empty Van" },
+    { type: "Organized", label: "Organized" }
+  ];
+
+  /** The classic flow's customer signature is uploaded to Drive, but only its
+   *  webViewLink is kept (in the Signatures sheet's Confirmation Text column, see
+   *  workflow.engine.ts's submitDrawnSignature) -- no dedicated file-id column exists,
+   *  so the id is pulled back out of Drive's stable ".../file/d/<id>/..." URL shape. */
+  function extractDriveFileId(url: string): string {
+    return url.match(/\/d\/([A-Za-z0-9_-]+)/)?.[1] ?? "";
+  }
+
+  router.get("/api/finished-jobs", async (_req, res) => {
+    try {
+      const [bookings, drivers, evidence, signatures] = await Promise.all([
+        listObjects(SHEETS.BOOKINGS, 0),
+        listObjects(SHEETS.DRIVERS, 0),
+        listObjects(SHEETS.EVIDENCE, 0),
+        listObjects(SHEETS.SIGNATURES, 0)
+      ]);
+
+      const driverNameByInitials = new Map(
+        drivers.map(d => [String(d["Initials"] || "").toUpperCase(), d["Full Name"] || ""])
+      );
+
+      const evidenceByJob = new Map<string, Record<string, string>[]>();
+      for (const row of evidence) {
+        if (row["Status"] !== "COMPLETED") continue;
+        if (!CLASSIC_PHOTO_STEPS.some(s => s.type === row["Evidence Type"])) continue;
+        const jobId = row["Job ID"];
+        const list = evidenceByJob.get(jobId) ?? [];
+        list.push(row);
+        evidenceByJob.set(jobId, list);
+      }
+
+      // A job can be redone (a re-signed signature), so keep only the most recent
+      // Signatures row per job -- listObjects returns sheet order, oldest first.
+      const signatureByJob = new Map<string, Record<string, string>>();
+      for (const row of signatures) signatureByJob.set(row["Job ID"], row);
+
+      const jobs = bookings
+        .filter(b => b["Status"] === "COMPLETED")
+        .map(b => {
+          const jobId = b["Job ID"];
+          const initials = String(b["Driver Initials"] || "").toUpperCase();
+          const byType = new Map(evidenceByJob.get(jobId)?.map(e => [e["Evidence Type"], e]) ?? []);
+          const photos = CLASSIC_PHOTO_STEPS
+            .map(step => ({ step, row: byType.get(step.type) }))
+            .filter((p): p is { step: typeof CLASSIC_PHOTO_STEPS[number]; row: Record<string, string> } => Boolean(p.row?.["Drive File ID"]))
+            .map(p => ({ label: p.step.label, thumbUrl: `/admin/api/drive-file/${p.row["Drive File ID"]}` }));
+
+          const signatureRow = signatureByJob.get(jobId);
+          const signatureFileId = signatureRow ? extractDriveFileId(signatureRow["Confirmation Text"] || "") : "";
+
+          return {
+            jobId,
+            driverInitials: b["Driver Initials"] || "",
+            driverName: driverNameByInitials.get(initials) || b["Driver Initials"] || "Unassigned",
+            customerName: b["Customer"] || "",
+            pickup: b["Pickup"] || "",
+            dropoff: b["Dropoff"] || "",
+            actualStart: b["Actual Start"] || "",
+            actualFinish: b["Actual Finish"] || "",
+            totalCharges: b["Total Charges"] || "",
+            paymentMethod: b["Payment Method"] || "",
+            driveFolderUrl: b["Drive Folder URL"] || "",
+            photos,
+            signature: signatureFileId
+              ? { customerName: (signatureRow && signatureRow["Customer Name"]) || "", thumbUrl: `/admin/api/drive-file/${signatureFileId}` }
+              : null
+          };
+        })
+        .sort((a, b) => (b.actualFinish || "").localeCompare(a.actualFinish || ""));
+
+      res.status(200).json({ jobs });
+    } catch (error) {
+      log.error("admin finished jobs load failed", error);
+      res.status(500).json({ error: "Failed to load finished jobs." });
     }
   });
 

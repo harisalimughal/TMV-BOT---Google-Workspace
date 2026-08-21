@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify": "npm run build && node verify/flow.js && node verify/harness.js",
+    "verify": "npm run build && node verify/flow.js && node verify/harness.js && node verify/admin.js",
     "preflight": "tsx verify/preflight.ts",
     "sweep": "curl -s -X POST -H 'Content-Type: application/json' -H \"x-tmv-worker-secret: $TMV_WORKER_SHARED_SECRET\" -d '{\"type\":\"SWEEP_STALE_EVIDENCE\"}' http://localhost:8080/internal/tasks/sweep-evidence",
     "test": "vitest run",
