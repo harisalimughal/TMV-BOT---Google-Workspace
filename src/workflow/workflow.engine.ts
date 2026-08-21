@@ -37,17 +37,6 @@ export async function beginJob(jobId: string, identifier: string): Promise<Job> 
   return startJob(jobId, identifier);
 }
 
-/**
- * Standalone completion path for the "Finish Job" menu button — used by jobs that
- * only ran Check In / Check Out / Parking Liability / Liability Report and never
- * touched Start Job's classic workflow at all. The workflow's own last step
- * (COMPLETE_JOB, via handleAction below) reaches the same completeJob() too, so
- * either path is a legitimate way for a job to finish.
- */
-export async function finishJob(jobId: string, identifier: string): Promise<Job> {
-  return completeJob(jobId, identifier);
-}
-
 const PHOTO_FOLDER: Record<string, EvidenceType> = {
   [WorkflowState.WAITING_ARRIVAL_PHOTO]: "Arrival",
   [WorkflowState.WAITING_LOADED_PHOTO]: "VanLoaded",

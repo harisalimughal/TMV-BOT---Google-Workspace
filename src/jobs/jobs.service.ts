@@ -24,10 +24,17 @@ export async function resolveDriver(identifier: string): Promise<DriverProfile> 
   return profile;
 }
 
-function isToday(iso: string): boolean {
+/**
+ * True for anything booked today or earlier — not just today. A job that was never
+ * started doesn't stop being real work once its date passes; it used to vanish from
+ * "Next Job" entirely at midnight (excluded by an exact same-day check), which is a
+ * trap for a driver who's simply behind. Still excludes future-dated bookings —
+ * tomorrow's job shouldn't show up as "next" today.
+ */
+function isDueByToday(iso: string): boolean {
   if (!iso) return false;
   const dt = DateTime.fromISO(iso).setZone(env.timezone);
-  return dt.hasSame(DateTime.now().setZone(env.timezone), "day");
+  return dt <= DateTime.now().setZone(env.timezone).endOf("day");
 }
 
 // ---------------------------------------------------------------------------
@@ -96,9 +103,10 @@ export async function getNextJobForDriver(
 
   const next =
     jobs
-      .filter(j => isToday(j.bookedStart))
+      .filter(j => isDueByToday(j.bookedStart))
       .filter(j => j.status !== JobStatus.COMPLETED && j.status !== JobStatus.CANCELLED)
       .filter(j => !j.driverInitials || j.driverInitials === driver.initials)
+      // Oldest first: an overdue job from three days ago surfaces before today's.
       .sort((a, b) => a.bookedStart.localeCompare(b.bookedStart))[0] ?? null;
 
   return { job: next, driver };

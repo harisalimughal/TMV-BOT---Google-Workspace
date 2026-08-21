@@ -36,10 +36,16 @@ function action(
   };
 }
 
-function button(text: string, functionName: string, jobId: string, type: "FILLED" | "OUTLINED" = "FILLED") {
+/** 0-1 floats, per Chat Cards v2's Color widget — not 0-255. */
+interface ButtonColor { red: number; green: number; blue: number; }
+
+function button(
+  text: string, functionName: string, jobId: string, type: "FILLED" | "OUTLINED" = "FILLED", color?: ButtonColor
+) {
   return {
     text,
     type,
+    ...(color ? { color: { ...color, alpha: 1 } } : {}),
     onClick: {
       action: action(functionName, jobId)
     }
@@ -47,9 +53,21 @@ function button(text: string, functionName: string, jobId: string, type: "FILLED
 }
 
 /** A menu option. All are always enabled — see mainMenuCard(). */
-function menuButton(text: string, functionName: string, jobId: string, enabled: boolean, type: "FILLED" | "OUTLINED" = "FILLED") {
-  return { ...button(text, functionName, jobId, type), disabled: !enabled };
+function menuButton(
+  text: string, functionName: string, jobId: string, enabled: boolean,
+  type: "FILLED" | "OUTLINED" = "FILLED", color?: ButtonColor
+) {
+  return { ...button(text, functionName, jobId, type, color), disabled: !enabled };
 }
+
+/** One color per menu option so the driver's menu reads at a glance, not a wall of blue. */
+const MENU_COLORS = {
+  nextJob: { red: 0.102, green: 0.451, blue: 0.910 },       // blue
+  checkIn: { red: 0.204, green: 0.659, blue: 0.325 },       // green
+  checkOut: { red: 0.984, green: 0.549, blue: 0.0 },        // orange
+  parkingLiability: { red: 0.851, green: 0.188, blue: 0.145 }, // red
+  liabilityReport: { red: 0.576, green: 0.204, blue: 0.902 }  // purple
+} as const;
 
 /**
  * Opens as a layered overlay window rather than a full new browser tab — the closest
@@ -193,24 +211,26 @@ export function helpCard(): ChatResponse {
 }
 
 /**
- * Entry-point menu. Shown when the bot is added to a space, whenever a driver types
- * "jobs" / "help", and after every menu action completes.
+ * Entry-point menu. Shown when the bot is added to a space and on every other message
+ * the driver sends (see chat.controller.ts's handleChatEvent()) — there's no keyword to
+ * remember, any message shows it.
  *
  * Every option is independent and always enabled: Next Job drills into the classic
  * move workflow (see showCurrentOrNext() / workflowCard()), while Check In, Check Out,
- * Parking Liability, Liability Report and Finish Job each run their own standalone flow
- * against whatever job the driver currently has — none of them require Next Job's
- * workflow to have been started first (see chat.controller.ts's withActiveJob()).
+ * Parking Liability and Liability Report each run their own standalone flow against
+ * whatever job the driver currently has — none of them require Next Job's workflow to
+ * have been started first (see chat.controller.ts's withActiveJob()). No standalone
+ * Finish Job button: a job now only completes via the classic workflow's own final
+ * step (COMPLETE_JOB) — see workflow.engine.ts's handleAction().
  */
 export function mainMenuCard(job: Job | null): ChatResponse {
   const jobId = job?.jobId ?? "";
   return card("tmv-main-menu", "TMV Driver Bot", "What do you want to do?", [
-    { buttonList: { buttons: [menuButton("Next Job", "RESUME_JOB", jobId, true)] } },
-    { buttonList: { buttons: [menuButton("Check In", "MENU_CHECK_IN", jobId, true)] } },
-    { buttonList: { buttons: [menuButton("Check Out", "MENU_CHECK_OUT", jobId, true)] } },
-    { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, true)] } },
-    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true)] } },
-    { buttonList: { buttons: [menuButton("Finish Job", "FINISH_JOB_CONFIRM", jobId, true, "OUTLINED")] } }
+    { buttonList: { buttons: [menuButton("Next Job", "RESUME_JOB", jobId, true, "FILLED", MENU_COLORS.nextJob)] } },
+    { buttonList: { buttons: [menuButton("Check In", "MENU_CHECK_IN", jobId, true, "FILLED", MENU_COLORS.checkIn)] } },
+    { buttonList: { buttons: [menuButton("Check Out", "MENU_CHECK_OUT", jobId, true, "FILLED", MENU_COLORS.checkOut)] } },
+    { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, true, "FILLED", MENU_COLORS.parkingLiability)] } },
+    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true, "FILLED", MENU_COLORS.liabilityReport)] } }
   ]);
 }
 
@@ -225,23 +245,6 @@ export function openFormCard(jobId: string, title: string, description: string, 
     { buttonList: { buttons: [overlayLinkButton(`OPEN ${title.toUpperCase()}`, url)] } },
     { textParagraph: { text: "Once you've submitted it, tap below to go back to the menu." } },
     { buttonList: { buttons: [menuButton("Back to menu", "MAIN_MENU", jobId, true)] } }
-  ]);
-}
-
-export function finishJobConfirmCard(jobId: string): ChatResponse {
-  return card("tmv-finish-confirm", "Finish this job?", `Job ${jobId}`, [
-    { textParagraph: { text: "This marks the job as completed. Make sure every form this job needed has been submitted first." } },
-    { buttonList: { buttons: [button("YES, FINISH JOB", "FINISH_JOB", jobId)] } },
-    { buttonList: { buttons: [menuButton("Cancel", "MAIN_MENU", jobId, true)] } }
-  ]);
-}
-
-export function jobCompletedCard(job: Job): ChatResponse {
-  return card(`completed-${job.jobId}`, "Job completed", `Job ${job.jobId}`, [
-    { decoratedText: { topLabel: "Started", text: formatTime(job.actualStart) } },
-    { decoratedText: { topLabel: "Finished", text: formatTime(job.actualFinish) } },
-    { decoratedText: { topLabel: "Actual duration", text: `${job.actualMinutes} minutes` } },
-    { textParagraph: { text: "Type <b>Next Job</b> to receive the next unfinished job." } }
   ]);
 }
 

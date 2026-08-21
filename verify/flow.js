@@ -4,9 +4,11 @@
  *   1. The classic Start Job workflow (arrival photo -> loaded photo -> charges ->
  *      payment -> empty-van photo -> client details -> customer signature -> organized
  *      photo -> complete), restored after being briefly replaced by a menu-only design.
+ *      This is also the only way a job ever completes -- there is no standalone
+ *      "Finish Job" menu action.
  *   2. The menu's standalone scenarios (Check In / Check Out / Parking Liability /
- *      Liability Report / Finish Job), which must work on a job that never ran Start
- *      Job at all -- no "start a job first" gate, no silent auto-start.
+ *      Liability Report), which must work on a job that never ran Start Job at all --
+ *      no "start a job first" gate, no silent auto-start.
  */
 process.env.GOOGLE_SHEETS_SPREADSHEET_ID = "sheet-test";
 process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID = "root-test";
@@ -44,19 +46,24 @@ for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
 
 const JOB_CLASSIC = "TMV-FLOW0001";
 const JOB_STANDALONE = "TMV-FLOW0002";
-function addBooking(jobId, eventId) {
+const JOB_OVERDUE = "TMV-FLOW0003";
+function addBooking(jobId, eventId, daysAgo = 0) {
   const row = new Array(HEADERS.Bookings.length).fill("");
   const set = (c, v) => { row[HEADERS.Bookings.indexOf(c)] = String(v); };
+  const start = new Date(Date.now() - daysAgo * 86400e3);
   set("Job ID", jobId); set("Calendar Event ID", eventId); set("Driver Initials", "WD");
   set("Customer", "Barry"); set("Customer Email", "barry@example.test");
   set("Pickup", "10 Example Street"); set("Dropoff", "74 Ferndale Road, N15 6UQ");
-  set("Base Price", 350); set("Booked Start", new Date().toISOString());
-  set("Booked Finish", new Date(Date.now() + 3600e3).toISOString()); set("Booked Minutes", 60);
+  set("Base Price", 350); set("Booked Start", start.toISOString());
+  set("Booked Finish", new Date(start.getTime() + 3600e3).toISOString()); set("Booked Minutes", 60);
   set("Status", "READY"); set("Current State", "READY");
   tabs.Bookings.push(row);
 }
 addBooking(JOB_CLASSIC, "evt-flow-classic");
 addBooking(JOB_STANDALONE, "evt-flow-standalone");
+// JOB_OVERDUE is added later, right before the section that tests it — adding it here
+// would make it (earliest Booked Start) win driver-resolution ahead of JOB_CLASSIC in
+// the very first "Next Job" check below, which explicitly expects JOB_CLASSIC.
 tabs.Drivers.push(["WD", "Test Driver", "driver@tmv.test", "", "TRUE", "Driver"]);
 
 const calls = {};
@@ -189,19 +196,23 @@ const buttonUrl = (r, text) => {
   const after = json.slice(idx);
   return after.match(/"url":"([^"]+)"/)?.[1]?.replace(/\\u0026/g, "&").replace(/\\\//g, "/") ?? null;
 };
-const disabledButtons = r => {
+const menuButtons = r => {
   const widgets = r.message?.cardsV2?.[0]?.card?.sections?.[0]?.widgets ?? [];
-  return widgets.flatMap(w => w.buttonList?.buttons ?? []).filter(b => b.disabled).map(b => b.text);
+  return widgets.flatMap(w => w.buttonList?.buttons ?? []);
 };
+const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.text);
 
 (async () => {
   console.log("=".repeat(74));
-  console.log("Main menu: every option always enabled, regardless of job status");
+  console.log("Main menu: every option always enabled, colorful, no Finish Job button");
   console.log("=".repeat(74));
 
   const menuFromSpace = await handleChatEvent({ type: "ADDED_TO_SPACE", user: USER });
   check("bot added to space -> menu shown", title(menuFromSpace), "TMV Driver Bot");
   check("nothing disabled before either job is started", disabledButtons(menuFromSpace).length, 0);
+  check("menu has exactly 5 buttons (no Finish Job)", menuButtons(menuFromSpace).length, 5);
+  check("no button is labelled Finish Job", menuButtons(menuFromSpace).some(b => b.text === "Finish Job"), false);
+  check("every menu button carries a distinct color", new Set(menuButtons(menuFromSpace).map(b => JSON.stringify(b.color))).size, 5);
 
   console.log("\n" + "=".repeat(74));
   console.log("Classic Start Job workflow (restored)");
@@ -381,19 +392,33 @@ const disabledButtons = r => {
   server.closeAllConnections?.();
 
   console.log("\n" + "-".repeat(74));
-  console.log("Finish Job standalone (job never ran Start Job's workflow)");
+  console.log("Finish Job is gone: those action names are unknown now");
   console.log("-".repeat(74));
-  const confirmCard = await click("FINISH_JOB_CONFIRM", JOB_STANDALONE);
-  check("finish confirm card shown", title(confirmCard), "Finish this job?");
+  const unknownConfirm = await click("FINISH_JOB_CONFIRM", JOB_STANDALONE);
+  check("FINISH_JOB_CONFIRM is rejected as an unknown action", title(unknownConfirm), "TMV — Action blocked");
+  const unknownFinish = await click("FINISH_JOB", JOB_STANDALONE);
+  check("FINISH_JOB is rejected as an unknown action", title(unknownFinish), "TMV — Action blocked");
+  check("job is still not completed", statusOf(JOB_STANDALONE), "READY");
 
-  const finishedCard = await click("FINISH_JOB", JOB_STANDALONE);
-  check("job completed despite Start Job never running", statusOf(JOB_STANDALONE), "COMPLETED");
-  check("actualStart backfilled instead of NaN duration", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_STANDALONE, "Actual Start")), true);
-  check("actualMinutes is a number, not NaN", fieldOf(JOB_STANDALONE, "Actual Minutes"), "0");
-  check("completion card returned", title(finishedCard), "Job completed");
+  console.log("\n" + "-".repeat(74));
+  console.log("Overdue jobs (booked for a previous day) still surface as Next Job");
+  console.log("-".repeat(74));
+  // Booked 3 days ago, never started -- the oldest unfinished job, so it should now
+  // outrank JOB_STANDALONE (booked today) as "next".
+  addBooking(JOB_OVERDUE, "evt-flow-overdue", 3);
+  const overdueCard = await click("RESUME_JOB", "");
+  check("an overdue, never-started job is still offered as Next Job", title(overdueCard), `Job ${JOB_OVERDUE}`);
 
-  const noMoreJobs = await click("RESUME_JOB", "");
-  check("no more jobs for today", title(noMoreJobs), "No unfinished jobs");
+  console.log("\n" + "-".repeat(74));
+  console.log("Any message shows the menu (not just an exact keyword)");
+  console.log("-".repeat(74));
+  // Last in the script deliberately: this is the only path that requests a fresh
+  // Calendar sync (sync: true), and the stub calendar always returns zero events, which
+  // would reconcile every fixture job above as "cancelled" (see reconcileDisappeared())
+  // if this ran any earlier. Real Calendar always has the actual events, so this isn't
+  // a production concern -- it's specific to the stub having no calendar data at all.
+  const hiMenu = await handleChatEvent({ type: "MESSAGE", user: USER, message: { text: "Hi" } });
+  check("typing 'Hi' shows the menu, not a placeholder greeting", title(hiMenu), "TMV Driver Bot");
 
   console.log("\n" + "=".repeat(74));
   console.log(`${pass} passed, ${fail} failed`);

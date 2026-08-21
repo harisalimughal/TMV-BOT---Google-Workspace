@@ -1,12 +1,11 @@
 import {
-  ChatResponse, ChatResult, createResponse, errorResponse, evidenceFailedCard, evidencePendingCard,
-  finishJobConfirmCard, helpCard, jobCard, jobCompletedCard, mainMenuCard, noJobsCard, openFormCard, photoAckCard,
-  updateResponse, workflowCard
+  ChatResponse, ChatResult, createResponse, errorResponse, evidenceFailedCard, evidencePendingCard, helpCard,
+  jobCard, mainMenuCard, noJobsCard, openFormCard, photoAckCard, updateResponse, workflowCard
 } from "./cards";
 import { parseCommand } from "./commands";
 import { getActiveJobForDriver, getNextJobForDriver } from "../jobs/jobs.service";
 import {
-  CUSTOMER_CONFIRMATION_TEXT, EvidenceFailedError, EvidencePendingError, finishJob, handleAction, handlePhotoStep,
+  CUSTOMER_CONFIRMATION_TEXT, EvidenceFailedError, EvidencePendingError, handleAction, handlePhotoStep,
   reopenPhotoStep, retryFailedEvidence
 } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
@@ -83,11 +82,10 @@ async function showCurrentOrNext(event: GoogleChatEvent, confirmationText: strin
 }
 
 /**
- * Shared by every MENU_* / FINISH_JOB_CONFIRM click: fresh-reads the driver's active or
- * next job and runs the requested action against it directly. Deliberately does NOT
- * start the job first — Check In, Check Out, Parking Liability, Liability Report and
- * Finish Job are independent, standalone flows that never require Start Job's classic
- * workflow to have run at all.
+ * Shared by every MENU_* click: fresh-reads the driver's active or next job and runs
+ * the requested scenario against it directly. Deliberately does NOT start the job
+ * first — Check In, Check Out, Parking Liability and Liability Report are independent,
+ * standalone flows that never require Start Job's classic workflow to have run at all.
  */
 async function withActiveJob(
   event: GoogleChatEvent,
@@ -165,13 +163,14 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
           );
         }
 
+        // Chat can't push a card with zero interaction — nothing fires until the driver
+        // sends something — so instead of requiring an exact keyword ("jobs"/"help"),
+        // any message shows the menu. "resume"/"continue" stay a distinct explicit path
+        // since they mean "take me back to the classic workflow step", not "show menu".
         const command = parseCommand(event.message?.argumentText || event.message?.text || "");
         if (command === "resume") return createResponse(await showCurrentOrNext(event, confirmationText, true));
-        if (command === "jobs" || command === "help") {
-          const { job } = await getNextJobForDriver(identifier(event), { sync: true });
-          return createResponse(mainMenuCard(job));
-        }
-        return createResponse({ text: "Hello from TMV Bot ✅" });
+        const { job } = await getNextJobForDriver(identifier(event), { sync: true });
+        return createResponse(mainMenuCard(job));
       }
 
       case "CARD_CLICKED": {
@@ -186,9 +185,6 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (fn === "MENU_CHECK_OUT") return updateResponse(await scenarioMenuAction("checkout")(event));
         if (fn === "MENU_PARKING_LIABILITY") return updateResponse(await scenarioMenuAction("parking")(event));
         if (fn === "MENU_LIABILITY_REPORT") return updateResponse(await scenarioMenuAction("liability")(event));
-        if (fn === "FINISH_JOB_CONFIRM") {
-          return updateResponse(await withActiveJob(event, async job => finishJobConfirmCard(job.jobId)));
-        }
 
         const jobId = actionParam(event, "jobId");
         if (!jobId) throw new Error("Missing job ID in card action.");
@@ -208,20 +204,6 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         const clickKey = event.message?.name
           ? eventKeyFor({ messageName: `${event.message.name}#${fn}` })
           : null;
-
-        if (fn === "FINISH_JOB") {
-          return await runOnce(
-            clickKey,
-            { jobId },
-            async () => {
-              const job = await finishJob(jobId, identifier(event));
-              timer.mark("action");
-              log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
-              return { result: updateResponse(jobCompletedCard(job)), outcomeState: job.currentState, jobId: job.jobId };
-            },
-            async () => updateResponse(mainMenuCard(null))
-          );
-        }
 
         // Everything else — START_JOB, FINISH_MOVE, SUBMIT_EXTRA_CHARGES, SUBMIT_OVERTIME,
         // SUBMIT_TOTAL_CHARGES, SUBMIT_PAYMENT, SUBMIT_CLIENT_DETAILS, COMPLETE_JOB — runs

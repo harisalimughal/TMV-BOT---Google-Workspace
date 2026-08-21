@@ -218,15 +218,10 @@ const cardTitle = r => JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1]
   report("WARM: open Check In form link");
   console.log(`  -> card: ${cardTitle(r)}`);
 
-  reset();
-  r = await click("FINISH_JOB_CONFIRM");
-  report("WARM: tap Finish Job (confirm card)");
-  console.log(`  -> card: ${cardTitle(r)}`);
-
-  reset();
-  r = await click("FINISH_JOB");
-  report("WARM: confirm Finish Job");
-  console.log(`  -> update=${r.update} (replaces the clicked card)`);
+  // No standalone Finish Job menu action anymore — a job only completes via the classic
+  // workflow's own arrival/loaded-photo -> ... -> COMPLETE_JOB sequence, which needs
+  // real photo attachments to progress through and isn't representative to fake here
+  // (see verify/flow.js for that end-to-end path with full evidence-pipeline mocking).
 
   console.log("\nPersisted rows written: " +
     JSON.stringify({ DriverFlow: tabs.DriverFlow.length - 1, ActivityLog: tabs.ActivityLog.length - 1,
