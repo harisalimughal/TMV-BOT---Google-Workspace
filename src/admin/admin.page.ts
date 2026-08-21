@@ -181,11 +181,12 @@ export function dashboardShell(): string {
           { name: 'customerPhone', label: 'Customer phone', type: 'tel' },
           { name: 'pickup', label: 'Pickup address', type: 'text', required: true },
           { name: 'dropoff', label: 'Drop-off address', type: 'text', required: true },
-          { name: 'crewSize', label: 'Crew size', type: 'number', required: true },
-          { name: 'price', label: 'Price (£)', type: 'number', required: true },
+          { name: 'crewSize', label: 'Crew size', type: 'number', required: true, attrs: 'min="1" step="1" value="2"' },
+          { name: 'price', label: 'Price (£)', type: 'number', required: true, attrs: 'min="0.01" step="0.01"' },
           { name: 'start', label: 'Start', type: 'datetime-local', required: true },
           { name: 'finish', label: 'Finish', type: 'datetime-local', required: true },
-          { name: 'driverInitials', label: 'Driver initials (blank = unassigned, open to any driver)', type: 'text' },
+          { name: 'driverInitials', label: 'Driver initials (blank = unassigned, open to any driver)', type: 'text',
+            attrs: 'maxlength="5" pattern="[A-Za-z]{1,5}" title="1-5 letters, e.g. JD"' },
           { name: 'paidOnline', label: 'Paid online', type: 'checkbox' }
         ]
       },
@@ -242,7 +243,7 @@ export function dashboardShell(): string {
             return '<label class="form-check"><input type="checkbox" name="' + f.name + '"' + (f.checkedByDefault ? ' checked' : '') + '> ' + escapeHtml(f.label) + '</label>';
           }
           return '<label class="form-label">' + escapeHtml(f.label) + (f.required ? ' *' : '') + '</label>' +
-            '<input class="form-input" type="' + f.type + '" name="' + f.name + '"' + (f.required ? ' required' : '') + '>';
+            '<input class="form-input" type="' + f.type + '" name="' + f.name + '"' + (f.required ? ' required' : '') + (f.attrs ? ' ' + f.attrs : '') + '>';
         }).join('') +
         '<div id="formError" class="error"></div>' +
         '<div class="modal-actions"><button type="button" class="close" id="modalCancel">Cancel</button><button type="submit" class="primary">Save</button></div>' +

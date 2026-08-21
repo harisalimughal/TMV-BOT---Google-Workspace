@@ -2,9 +2,9 @@ import { Router } from "express";
 import { DateTime } from "luxon";
 import { checkAdminPassword, clearSessionCookie, issueSessionCookie, requireAdminSession } from "./admin.auth";
 import { dashboardShell, loginPage } from "./admin.page";
-import { commitWrites, driverWrite, listObjects, SCHEMA, SHEETS } from "../google/sheets";
+import { commitWrites, driverWrite, getDriverByInitials, listObjects, SCHEMA, SHEETS } from "../google/sheets";
 import { createCalendarEvent } from "../google/calendar";
-import { syncBookingsForDate } from "../jobs/booking.service";
+import { parseCalendarEvent, syncBookingsForDate } from "../jobs/booking.service";
 import { env } from "../config/env";
 import { log } from "../utils/logger";
 
@@ -112,15 +112,39 @@ export function adminRouter(): Router {
     const start = String(body.start ?? "");
     const finish = String(body.finish ?? "");
 
-    if (!customerName || !pickup || !dropoff || !start || !finish || !crewSize || !price) {
+    if (!customerName || !pickup || !dropoff || !start || !finish) {
       return res.status(400).json({
-        error: "Customer name, pickup, drop-off, crew size, price, start and finish time are all required."
+        error: "Customer name, pickup, drop-off, start and finish time are all required."
       });
+    }
+    if (!Number.isInteger(crewSize) || crewSize <= 0) {
+      return res.status(400).json({ error: "Crew size must be a whole number greater than 0." });
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ error: "Price must be a number greater than 0." });
     }
     const startDt = DateTime.fromISO(start, { zone: env.timezone });
     const finishDt = DateTime.fromISO(finish, { zone: env.timezone });
     if (!startDt.isValid || !finishDt.isValid || finishDt <= startDt) {
       return res.status(400).json({ error: "Start/finish time is invalid." });
+    }
+    if (driverInitials && !/^[A-Z]{1,5}$/.test(driverInitials)) {
+      return res.status(400).json({ error: "Driver initials must be 1-5 letters, e.g. JD." });
+    }
+
+    // Job<->driver matching is purely by initials string equality (see jobs.service.ts's
+    // getNextJobForDriver) — a typo here wouldn't error anywhere downstream, it would just
+    // make the job invisible to every driver. Catch that at creation time instead.
+    if (driverInitials) {
+      const driver = await getDriverByInitials(driverInitials);
+      if (!driver) {
+        return res.status(400).json({
+          error: `No driver with initials "${driverInitials}" in the Drivers sheet. Add that driver first, or leave initials blank to leave the job unassigned.`
+        });
+      }
+      if (!driver.active) {
+        return res.status(400).json({ error: `Driver "${driverInitials}" exists but is marked inactive.` });
+      }
     }
 
     // Reproduces the exact title shape parseTitle() parses: "<name> - <n> Men - £<price>
@@ -136,6 +160,41 @@ export function adminRouter(): Router {
       `Pickup: ${pickup}`,
       `Drop-off: ${dropoff}`
     ].join("\n");
+
+    // Round-trip through the exact parser production uses (parseCalendarEvent), instead
+    // of duplicating its regexes here — the two can never silently drift apart this way.
+    // Anything the bot wouldn't read back correctly is rejected before it ever reaches
+    // Calendar, rather than being discovered later as a job with a blank field or the
+    // wrong crew size.
+    const parsed = parseCalendarEvent({
+      id: "admin-validation-check",
+      status: "confirmed",
+      summary: title,
+      description,
+      start: { dateTime: startDt.toISO()! },
+      end: { dateTime: finishDt.toISO()! }
+    });
+    const mismatches: string[] = [];
+    if (!parsed) mismatches.push("event");
+    else {
+      if (parsed.driverInitials !== driverInitials) mismatches.push("driver initials");
+      if (parsed.crewSize !== crewSize) mismatches.push("crew size");
+      if (parsed.price !== price) mismatches.push("price");
+      if (parsed.paidOnline !== paidOnline) mismatches.push("paid online");
+      if (parsed.customerName !== customerName) mismatches.push("customer name");
+      if (parsed.customerEmail !== customerEmail) mismatches.push("customer email");
+      if (parsed.customerPhone !== customerPhone) mismatches.push("customer phone");
+      if (parsed.pickup !== pickup) mismatches.push("pickup address");
+      if (parsed.dropoff !== dropoff) mismatches.push("drop-off address");
+    }
+    if (mismatches.length) {
+      return res.status(400).json({
+        error:
+          `This job wouldn't be read back correctly by the bot (${mismatches.join(", ")}). ` +
+          "Avoid colons, dashes, slashes or line breaks inside name/address fields — those characters " +
+          "are part of the calendar format the bot parses."
+      });
+    }
 
     try {
       await createCalendarEvent({

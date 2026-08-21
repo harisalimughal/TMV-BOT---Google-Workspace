@@ -912,6 +912,17 @@ export async function listJobs(ttlMs?: number): Promise<Job[]> {
   return (await listObjects(SHEETS.BOOKINGS, ttlMs)).map(bookingRowToJob);
 }
 
+function rowToDriverProfile(row: Record<string, string>): DriverProfile {
+  return {
+    initials: (row["Initials"] ?? "").trim(),
+    fullName: (row["Full Name"] ?? "").trim(),
+    email: (row["Email"] ?? "").trim(),
+    chatUserName: (row["Chat User Name"] ?? "").trim(),
+    active: boolFromSheet(row["Active"] || "TRUE"),
+    role: (row["Role"] ?? "").trim() || "Driver"
+  };
+}
+
 export async function getDriver(identifier: string): Promise<DriverProfile | null> {
   // The driver roster changes very rarely, so it gets a long TTL and normally
   // costs zero API calls on the request path.
@@ -922,15 +933,20 @@ export async function getDriver(identifier: string): Promise<DriverProfile | nul
       (r["Email"] ?? "").trim().toLowerCase() === normalized ||
       (r["Chat User Name"] ?? "").trim().toLowerCase() === normalized
   );
-  if (!row) return null;
-  return {
-    initials: (row["Initials"] ?? "").trim(),
-    fullName: (row["Full Name"] ?? "").trim(),
-    email: (row["Email"] ?? "").trim(),
-    chatUserName: (row["Chat User Name"] ?? "").trim(),
-    active: boolFromSheet(row["Active"] || "TRUE"),
-    role: (row["Role"] ?? "").trim() || "Driver"
-  };
+  return row ? rowToDriverProfile(row) : null;
+}
+
+/**
+ * Used to validate a driver-initials tag (e.g. the admin panel's Add Job form) before
+ * it's baked into a Calendar title. Job<->driver matching is by initials (see
+ * jobs.service.ts's getNextJobForDriver), so a typo here silently makes a job invisible
+ * to every driver rather than erroring — worth catching at creation time.
+ */
+export async function getDriverByInitials(initials: string): Promise<DriverProfile | null> {
+  const rows = await listObjects(SHEETS.DRIVERS, env.driverCacheTtlMs);
+  const normalized = initials.trim().toUpperCase();
+  const row = rows.find(r => (r["Initials"] ?? "").trim().toUpperCase() === normalized);
+  return row ? rowToDriverProfile(row) : null;
 }
 
 export async function upsertWorkflow(jobId: string, driver: string, state: string): Promise<void> {
