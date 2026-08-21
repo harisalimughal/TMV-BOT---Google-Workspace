@@ -176,28 +176,29 @@ export function dashboardShell(): string {
       jobs: {
         title: 'Add job', endpoint: '/admin/api/jobs',
         fields: [
-          { name: 'customerName', label: 'Customer name', type: 'text', required: true },
-          { name: 'customerEmail', label: 'Customer email', type: 'email' },
-          { name: 'customerPhone', label: 'Customer phone', type: 'tel' },
-          { name: 'pickup', label: 'Pickup address', type: 'text', required: true },
-          { name: 'dropoff', label: 'Drop-off address', type: 'text', required: true },
+          { name: 'customerName', label: 'Customer name', type: 'text', required: true, placeholder: 'e.g. John Smith' },
+          { name: 'customerEmail', label: 'Customer email', type: 'email', placeholder: 'e.g. john@example.com' },
+          { name: 'customerPhone', label: 'Customer phone', type: 'tel', placeholder: 'e.g. 07123 456789' },
+          { name: 'pickup', label: 'Pickup address', type: 'text', required: true, placeholder: 'e.g. 12 High Street, London, SW1A 1AA' },
+          { name: 'dropoff', label: 'Drop-off address', type: 'text', required: true, placeholder: 'e.g. 45 Park Road, Manchester, M1 2AB' },
           { name: 'crewSize', label: 'Crew size', type: 'number', required: true, attrs: 'min="1" step="1" value="2"' },
-          { name: 'price', label: 'Price (£)', type: 'number', required: true, attrs: 'min="0.01" step="0.01"' },
+          { name: 'price', label: 'Price (£)', type: 'number', required: true, attrs: 'min="0.01" step="0.01"', placeholder: 'e.g. 350' },
           { name: 'start', label: 'Start', type: 'datetime-local', required: true },
           { name: 'finish', label: 'Finish', type: 'datetime-local', required: true },
           { name: 'driverInitials', label: 'Driver initials (blank = unassigned, open to any driver)', type: 'text',
-            attrs: 'maxlength="5" pattern="[A-Za-z]{1,5}" title="1-5 letters, e.g. JD"' },
+            attrs: 'maxlength="5" pattern="[A-Za-z]{1,5}" title="1-5 letters, e.g. JD"', placeholder: 'e.g. JD — must match an existing driver' },
           { name: 'paidOnline', label: 'Paid online', type: 'checkbox' }
         ]
       },
       drivers: {
         title: 'Add driver', endpoint: '/admin/api/drivers',
         fields: [
-          { name: 'initials', label: 'Initials', type: 'text', required: true },
-          { name: 'fullName', label: 'Full name', type: 'text', required: true },
-          { name: 'email', label: 'Email (used to sign in from Chat)', type: 'email', required: true },
-          { name: 'chatUserName', label: 'Chat user name (optional fallback)', type: 'text' },
-          { name: 'role', label: 'Role', type: 'text' },
+          { name: 'initials', label: 'Initials (used to match jobs to this driver)', type: 'text',
+            required: true, attrs: 'maxlength="5" pattern="[A-Za-z]{1,5}" title="1-5 letters, e.g. JD"', placeholder: 'e.g. JD' },
+          { name: 'fullName', label: 'Full name', type: 'text', required: true, placeholder: 'e.g. James Dean' },
+          { name: 'email', label: 'Email (used to sign in from Chat)', type: 'email', required: true, placeholder: 'e.g. james@tmv.co.uk' },
+          { name: 'chatUserName', label: 'Chat user name (optional fallback)', type: 'text', placeholder: 'only needed if Chat login differs from email' },
+          { name: 'role', label: 'Role', type: 'text', placeholder: 'e.g. Driver' },
           { name: 'active', label: 'Active', type: 'checkbox', checkedByDefault: true }
         ]
       }
@@ -243,7 +244,8 @@ export function dashboardShell(): string {
             return '<label class="form-check"><input type="checkbox" name="' + f.name + '"' + (f.checkedByDefault ? ' checked' : '') + '> ' + escapeHtml(f.label) + '</label>';
           }
           return '<label class="form-label">' + escapeHtml(f.label) + (f.required ? ' *' : '') + '</label>' +
-            '<input class="form-input" type="' + f.type + '" name="' + f.name + '"' + (f.required ? ' required' : '') + (f.attrs ? ' ' + f.attrs : '') + '>';
+            '<input class="form-input" type="' + f.type + '" name="' + f.name + '"' + (f.required ? ' required' : '') +
+              (f.placeholder ? ' placeholder="' + escapeHtml(f.placeholder) + '"' : '') + (f.attrs ? ' ' + f.attrs : '') + '>';
         }).join('') +
         '<div id="formError" class="error"></div>' +
         '<div class="modal-actions"><button type="button" class="close" id="modalCancel">Cancel</button><button type="submit" class="primary">Save</button></div>' +
