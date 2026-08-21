@@ -39,7 +39,8 @@ const HEADERS = {
   StorageCheckIn: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Phone","Client Email","Client Present","Date","Photo URLs","Signature URL"],
   StorageCheckOut: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Email","Client Present At Dropoff","Date","Photo URLs","Signature URL"],
   ParkingLiability: ["Timestamp","Job ID","Driver","Address","Client Full Name","Photo URLs","Signature URL"],
-  LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"]
+  LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"],
+  PendingSignatures: ["Job ID","Message Name","Updated"]
 };
 const tabs = {};
 for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
@@ -112,6 +113,10 @@ googleapis.google.drive = () => ({ files: {
 } });
 googleapis.google.calendar = () => ({ events: { list: async () => ({ data: { items: [] } }) } });
 googleapis.google.gmail = () => ({ users: { messages: { send: async () => { bump("email"); return { data: {} }; } } } });
+let lastChatPatch = null;
+googleapis.google.chat = () => ({ spaces: { messages: {
+  patch: async ({ name, requestBody }) => { bump("chatPatch"); lastChatPatch = { name, requestBody }; return { data: {} }; }
+} } });
 // The classic workflow's background worker downloads each Chat-attached photo before
 // uploading it to Drive -- the one bit of real network I/O the merged scripts still
 // need. The Check-In HTTP round-trip test later in this file also uses fetch, against
@@ -134,9 +139,18 @@ const express = require("express");
 const { handleChatEvent } = require(BOT + "/chat/chat.controller");
 const { scenarioRouter } = require(BOT + "/chat/scenario.routes");
 const { scenarioLinkFor } = require(BOT + "/chat/scenario.link");
-const { submitDrawnSignature } = require(BOT + "/workflow/workflow.engine");
+const { signatureRouter } = require(BOT + "/chat/signature.routes");
+const { signatureLinkFor } = require(BOT + "/chat/signature.link");
 const { registerInlineDispatcher, drainInlineQueue } = require(BOT + "/queue/queue.service");
 const { dispatchTask } = require(BOT + "/queue/dispatch");
+
+// One shared server for the whole script: the classic workflow's real /sign/:jobId
+// round trip needs it early, the scenario forms need it later.
+const app = express();
+app.use(express.json({ limit: "2mb" }));
+app.use("/forms", scenarioRouter());
+app.use("/sign", signatureRouter());
+const server = app.listen(0);
 
 /*
  * Background tasks (photo processing) are captured rather than run immediately, so the
@@ -159,14 +173,21 @@ const statusOf = jobId => row(jobId)[HEADERS.Bookings.indexOf("Status")];
 const fieldOf = (jobId, c) => row(jobId)[HEADERS.Bookings.indexOf(c)];
 const evidenceFor = jobId => tabs.Evidence.slice(1).filter(r => r[HEADERS.Evidence.indexOf("Job ID")] === jobId);
 
+// A real Chat CARD_CLICKED event always carries the identity of the message that was
+// clicked (event.message.name) -- UPDATE_MESSAGE responses replace that same message's
+// content in place, so one job's card keeps one message identity across its whole
+// classic-flow lifecycle. Needed so the pending-signature push (see
+// chat.controller.ts) has something real to record.
 const click = (fn, jobId) => handleChatEvent({
   type: "CARD_CLICKED", user: USER,
   action: { function: fn, parameters: [{ key: "jobId", value: jobId }] },
+  message: { name: `spaces/S/messages/${jobId}` },
   common: { formInputs: {} }
 });
 const clickWithInputs = (fn, jobId, formInputs) => handleChatEvent({
   type: "CARD_CLICKED", user: USER,
   action: { function: fn, parameters: [{ key: "jobId", value: jobId }] },
+  message: { name: `spaces/S/messages/${jobId}` },
   common: { formInputs }
 });
 let mediaSeq = 0;
@@ -203,6 +224,10 @@ const menuButtons = r => {
 const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.text);
 
 (async () => {
+  await new Promise(resolve => server.once("listening", resolve));
+  const port = server.address().port;
+  const png = "data:image/png;base64," + Buffer.from("fake-photo-bytes").toString("base64");
+
   console.log("=".repeat(74));
   console.log("Main menu: every option always enabled, colorful, no Finish Job button");
   console.log("=".repeat(74));
@@ -264,12 +289,37 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("signature step has a manual CHECK AGAIN fallback button",
     JSON.stringify(signatureStepCard.message).includes('"CHECK AGAIN"'), true);
 
-  // The customer signature is captured on their own device (see chat/signature.routes.ts)
-  // rather than as a Chat form submission -- simulating it directly is the equivalent of
-  // a real POST to /sign/:jobId.
-  await submitDrawnSignature(JOB_CLASSIC, "Barry Smith", { fileId: "sig1", fileUrl: "https://drive.test/sig1" });
+  check("pending-signature message recorded for the push-forward", tabs.PendingSignatures.length - 1, 1);
+  check("pending-signature message matches the clicked card",
+    tabs.PendingSignatures[1][HEADERS.PendingSignatures.indexOf("Message Name")], `spaces/S/messages/${JOB_CLASSIC}`);
+
+  // The customer signature is captured on their own device -- a real HTTP round trip
+  // against /sign/:jobId, not a Chat form submission.
+  const signLinkUrl = new URL(signatureLinkFor(JOB_CLASSIC));
+  const signTarget = `http://127.0.0.1:${port}${signLinkUrl.pathname}${signLinkUrl.search}`;
+  const signGetRes = await fetch(signTarget);
+  check("sign pad GET status", signGetRes.status, 200);
+  const signHtml = await signGetRes.text();
+  check("sign pad has a signature canvas", signHtml.includes('id="pad"'), true);
+
+  lastChatPatch = null;
+  const signPostRes = await fetch(signTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: png })
+  });
+  const signPostBody = await signPostRes.json();
+  check("sign pad POST status", signPostRes.status, 200);
+  check("sign pad POST ok", signPostBody.ok, true);
   check("signature advances to the organized-photo step", stateOf(JOB_CLASSIC), "WAITING_ORGANIZED_PHOTO");
   check("signature row written", tabs.Signatures.length - 1, 1);
+
+  // The real point of this whole feature: signing pushed the next card into Chat on
+  // its own, no CHECK AGAIN tap needed.
+  check("signing pushed a card update into Chat automatically", lastChatPatch !== null, true);
+  check("the push targeted the exact message that was showing the signature step",
+    lastChatPatch && lastChatPatch.name, `spaces/S/messages/${JOB_CLASSIC}`);
+  check("the pushed card shows the next step (organized photo)",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes("Is the van organized"), true);
 
   await photo(); await drain();
   check("organized photo makes the job ready to complete", stateOf(JOB_CLASSIC), "READY_TO_COMPLETE");
@@ -301,13 +351,6 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   console.log("\n" + "-".repeat(74));
   console.log("Check-In form: real HTTP GET + POST against the actual route");
   console.log("-".repeat(74));
-  const app = express();
-  app.use(express.json({ limit: "2mb" }));
-  app.use("/forms", scenarioRouter());
-  const server = app.listen(0);
-  await new Promise(resolve => server.once("listening", resolve));
-  const port = server.address().port;
-
   const linkUrl = new URL(scenarioLinkFor("checkin", JOB_STANDALONE));
   const target = `http://127.0.0.1:${port}${linkUrl.pathname}${linkUrl.search}`;
 
@@ -316,7 +359,6 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const html = await getRes.text();
   check("check-in form contains Container Number field", html.includes("Container Number"), true);
 
-  const png = "data:image/png;base64," + Buffer.from("fake-photo-bytes").toString("base64");
   const postRes = await fetch(target, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -387,14 +429,6 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("LiabilityReport row written", tabs.LiabilityReport.length - 1, 1);
   check("LiabilityReport stores the selected category", tabs.LiabilityReport[1][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
 
-  await new Promise((resolve, reject) => server.close(err => (err ? reject(err) : resolve())));
-  // fetch's keep-alive pool can leave a socket to this server open past server.close()
-  // (whose callback fires once it stops accepting new connections, not once every
-  // pooled client connection is gone), which otherwise holds the event loop open
-  // indefinitely since process.exit() is deliberately not used below (see the comment
-  // there). Force them shut so the process can exit on its own.
-  server.closeAllConnections?.();
-
   console.log("\n" + "-".repeat(74));
   console.log("Finish Job is gone: those action names are unknown now");
   console.log("-".repeat(74));
@@ -423,6 +457,14 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   // a production concern -- it's specific to the stub having no calendar data at all.
   const hiMenu = await handleChatEvent({ type: "MESSAGE", user: USER, message: { text: "Hi" } });
   check("typing 'Hi' shows the menu, not a placeholder greeting", title(hiMenu), "TMV Driver Bot");
+
+  await new Promise((resolve, reject) => server.close(err => (err ? reject(err) : resolve())));
+  // fetch's keep-alive pool can leave a socket to this server open past server.close()
+  // (whose callback fires once it stops accepting new connections, not once every
+  // pooled client connection is gone), which otherwise holds the event loop open
+  // indefinitely since process.exit() is deliberately not used below (see the comment
+  // there). Force them shut so the process can exit on its own.
+  server.closeAllConnections?.();
 
   console.log("\n" + "=".repeat(74));
   console.log(`${pass} passed, ${fail} failed`);

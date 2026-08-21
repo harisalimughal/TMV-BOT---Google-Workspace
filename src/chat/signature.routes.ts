@@ -1,9 +1,11 @@
 import { Request, Response, Router } from "express";
-import { getJob, getSetting } from "../google/sheets";
+import { getJob, getPendingSignatureMessage, getSetting } from "../google/sheets";
 import { uploadEvidenceImage } from "../google/drive";
+import { updateChatCard } from "../google/chat";
 import { CUSTOMER_CONFIRMATION_TEXT, SignatureAlreadyCapturedError, submitDrawnSignature } from "../workflow/workflow.engine";
 import { WorkflowState } from "../workflow/workflow.states";
 import { verifySignatureLink } from "./signature.link";
+import { workflowCard } from "./cards";
 import { log } from "../utils/logger";
 
 function escapeHtml(value: string): string {
@@ -197,8 +199,9 @@ export function signatureRouter(): Router {
     const file = await uploadEvidenceImage(job, "Signature", "sig", "signature.png", buffer, "image/png");
 
     // Client name is already known from the booking — asked once, not re-typed here.
+    let signedJob;
     try {
-      await submitDrawnSignature(jobId, job.customerName, { fileId: file.fileId, fileUrl: file.fileUrl });
+      signedJob = await submitDrawnSignature(jobId, job.customerName, { fileId: file.fileId, fileUrl: file.fileUrl });
     } catch (error) {
       if (error instanceof SignatureAlreadyCapturedError) {
         return res.status(200).json({ ok: true, alreadySigned: true });
@@ -207,6 +210,20 @@ export function signatureRouter(): Router {
     }
 
     log.info("customer signature captured", { job_id: jobId });
+
+    // Best-effort: push the next-step card into the driver's Chat conversation so they
+    // don't have to tap CHECK AGAIN. If this fails for any reason (the tracked message
+    // was deleted, a stale reference, an API hiccup), CHECK AGAIN on the still-showing
+    // signature card is the fallback — the signature itself is already safely recorded
+    // either way, so a failure here must not turn into an error for the customer.
+    const messageName = await getPendingSignatureMessage(jobId);
+    if (messageName) {
+      const confirmationText = await getSetting("CUSTOMER_CONFIRMATION_TEXT", CUSTOMER_CONFIRMATION_TEXT);
+      await updateChatCard(messageName, workflowCard(signedJob, confirmationText)).catch(error =>
+        log.warn("failed to push next-step card after signing", { job_id: jobId, error: String(error) })
+      );
+    }
+
     return res.status(200).json({ ok: true });
   });
 

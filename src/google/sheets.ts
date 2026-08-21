@@ -26,7 +26,8 @@ export const SHEETS = {
   STORAGE_CHECK_IN: "StorageCheckIn",
   STORAGE_CHECK_OUT: "StorageCheckOut",
   PARKING_LIABILITY: "ParkingLiability",
-  LIABILITY_REPORT: "LiabilityReport"
+  LIABILITY_REPORT: "LiabilityReport",
+  PENDING_SIGNATURES: "PendingSignatures"
 } as const;
 
 const BOOKING_HEADERS = [
@@ -78,7 +79,12 @@ export const SCHEMA: Record<string, string[]> = {
   ],
   [SHEETS.LIABILITY_REPORT]: [
     "Timestamp", "Job ID", "Driver", "Damage Categories", "Photo URLs", "Signature URL"
-  ]
+  ],
+  // Remembers which Chat message is currently showing the "waiting on the customer to
+  // sign" card for a job, so the signature POST handler (running on the customer's
+  // device, outside the normal Chat request/response cycle) can push that same card
+  // forward to the next step once they've signed — see google/chat.ts's updateChatCard().
+  [SHEETS.PENDING_SIGNATURES]: ["Job ID", "Message Name", "Updated"]
 };
 
 // ---------------------------------------------------------------------------
@@ -269,6 +275,20 @@ export async function getSetting(key: string, fallback: string, ttlMs = env.driv
 
 export function settingWrite(key: string, value: string, notes = ""): SheetWrite {
   return { sheet: SHEETS.SETTINGS, key: { column: "Key", value: key }, data: { "Key": key, "Value": value, "Notes": notes } };
+}
+
+export function pendingSignatureWrite(jobId: string, messageName: string): SheetWrite {
+  return {
+    sheet: SHEETS.PENDING_SIGNATURES,
+    key: { column: "Job ID", value: jobId },
+    data: { "Job ID": jobId, "Message Name": messageName, "Updated": new Date().toISOString() }
+  };
+}
+
+/** Always fresh — a stale message name would push the update into the wrong card. */
+export async function getPendingSignatureMessage(jobId: string): Promise<string> {
+  const row = await findObject(SHEETS.PENDING_SIGNATURES, "Job ID", jobId, 0);
+  return row?.["Message Name"]?.trim() ?? "";
 }
 
 export async function findObject(

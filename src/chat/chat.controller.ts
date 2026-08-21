@@ -9,6 +9,7 @@ import {
   reopenPhotoStep, retryFailedEvidence
 } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
+import { WorkflowState } from "../workflow/workflow.states";
 import { PermanentTaskError } from "../queue/queue.types";
 import { ChatAttachment, EvidenceType } from "../jobs/job.types";
 import { setContext, log } from "../utils/logger";
@@ -16,7 +17,7 @@ import { PhaseTimer } from "../utils/timing";
 import { eventKeyFor, runOnce } from "./replay.guard";
 import { ScenarioKey, SCENARIOS } from "./scenario.spec";
 import { scenarioLinkFor } from "./scenario.link";
-import { getJob, getSetting } from "../google/sheets";
+import { commitWrites, getJob, getSetting, pendingSignatureWrite } from "../google/sheets";
 
 export interface GoogleChatEvent {
   type?: string;
@@ -215,6 +216,18 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
             const job = await handleAction(fn, jobId, identifier(event), formInputs(event));
             timer.mark("action");
             log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
+
+            // This click's response card is about to become "waiting on the customer
+            // to sign" — remember which Chat message that is, so the signature POST
+            // handler can push it forward automatically once they've signed (see
+            // chat/signature.routes.ts). Best-effort: CHECK AGAIN is still the fallback
+            // if this write or the later push fails for any reason.
+            if (job.currentState === WorkflowState.WAITING_CLIENT_CONFIRMATION && event.message?.name) {
+              await commitWrites([pendingSignatureWrite(job.jobId, event.message.name)]).catch(error =>
+                log.warn("failed to record pending-signature message", { job_id: job.jobId, error: String(error) })
+              );
+            }
+
             return { result: updateResponse(workflowCard(job, confirmationText)), outcomeState: job.currentState, jobId: job.jobId };
           },
           async () => {
