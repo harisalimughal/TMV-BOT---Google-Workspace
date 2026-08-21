@@ -55,8 +55,9 @@ function menuButton(text: string, functionName: string, jobId: string, enabled: 
  * Opens as a layered overlay window rather than a full new browser tab — the closest
  * thing Chat's platform has to "a pop-up in the same window", since cards themselves
  * cannot embed arbitrary content like a signature canvas or a photo picker. onClose:
- * RELOAD asks Chat to re-render the card that opened it once the overlay closes, so
- * the driver's "Back to menu"/"CHECK AGAIN" tap is a fallback, not the only way forward.
+ * RELOAD asks Chat to re-render the card that opened it once the overlay closes — the
+ * mechanism the signature step and the scenario forms both rely on to advance
+ * automatically with no manual "check again"/"back to menu" tap needed.
  */
 function overlayLinkButton(text: string, url: string) {
   return {
