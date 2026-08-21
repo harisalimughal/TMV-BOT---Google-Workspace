@@ -1,13 +1,13 @@
 import {
   ChatResponse, ChatResult, createResponse, errorResponse, finishJobConfirmCard, helpCard, jobCard,
-  jobCompletedCard, mainMenuCard, noActiveJobCard, noJobsCard, openFormCard, updateResponse
+  jobCompletedCard, mainMenuCard, noJobsCard, openFormCard, updateResponse
 } from "./cards";
 import { parseCommand } from "./commands";
-import { getActiveJobForDriver, getNextJobForDriver } from "../jobs/jobs.service";
+import { getActiveJobForDriver, getNextJobForDriver, startJob } from "../jobs/jobs.service";
 import { beginJob, finishJob } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
 import { PermanentTaskError } from "../queue/queue.types";
-import { ChatAttachment } from "../jobs/job.types";
+import { ChatAttachment, JobStatus } from "../jobs/job.types";
 import { setContext, log } from "../utils/logger";
 import { PhaseTimer } from "../utils/timing";
 import { eventKeyFor, runOnce } from "./replay.guard";
@@ -61,19 +61,22 @@ async function showCurrentOrNext(event: GoogleChatEvent, sync = false): Promise<
 }
 
 /**
- * Shared by every MENU_* / FINISH_JOB_CONFIRM click: fresh-reads the driver's active
- * job and, if there isn't one, replies with noActiveJobCard() instead of running the
- * requested action. Menu buttons are never rendered disabled (see cards.ts's
- * mainMenuCard()), so this server-side check is the only thing standing between a
- * premature tap and running the scenario/finish flow with no job behind it.
+ * Shared by every MENU_* / FINISH_JOB_CONFIRM click: fresh-reads the driver's active or
+ * next job and runs the requested action against it directly — no "start a job first"
+ * prompt. If the job hasn't been started yet, it's started silently first (so
+ * actualStart/status/the claim-on-first-tap logic in startJob() all still happen
+ * correctly), then the scenario/finish flow proceeds immediately. Only genuinely having
+ * no eligible job at all still short-circuits, since there's nothing to attach the data
+ * to.
  */
 async function withActiveJob(
   event: GoogleChatEvent,
   run: (job: NonNullable<Awaited<ReturnType<typeof getActiveJobForDriver>>["job"]>) => Promise<ChatResponse>
 ): Promise<ChatResponse> {
   const { job } = await getActiveJobForDriver(identifier(event));
-  if (!job || job.status !== "IN_PROGRESS") return noActiveJobCard();
-  return run(job);
+  if (!job) return noJobsCard();
+  const active = job.status === JobStatus.IN_PROGRESS ? job : await startJob(job.jobId, identifier(event));
+  return run(active);
 }
 
 function scenarioMenuAction(scenario: ScenarioKey) {
@@ -94,7 +97,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
     switch (event.type) {
       case "ADDED_TO_SPACE": {
         const { job } = await getNextJobForDriver(identifier(event));
-        return createResponse(mainMenuCard(job && job.status === "IN_PROGRESS" ? job : null));
+        return createResponse(mainMenuCard(job));
       }
 
       case "MESSAGE": {
@@ -109,7 +112,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (command === "resume") return createResponse(await showCurrentOrNext(event, true));
         if (command === "jobs" || command === "help") {
           const { job } = await getNextJobForDriver(identifier(event), { sync: true });
-          return createResponse(mainMenuCard(job && job.status === "IN_PROGRESS" ? job : null));
+          return createResponse(mainMenuCard(job));
         }
         return createResponse({ text: "Hello from TMV Bot ✅" });
       }
@@ -120,7 +123,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (fn === "RESUME_JOB") return updateResponse(await showCurrentOrNext(event));
         if (fn === "MAIN_MENU") {
           const { job } = await getActiveJobForDriver(identifier(event));
-          return updateResponse(mainMenuCard(job && job.status === "IN_PROGRESS" ? job : null));
+          return updateResponse(mainMenuCard(job));
         }
         if (fn === "MENU_CHECK_IN") return updateResponse(await scenarioMenuAction("checkin")(event));
         if (fn === "MENU_CHECK_OUT") return updateResponse(await scenarioMenuAction("checkout")(event));

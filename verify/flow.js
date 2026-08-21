@@ -147,16 +147,17 @@ const disabledButtons = r => {
   check("bot added to space -> menu shown", title(menuFromSpace), "TMV Driver Bot");
   check("nothing disabled before start (buttons always enabled)", disabledButtons(menuFromSpace).length, 0);
 
-  const blocked = await click("MENU_CHECK_IN");
-  check("scenario blocked without an active job", title(blocked), "Start a job first");
-  const blockedFinish = await click("FINISH_JOB_CONFIRM");
-  check("finish blocked without an active job", title(blockedFinish), "Start a job first");
-
-  await click("START_JOB");
-  check("after START_JOB, status", status(), "IN_PROGRESS");
-  check("after START_JOB, currentState", state(), "IN_PROGRESS");
+  // Tapping a menu action before Start Job no longer blocks with a "start a job
+  // first" prompt — it silently starts the job first, then runs the requested
+  // action right away.
+  const checkInBeforeStart = await click("MENU_CHECK_IN");
+  check("Check In before Start Job runs immediately, no blocking prompt", title(checkInBeforeStart), "Check In");
+  check("menu tap auto-started the job, status", status(), "IN_PROGRESS");
+  check("menu tap auto-started the job, currentState", state(), "IN_PROGRESS");
   check("actualStart is a server timestamp", /^\d{4}-\d{2}-\d{2}T/.test(field("Actual Start")), true);
   check("drive folder deferred (no folder created yet)", (calls.folderCreate ?? 0), 0);
+
+  // An explicit START_JOB tap after the auto-start above must be a no-op (idempotent).
 
   // Double-tap: must not restart or duplicate the start email.
   const startedAt = field("Actual Start");
@@ -250,8 +251,11 @@ const disabledButtons = r => {
   check("completion card returned", title(doneCard), "Job completed");
   check("card replaces clicked message", doneCard.update, true);
 
+  // Completed jobs are never returned by getNextJobForDriver, so with no other job
+  // left for today, this now falls back to "no eligible job" rather than a specific
+  // "already completed" message.
   const finishAgain = await click("FINISH_JOB_CONFIRM");
-  check("finish blocked once already completed", title(finishAgain), "Start a job first");
+  check("no job left to run Finish Job against once completed", title(finishAgain), "No unfinished jobs");
 
   const noMoreJobs = await click("RESUME_JOB");
   check("no more jobs for today", title(noMoreJobs), "No unfinished jobs");

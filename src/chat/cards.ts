@@ -44,12 +44,9 @@ function button(text: string, functionName: string, jobId: string, type: "FILLED
 }
 
 /**
- * A menu option. Every button — enabled or not — keeps its onClick wired to the real
- * action, because whether the `disabled` field is honored consistently across every
- * Chat client isn't something verified by live testing; the handler behind each
- * action independently re-checks job status server-side and replies with
- * noActiveJobCard() rather than erroring or silently doing nothing if tapped while
- * "disabled".
+ * A menu option. All six are always enabled (see mainMenuCard()) — tapping one before
+ * a job is started silently starts it first (see chat.controller.ts's withActiveJob()),
+ * so there's nothing left to gate here.
  */
 function menuButton(text: string, functionName: string, jobId: string, enabled: boolean, type: "FILLED" | "OUTLINED" = "FILLED") {
   return { ...button(text, functionName, jobId, type), disabled: !enabled };
@@ -128,12 +125,12 @@ export function helpCard(): ChatResponse {
  * Entry-point menu. Shown when the bot is added to a space, whenever a driver types
  * "jobs" / "next job" / "help" / "start", and after every menu action completes.
  *
- * All six buttons are always enabled — a driver can tap Check In, Finish Job, etc.
- * before a job is started or between steps, with no greyed-out state to fight with
- * on Chat clients that may render `disabled` inconsistently. Each handler still
- * re-checks job.status server-side on a fresh read and replies with noActiveJobCard()
- * if tapped with nothing active, so this is a UI simplification, not a removal of the
- * underlying guard. Re-introduce per-button gating here if the client asks for it later.
+ * All six buttons are always enabled — a driver can tap Check In, Finish Job, etc. at
+ * any point, before or after Start Job, with no greyed-out state to fight with on Chat
+ * clients that may render `disabled` inconsistently. Tapping one before a job is
+ * started silently starts it first rather than blocking with a message (see
+ * chat.controller.ts's withActiveJob()). Re-introduce per-button gating here if the
+ * client asks for it later.
  */
 export function mainMenuCard(job: Job | null): ChatResponse {
   const jobId = job?.jobId ?? "";
@@ -144,14 +141,6 @@ export function mainMenuCard(job: Job | null): ChatResponse {
     { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, true)] } },
     { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true)] } },
     { buttonList: { buttons: [menuButton("Finish Job", "FINISH_JOB_CONFIRM", jobId, true, "OUTLINED")] } }
-  ]);
-}
-
-/** Shown when a menu button is tapped (disabled or not) with no active job behind it. */
-export function noActiveJobCard(): ChatResponse {
-  return card("tmv-no-active-job", "Start a job first", "No active job", [
-    { textParagraph: { text: "You need to start a job before you can use this. Tap <b>Next Job</b> to get started." } },
-    { buttonList: { buttons: [menuButton("Back to menu", "MAIN_MENU", "", true)] } }
   ]);
 }
 
