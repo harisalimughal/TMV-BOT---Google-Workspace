@@ -1,14 +1,18 @@
 /**
- * Two independent flows now coexist and this checks both, plus that neither leaks into
+ * Two independent flows coexist and this checks both, plus that neither leaks into
  * the other:
  *   1. The classic Start Job workflow (arrival photo -> loaded photo -> charges ->
  *      payment -> empty-van photo -> client details -> customer signature -> organized
- *      photo -> complete), restored after being briefly replaced by a menu-only design.
- *      This is also the only way a job ever completes -- there is no standalone
- *      "Finish Job" menu action.
+ *      photo -> complete). This is also the only way a job ever completes -- there is
+ *      no standalone "Finish Job" menu action.
  *   2. The menu's standalone scenarios (Check In / Check Out / Parking Liability /
  *      Liability Report), which must work on a job that never ran Start Job at all --
- *      no "start a job first" gate, no silent auto-start.
+ *      no "start a job first" gate, no silent auto-start. Each is a Chat-card stepper
+ *      now (one field asked at a time, like the classic flow) instead of a bundled web
+ *      form -- only the final signature still opens externally, since Chat has no
+ *      drawing/canvas widget. Both flows' signature steps push their next card into
+ *      Chat automatically once signed (google/chat.ts's updateChatCard) -- confirmed
+ *      working live, so there's no manual "check again" button on either.
  */
 process.env.GOOGLE_SHEETS_SPREADSHEET_ID = "sheet-test";
 process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID = "root-test";
@@ -40,7 +44,8 @@ const HEADERS = {
   StorageCheckOut: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Email","Client Present At Dropoff","Date","Photo URLs","Signature URL"],
   ParkingLiability: ["Timestamp","Job ID","Driver","Address","Client Full Name","Photo URLs","Signature URL"],
   LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"],
-  PendingSignatures: ["Job ID","Message Name","Updated"]
+  PendingSignatures: ["Job ID","Message Name","Updated"],
+  ScenarioProgress: ["Key","Job ID","Scenario","Step","Fields JSON","Message Name","Updated"]
 };
 const tabs = {};
 for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
@@ -203,6 +208,34 @@ const photo = () => handleChatEvent({
 });
 const si = (...v) => ({ stringInputs: { value: v } });
 
+// A scenario's Chat card message keeps one identity for its whole session, same as the
+// classic flow's job card -- UPDATE_MESSAGE always replaces that same message in place,
+// and it's what scenario.engine.ts remembers as the pending "push the next step"
+// target once the driver reaches the signature step.
+const scenarioMsgName = (jobId, scenario) => `spaces/S/messages/${jobId}-${scenario}`;
+const menuTap = (fn, jobId, scenario) => handleChatEvent({
+  type: "CARD_CLICKED", user: USER,
+  action: { function: fn, parameters: [{ key: "jobId", value: jobId }] },
+  message: { name: scenarioMsgName(jobId, scenario) },
+  common: { formInputs: {} }
+});
+const scenarioClick = (fn, jobId, scenario, extra = {}, formInputsObj = {}) => handleChatEvent({
+  type: "CARD_CLICKED", user: USER,
+  action: {
+    function: fn,
+    parameters: [
+      { key: "jobId", value: jobId }, { key: "scenario", value: scenario },
+      ...Object.entries(extra).map(([key, value]) => ({ key, value }))
+    ]
+  },
+  message: { name: scenarioMsgName(jobId, scenario) },
+  common: { formInputs: formInputsObj }
+});
+const submitField = (jobId, scenario, fieldIndex, fieldName, ...values) =>
+  scenarioClick("SCENARIO_FIELD_SUBMIT", jobId, scenario, { fieldIndex: String(fieldIndex) }, { [fieldName]: si(...values) });
+const ackNotice = (jobId, scenario) => scenarioClick("SCENARIO_NOTICE_ACK", jobId, scenario);
+const continuePhotos = (jobId, scenario) => scenarioClick("SCENARIO_PHOTOS_CONTINUE", jobId, scenario);
+
 let pass = 0, fail = 0;
 function check(label, actual, expected) {
   const ok = actual === expected;
@@ -210,6 +243,8 @@ function check(label, actual, expected) {
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${label.padEnd(52)} ${ok ? actual : `got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`}`);
 }
 const title = r => JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1] ?? "(none)";
+const subtitle = r => JSON.stringify(r.message).match(/"subtitle":"([^"]+)"/)?.[1] ?? "(none)";
+const hasText = (r, needle) => JSON.stringify(r.message).includes(needle);
 const buttonUrl = (r, text) => {
   const json = JSON.stringify(r.message);
   const idx = json.indexOf(`"text":"${text}"`);
@@ -288,10 +323,10 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
 
   const signatureStepCard = await clickWithInputs("SUBMIT_CLIENT_DETAILS", JOB_CLASSIC, { client_name_postcode: si("Barry, N15 6UQ") });
   check("client details advance to signature step", stateOf(JOB_CLASSIC), "WAITING_CLIENT_CONFIRMATION");
-  // onClose: RELOAD was assumed to auto-refresh this card once the customer signs;
-  // confirmed live in Chat that it doesn't reliably do that, so CHECK AGAIN is back.
-  check("signature step has a manual CHECK AGAIN fallback button",
-    JSON.stringify(signatureStepCard.message).includes('"CHECK AGAIN"'), true);
+  // Confirmed live: the server-side push (not onClose: RELOAD) reliably advances this
+  // card once the customer signs, so there's no manual fallback button anymore.
+  check("signature step has no manual CHECK AGAIN button",
+    JSON.stringify(signatureStepCard.message).includes('"CHECK AGAIN"'), false);
 
   check("pending-signature message recorded for the push-forward", tabs.PendingSignatures.length - 1, 1);
   check("pending-signature message matches the clicked card",
@@ -337,103 +372,190 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
     JSON.stringify(doneCard.message).includes('"Main Menu"'), true);
 
   console.log("\n" + "=".repeat(74));
-  console.log("Menu scenarios run standalone -- no Start Job required or triggered");
+  console.log("Menu scenarios run standalone -- step by step in Chat, no Start Job needed");
   console.log("=".repeat(74));
 
   // JOB_CLASSIC is now COMPLETED, so the driver's only eligible job is JOB_STANDALONE --
   // every menu action below resolves to it without an explicit jobId being trusted.
-  const checkInCard = await click("MENU_CHECK_IN", JOB_STANDALONE);
-  check("Check In runs immediately with no job ever started", title(checkInCard), "Check In");
+  const widgetsOf = r => r.message?.cardsV2?.[0]?.card?.sections?.[0]?.widgets ?? [];
+  const { DAMAGE_CATEGORIES, CHECK_IN_SIGNATURE_TEXT, CHECK_OUT_SIGNATURE_TEXT, LIABILITY_REPORT_SIGNATURE_TEXT,
+    OVERLOADING_LIABILITY_WAIVER_TITLE, OVERLOADING_LIABILITY_WAIVER_TEXT, PARKING_LIABILITY_NOTICE_TITLE
+  } = require(BOT + "/chat/scenario.text");
+
+  console.log("\n" + "-".repeat(74));
+  console.log("Check In: full field-by-field walkthrough, photo parked after Container Number");
+  console.log("-".repeat(74));
+
+  const checkInField0 = await menuTap("MENU_CHECK_IN", JOB_STANDALONE, "checkin");
+  check("Check In starts immediately, asking for field 1", title(checkInField0), "Check In");
+  check("step subtitle shows position 1 of 6", subtitle(checkInField0), "Step 1 of 6");
+  check("first field is Container Number", hasText(checkInField0, "Container Number"), true);
   check("Check In does NOT start the job -- status unchanged", statusOf(JOB_STANDALONE), "READY");
   check("Check In does NOT touch currentState", stateOf(JOB_STANDALONE), "READY");
   check("Check In leaves actualStart blank", fieldOf(JOB_STANDALONE, "Actual Start"), "");
 
-  const checkInUrl = buttonUrl(checkInCard, "OPEN CHECK IN");
-  check("Check In link generated", typeof checkInUrl === "string" && checkInUrl.includes("/forms/checkin/"), true);
-  check("Check Out opens a form card", title(await click("MENU_CHECK_OUT", JOB_STANDALONE)), "Check Out");
-  check("Parking Liability opens a form card", title(await click("MENU_PARKING_LIABILITY", JOB_STANDALONE)), "Parking Liability");
-  check("Liability Report opens a form card", title(await click("MENU_LIABILITY_REPORT", JOB_STANDALONE)), "Liability Report");
+  const checkInPhotosEmpty = await submitField(JOB_STANDALONE, "checkin", 0, "container_number", "C-123");
+  check("container number submitted -> photo step (parked mid-form, not at the end)", title(checkInPhotosEmpty), "Check In");
+  check("photo step asks for evidence, not the next field yet", hasText(checkInPhotosEmpty, "Evidence that the items have been loaded."), true);
+  check("no CONTINUE button until the minimum photo count is met", hasText(checkInPhotosEmpty, "CONTINUE"), false);
 
-  console.log("\n" + "-".repeat(74));
-  console.log("Check-In form: real HTTP GET + POST against the actual route");
-  console.log("-".repeat(74));
-  const linkUrl = new URL(scenarioLinkFor("checkin", JOB_STANDALONE));
-  const target = `http://127.0.0.1:${port}${linkUrl.pathname}${linkUrl.search}`;
+  const checkInAfterPhoto = await photo();
+  check("sending a photo advances the received count immediately (no drain needed)",
+    hasText(checkInAfterPhoto, "<b>1</b> of up to 1 photo(s) received."), true);
+  check("CONTINUE appears once the minimum is met", hasText(checkInAfterPhoto, "CONTINUE"), true);
 
-  const getRes = await fetch(target);
-  check("check-in form GET status", getRes.status, 200);
-  const html = await getRes.text();
-  check("check-in form contains Container Number field", html.includes("Container Number"), true);
+  const checkInField1 = await continuePhotos(JOB_STANDALONE, "checkin");
+  check("continuing from photos resumes the REMAINING fields, not signature", subtitle(checkInField1), "Step 2 of 6");
+  check("resumed field is Cliente Name", hasText(checkInField1, "Cliente Name"), true);
 
-  const postRes = await fetch(target, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fields: {
-        container_number: "C-123", client_name: "Barry Thompson", client_phone: "07123456789",
-        client_email: "barry@example.test", client_present: "Yes", date: "2026-08-15"
-      },
-      photos: [jpeg],
-      signature: png
-    })
+  const checkInField2 = await submitField(JOB_STANDALONE, "checkin", 1, "client_name", "Barry Thompson");
+  check("step 3 of 6 (Client phone)", subtitle(checkInField2), "Step 3 of 6");
+  const checkInField3 = await submitField(JOB_STANDALONE, "checkin", 2, "client_phone", "07123456789");
+  check("step 4 of 6 (Client Email)", subtitle(checkInField3), "Step 4 of 6");
+  const checkInField4 = await submitField(JOB_STANDALONE, "checkin", 3, "client_email", "barry@example.test");
+  check("step 5 of 6 (Is the client present ?)", subtitle(checkInField4), "Step 5 of 6");
+  const checkInField5 = await submitField(JOB_STANDALONE, "checkin", 4, "client_present", "Yes");
+  check("step 6 of 6 (date)", subtitle(checkInField5), "Step 6 of 6");
+
+  const checkInSig = await submitField(JOB_STANDALONE, "checkin", 5, "date", "2026-08-15");
+  check("final field goes straight to signature -- photo step is not asked again", title(checkInSig), "Check In");
+  check("signature step subtitle", subtitle(checkInSig), "Waiting on signature");
+  check("signature step shows the verbatim Check In confirmation text", hasText(checkInSig, CHECK_IN_SIGNATURE_TEXT), true);
+  check("signature step has no manual CHECK AGAIN button (auto-push only)", hasText(checkInSig, "CHECK AGAIN"), false);
+  const checkInSigUrl = buttonUrl(checkInSig, "OPEN SIGNATURE PAD");
+  check("signature link points at the checkin sign-only route", typeof checkInSigUrl === "string" && checkInSigUrl.includes("/forms/checkin/"), true);
+
+  await drain(); // finalizeScenario requires every photo's background upload to have completed
+
+  const checkInLinkUrl = new URL(scenarioLinkFor("checkin", JOB_STANDALONE));
+  const checkInTarget = `http://127.0.0.1:${port}${checkInLinkUrl.pathname}${checkInLinkUrl.search}`;
+  const checkInGetRes = await fetch(checkInTarget);
+  check("sign-only page GET status", checkInGetRes.status, 200);
+  const checkInSignHtml = await checkInGetRes.text();
+  check("sign-only page has a signature canvas", checkInSignHtml.includes('id="pad"'), true);
+  check("sign-only page shows the same verbatim confirmation text", checkInSignHtml.includes(CHECK_IN_SIGNATURE_TEXT), true);
+  check("sign-only page collects ONLY a signature -- fields/photos already came in via Chat",
+    !checkInSignHtml.includes("Container Number"), true);
+
+  lastChatPatch = null;
+  const checkInPostRes = await fetch(checkInTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: png })
   });
-  const postBody = await postRes.json();
-  check("check-in form POST status", postRes.status, 200);
-  check("check-in form POST ok", postBody.ok, true);
+  const checkInPostBody = await checkInPostRes.json();
+  check("check-in sign POST status", checkInPostRes.status, 200);
+  check("check-in sign POST ok", checkInPostBody.ok, true);
   check("StorageCheckIn row written", tabs.StorageCheckIn.length - 1, 1);
+  check("StorageCheckIn captured the container number entered in Chat",
+    tabs.StorageCheckIn[1][HEADERS.StorageCheckIn.indexOf("Container Number")], "C-123");
   check("job still not started after a scenario submit", statusOf(JOB_STANDALONE), "READY");
 
-  const badLinkRes = await fetch(target.replace(/sig=[^&]+/, "sig=deadbeef"));
-  check("tampered signature rejected", badLinkRes.status, 410);
+  check("signing pushed the submitted card into Chat automatically", lastChatPatch !== null, true);
+  check("the push targeted the exact message that was showing the signature step",
+    lastChatPatch && lastChatPatch.name, scenarioMsgName(JOB_STANDALONE, "checkin"));
+  check("the pushed card confirms submission and offers Main Menu",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes("Check In submitted") &&
+    JSON.stringify(lastChatPatch.requestBody).includes("Main Menu"), true);
+
+  const checkInBadLink = await fetch(checkInTarget.replace(/sig=[^&]+/, "sig=deadbeef"));
+  check("tampered signature link rejected", checkInBadLink.status, 410);
 
   console.log("\n" + "-".repeat(74));
-  console.log("Parking Liability form: requires a signature even with no legal paragraph");
+  console.log("Check Out: same pattern, lighter walkthrough");
   console.log("-".repeat(74));
+
+  const checkOutField0 = await menuTap("MENU_CHECK_OUT", JOB_STANDALONE, "checkout");
+  check("Check Out step 1 of 5", subtitle(checkOutField0), "Step 1 of 5");
+  await submitField(JOB_STANDALONE, "checkout", 0, "container_number", "C-999");
+  await photo();
+  const checkOutField1 = await continuePhotos(JOB_STANDALONE, "checkout");
+  check("Check Out resumes remaining fields after its photo step", subtitle(checkOutField1), "Step 2 of 5");
+  await submitField(JOB_STANDALONE, "checkout", 1, "client_name", "Barry Thompson");
+  await submitField(JOB_STANDALONE, "checkout", 2, "client_email", "barry@example.test");
+  await submitField(JOB_STANDALONE, "checkout", 3, "client_present", "No");
+  const checkOutSig = await submitField(JOB_STANDALONE, "checkout", 4, "date", "2026-08-16");
+  check("Check Out reaches signature with the verbatim Check Out confirmation text",
+    hasText(checkOutSig, CHECK_OUT_SIGNATURE_TEXT), true);
+  await drain();
+
+  const checkOutLinkUrl = new URL(scenarioLinkFor("checkout", JOB_STANDALONE));
+  const checkOutTarget = `http://127.0.0.1:${port}${checkOutLinkUrl.pathname}${checkOutLinkUrl.search}`;
+  const checkOutPostRes = await fetch(checkOutTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: png })
+  });
+  check("check-out sign POST status", checkOutPostRes.status, 200);
+  check("StorageCheckOut row written", tabs.StorageCheckOut.length - 1, 1);
+
+  console.log("\n" + "-".repeat(74));
+  console.log("Parking Liability: notice on field 1, bare signature (no legal paragraph), 4-photo cap");
+  console.log("-".repeat(74));
+
+  const parkingField0 = await menuTap("MENU_PARKING_LIABILITY", JOB_STANDALONE, "parking");
+  check("Parking Liability step 1 of 2 shows the PCN notice above the field", subtitle(parkingField0), "Step 1 of 2");
+  check("PCN notice title shown", hasText(parkingField0, PARKING_LIABILITY_NOTICE_TITLE), true);
+  check("PCN notice mentions the fine amounts", hasText(parkingField0, "£60"), true);
+
+  await submitField(JOB_STANDALONE, "parking", 0, "address", "12 High Street");
+  const parkingPhotos = await submitField(JOB_STANDALONE, "parking", 1, "client_name", "Barry Thompson");
+  check("Parking Liability's photo step comes after BOTH fields (no photoAfterField)", title(parkingPhotos), "Parking Liability");
+  const parkingAfterPhoto = await photo();
+  check("parking photo step allows up to 4", hasText(parkingAfterPhoto, "up to 4"), true);
+  const parkingSig = await continuePhotos(JOB_STANDALONE, "parking");
+  check("Parking Liability signature step has no legal paragraph, just the pad", subtitle(parkingSig), "Waiting on signature");
+  check("parking signature step doesn't show unrelated scenario text", hasText(parkingSig, CHECK_IN_SIGNATURE_TEXT), false);
+  await drain();
+
   const parkingLinkUrl = new URL(scenarioLinkFor("parking", JOB_STANDALONE));
   const parkingTarget = `http://127.0.0.1:${port}${parkingLinkUrl.pathname}${parkingLinkUrl.search}`;
-  const parkingHtml = await (await fetch(parkingTarget)).text();
-  check("parking form GET includes a signature canvas", parkingHtml.includes('id="pad"'), true);
-
   const parkingNoSig = await fetch(parkingTarget, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fields: { address: "12 High Street", client_name: "Barry Thompson" }, photos: [png]
-    })
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({})
   });
-  check("parking submit without a signature is rejected", parkingNoSig.status, 400);
-
+  check("parking sign submit without a signature is rejected", parkingNoSig.status, 400);
   const parkingWithSig = await fetch(parkingTarget, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fields: { address: "12 High Street", client_name: "Barry Thompson" }, photos: [png], signature: png
-    })
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: png })
   });
   const parkingBody = await parkingWithSig.json();
-  check("parking submit with a signature succeeds", parkingWithSig.status, 200);
-  check("parking submit ok", parkingBody.ok, true);
+  check("parking sign submit with a signature succeeds", parkingWithSig.status, 200);
+  check("parking sign submit ok", parkingBody.ok, true);
   check("ParkingLiability row written", tabs.ParkingLiability.length - 1, 1);
+  check("ParkingLiability captured the address entered in Chat",
+    tabs.ParkingLiability[1][HEADERS.ParkingLiability.indexOf("Address")], "12 High Street");
 
   console.log("\n" + "-".repeat(74));
-  console.log("Liability Report form: single-select damage category + conditional waiver");
+  console.log("Liability Report: full damage-category dropdown + conditional Overloading waiver");
   console.log("-".repeat(74));
+
+  const liabilityField0 = await menuTap("MENU_LIABILITY_REPORT", JOB_STANDALONE, "liability");
+  const dropdown = widgetsOf(liabilityField0).find(w => w.selectionInput)?.selectionInput;
+  check("damage-category field renders as a DROPDOWN, not a giant radio-button stack", dropdown?.type, "DROPDOWN");
+  check("dropdown lists every damage category from the client's full list", dropdown?.items?.length, DAMAGE_CATEGORIES.length);
+  check("dropdown includes a category added in the latest list", dropdown?.items?.some(i => i.value === "Fridges and Freezers"), true);
+  check("dropdown includes the last (longest) category added",
+    dropdown?.items?.some(i => i.value === "Lift Got No Protection – Damage Responsibility Notice"), true);
+
+  const liabilityNotice = await submitField(JOB_STANDALONE, "liability", 0, "damage_categories", "Van Overloaded");
+  check("picking Van Overloaded shows the conditional Overloading Liability Waiver", title(liabilityNotice), OVERLOADING_LIABILITY_WAIVER_TITLE);
+  check("waiver shows the verbatim waiver text", hasText(liabilityNotice, OVERLOADING_LIABILITY_WAIVER_TEXT), true);
+
+  const liabilityPhotos = await ackNotice(JOB_STANDALONE, "liability");
+  check("acknowledging the waiver moves on to photos (only field, no photoAfterField)", title(liabilityPhotos), "Liability Report");
+  const liabilityAfterPhoto = await photo();
+  check("liability photo step allows up to 8", hasText(liabilityAfterPhoto, "up to 8"), true);
+  const liabilitySig = await continuePhotos(JOB_STANDALONE, "liability");
+  check("Liability Report reaches signature with its own verbatim confirmation text",
+    hasText(liabilitySig, LIABILITY_REPORT_SIGNATURE_TEXT), true);
+  await drain();
+
   const liabilityLinkUrl = new URL(scenarioLinkFor("liability", JOB_STANDALONE));
   const liabilityTarget = `http://127.0.0.1:${port}${liabilityLinkUrl.pathname}${liabilityLinkUrl.search}`;
-  const liabilityHtml = await (await fetch(liabilityTarget)).text();
-  check("liability form renders a single-select dropdown", liabilityHtml.includes("<select"), true);
-  check("liability form includes the Van Overloaded option", liabilityHtml.includes("Van Overloaded"), true);
-  check("liability form includes the conditional waiver, hidden by default",
-    /class="notice conditional-notice"[^>]*style="display:none"/.test(liabilityHtml), true);
-  check("liability form includes the waiver text", liabilityHtml.includes("Overloading Liability Waiver"), true);
-
   const liabilitySubmit = await fetch(liabilityTarget, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: { damage_categories: "Van Overloaded" }, photos: [png], signature: png })
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: png })
   });
   const liabilityBody = await liabilitySubmit.json();
-  check("liability submit with a single selected category succeeds", liabilitySubmit.status, 200);
-  check("liability submit ok", liabilityBody.ok, true);
+  check("liability sign submit succeeds", liabilitySubmit.status, 200);
+  check("liability sign submit ok", liabilityBody.ok, true);
   check("LiabilityReport row written", tabs.LiabilityReport.length - 1, 1);
-  check("LiabilityReport stores the selected category", tabs.LiabilityReport[1][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
+  check("LiabilityReport stores the selected category",
+    tabs.LiabilityReport[1][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
 
   console.log("\n" + "-".repeat(74));
   console.log("Add Job refuses to silently fall back to the broken direct-share behavior");

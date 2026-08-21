@@ -102,9 +102,14 @@ export interface ChatAttachment {
 /**
  * Evidence types map 1:1 onto the Drive step subfolders. Declared here rather than
  * in google/drive.ts so the queue and workflow layers can reference them without
- * importing a Google service module.
+ * importing a Google service module. The four classic-flow types are the original
+ * step photos; the four scenario types (matching google/drive.ts's ScenarioFolderKey)
+ * let Check In/Check Out/Parking Liability/Liability Report's Chat-attached photos
+ * flow through the same async evidence pipeline instead of a bespoke one.
  */
-export type EvidenceType = "Arrival" | "VanLoaded" | "EmptyVan" | "Organized";
+export type EvidenceType =
+  | "Arrival" | "VanLoaded" | "EmptyVan" | "Organized"
+  | "CheckIn" | "CheckOut" | "ParkingLiability" | "LiabilityReport";
 
 export enum EvidenceStatus {
   /** Attachment reference safely persisted. Not yet in Drive. */

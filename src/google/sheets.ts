@@ -27,7 +27,8 @@ export const SHEETS = {
   STORAGE_CHECK_OUT: "StorageCheckOut",
   PARKING_LIABILITY: "ParkingLiability",
   LIABILITY_REPORT: "LiabilityReport",
-  PENDING_SIGNATURES: "PendingSignatures"
+  PENDING_SIGNATURES: "PendingSignatures",
+  SCENARIO_PROGRESS: "ScenarioProgress"
 } as const;
 
 const BOOKING_HEADERS = [
@@ -84,7 +85,11 @@ export const SCHEMA: Record<string, string[]> = {
   // sign" card for a job, so the signature POST handler (running on the customer's
   // device, outside the normal Chat request/response cycle) can push that same card
   // forward to the next step once they've signed — see google/chat.ts's updateChatCard().
-  [SHEETS.PENDING_SIGNATURES]: ["Job ID", "Message Name", "Updated"]
+  [SHEETS.PENDING_SIGNATURES]: ["Job ID", "Message Name", "Updated"],
+  // One row per (job, scenario) currently being filled in via Chat cards — see
+  // chat/scenario.engine.ts. "Key" is "<jobId>::<scenario>", the upsert key, since a
+  // driver could in principle be partway through more than one scenario on the same job.
+  [SHEETS.SCENARIO_PROGRESS]: ["Key", "Job ID", "Scenario", "Step", "Fields JSON", "Message Name", "Updated"]
 };
 
 // ---------------------------------------------------------------------------
@@ -289,6 +294,83 @@ export function pendingSignatureWrite(jobId: string, messageName: string): Sheet
 export async function getPendingSignatureMessage(jobId: string): Promise<string> {
   const row = await findObject(SHEETS.PENDING_SIGNATURES, "Job ID", jobId, 0);
   return row?.["Message Name"]?.trim() ?? "";
+}
+
+// ---------------------------------------------------------------------------
+// Scenario progress — the Chat-card-driven Check In/Check Out/Parking Liability/
+// Liability Report steppers (see chat/scenario.engine.ts). One row per (job, scenario).
+// ---------------------------------------------------------------------------
+
+export interface ScenarioProgressRecord {
+  jobId: string;
+  scenario: string;
+  /** A field index ("0", "1", ...) or a sentinel: "notice:<fieldIndex>" | "photos" | "signature". */
+  step: string;
+  fields: Record<string, string>;
+  /** The Chat message currently showing this scenario's card, for the same
+   *  proactive-push pattern the classic flow's signature step uses. */
+  messageName: string;
+  updatedAt: string;
+}
+
+function scenarioProgressKey(jobId: string, scenario: string): string {
+  return `${jobId}::${scenario}`;
+}
+
+function rowToScenarioProgress(row: Record<string, string>): ScenarioProgressRecord {
+  let fields: Record<string, string> = {};
+  try {
+    fields = JSON.parse(row["Fields JSON"] || "{}");
+  } catch {
+    fields = {};
+  }
+  return {
+    jobId: row["Job ID"] ?? "",
+    scenario: row["Scenario"] ?? "",
+    step: row["Step"] ?? "",
+    fields,
+    messageName: row["Message Name"] ?? "",
+    updatedAt: row["Updated"] ?? ""
+  };
+}
+
+export function scenarioProgressWrite(record: {
+  jobId: string; scenario: string; step: string; fields: Record<string, string>; messageName: string;
+}): SheetWrite {
+  const key = scenarioProgressKey(record.jobId, record.scenario);
+  return {
+    sheet: SHEETS.SCENARIO_PROGRESS,
+    key: { column: "Key", value: key },
+    data: {
+      "Key": key,
+      "Job ID": record.jobId,
+      "Scenario": record.scenario,
+      "Step": record.step,
+      "Fields JSON": JSON.stringify(record.fields),
+      "Message Name": record.messageName,
+      "Updated": new Date().toISOString()
+    }
+  };
+}
+
+export async function getScenarioProgress(
+  jobId: string, scenario: string, ttlMs = 0
+): Promise<ScenarioProgressRecord | null> {
+  const row = await findObject(SHEETS.SCENARIO_PROGRESS, "Key", scenarioProgressKey(jobId, scenario), ttlMs);
+  return row ? rowToScenarioProgress(row) : null;
+}
+
+/**
+ * Every scenario currently in progress for a job (any scenario), most recently
+ * updated first — used to route a bare Chat-attached photo to whichever scenario is
+ * actually waiting on one, since a MESSAGE event carries no scenario of its own.
+ */
+export async function listScenarioProgressForJob(jobId: string, ttlMs = 0): Promise<ScenarioProgressRecord[]> {
+  const rows = await listObjects(SHEETS.SCENARIO_PROGRESS, ttlMs);
+  return rows
+    .filter(r => r["Job ID"] === jobId)
+    .map(rowToScenarioProgress)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function findObject(

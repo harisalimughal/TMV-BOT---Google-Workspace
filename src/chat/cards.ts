@@ -5,6 +5,9 @@ import { EvidenceRecord, EvidenceType, ExtraChargeType, Job, PaymentMethod } fro
 import { CUSTOMER_CONFIRMATION_TEXT, suggestedTotal } from "../workflow/workflow.engine";
 import { WorkflowState } from "../workflow/workflow.states";
 import { signatureLinkFor } from "./signature.link";
+import { ScenarioFieldSpec, ScenarioKey, ScenarioSpec } from "./scenario.spec";
+import { scenarioLinkFor } from "./scenario.link";
+import type { ScenarioStepView } from "./scenario.engine";
 
 export type ChatResponse = Record<string, unknown>;
 
@@ -50,6 +53,31 @@ function button(
       action: action(functionName, jobId)
     }
   };
+}
+
+/** Like action(), plus a "scenario" parameter and arbitrary extras (e.g. fieldIndex) —
+ *  every Chat-card-driven scenario step click needs to say which scenario it's for. */
+function scenarioAction(
+  functionName: string, jobId: string, scenario: string, extra: Record<string, string> = {},
+  requiredWidgets: string[] = []
+) {
+  return {
+    function: env.chatActionUrl,
+    parameters: [
+      { key: "actionName", value: functionName },
+      { key: "jobId", value: jobId },
+      { key: "scenario", value: scenario },
+      ...Object.entries(extra).map(([key, value]) => ({ key, value }))
+    ],
+    requiredWidgets
+  };
+}
+
+function scenarioButton(
+  text: string, functionName: string, jobId: string, scenario: string,
+  extra: Record<string, string> = {}, requiredWidgets: string[] = [], type: "FILLED" | "OUTLINED" = "FILLED"
+) {
+  return { text, type, onClick: { action: scenarioAction(functionName, jobId, scenario, extra, requiredWidgets) } };
 }
 
 /** A menu option. All are always enabled — see mainMenuCard(). */
@@ -235,20 +263,6 @@ export function mainMenuCard(job: Job | null): ChatResponse {
   ]);
 }
 
-/**
- * Shown after a menu scenario is confirmed available. One button opens the actual
- * form (see chat/scenario.routes.ts) as an overlay; the form itself handles
- * submission and tells the driver to come back here.
- */
-export function openFormCard(jobId: string, title: string, description: string, url: string): ChatResponse {
-  return card(`tmv-form-${jobId}-${title}`, title, "Tap to open", [
-    { textParagraph: { text: escapeHtml(description) } },
-    { buttonList: { buttons: [overlayLinkButton(`OPEN ${title.toUpperCase()}`, url)] } },
-    { textParagraph: { text: "Once you've submitted it, tap below to go back to the menu." } },
-    { buttonList: { buttons: [menuButton("Back to menu", "MAIN_MENU", jobId, true)] } }
-  ]);
-}
-
 function formatTime(iso: string): string {
   if (!iso) return "—";
   return DateTime.fromISO(iso).setZone(env.timezone).toFormat("dd LLL yyyy, HH:mm");
@@ -365,15 +379,14 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
       ]);
 
     case WorkflowState.WAITING_CLIENT_CONFIRMATION:
-      // onClose: RELOAD on the overlay button was assumed to auto-refresh this card
-      // once the customer finishes signing — confirmed live in Chat that it doesn't
-      // reliably do that, so CHECK AGAIN is back as the actual way forward.
+      // No manual button: the server proactively pushes the next card the moment the
+      // customer signs (see google/chat.ts's updateChatCard(), wired from
+      // signature.routes.ts) — confirmed working live. onClose: RELOAD stays on the
+      // overlay button as a harmless no-op in case Chat's own reload ever also fires.
       return card(id, "9. Client Signature", "Customer completion confirmation", [
         { textParagraph: { text: escapeHtml(confirmationText) } },
         { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
-        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } },
-        { textParagraph: { text: "Once they've signed, tap below to continue." } },
-        { buttonList: { buttons: [button("CHECK AGAIN", "RESUME_JOB", job.jobId)] } }
+        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } }
       ]);
 
     case WorkflowState.WAITING_ORGANIZED_PHOTO:
@@ -405,4 +418,120 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+}
+
+// ---------------------------------------------------------------------------
+// Chat-card-driven scenario steppers (Check In / Check Out / Parking Liability /
+// Liability Report) — the bot asks one field at a time, like the classic workflow,
+// instead of opening a bundled web form. Only the final signature still opens
+// externally (Chat has no drawing/canvas widget) — see chat/scenario.engine.ts for
+// the state machine these cards render.
+// ---------------------------------------------------------------------------
+
+function scenarioFieldWidget(field: ScenarioFieldSpec): any {
+  if (field.type === "yesno") {
+    return {
+      selectionInput: {
+        name: field.name, label: field.label, type: "RADIO_BUTTON",
+        items: [{ text: "Yes", value: "Yes" }, { text: "No", value: "No" }]
+      }
+    };
+  }
+  if (field.type === "select" || field.type === "multiselect") {
+    // DROPDOWN for single-select: the damage-category list alone runs to several dozen
+    // options (see scenario.text.ts), which would render as an unusably long scrolling
+    // radio-button stack on mobile — a real dropdown matches the "Tap to select" mockup
+    // and stays usable at any list length.
+    return {
+      selectionInput: {
+        name: field.name, label: field.label, type: field.type === "select" ? "DROPDOWN" : "CHECK_BOX",
+        items: (field.options ?? []).map(opt => ({ text: opt, value: opt }))
+      }
+    };
+  }
+  return { textInput: { name: field.name, label: field.label, hintText: field.placeholder ?? "Type here", type: "SINGLE_LINE" } };
+}
+
+export function scenarioFieldCard(
+  spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, fieldIndex: number
+): ChatResponse {
+  const field = spec.fields[fieldIndex];
+  const widgets: any[] = [];
+  if (fieldIndex === 0 && spec.noticeHtml) {
+    widgets.push({ textParagraph: { text: `<b>${escapeHtml(spec.noticeTitle ?? spec.title)}</b>` } });
+    widgets.push({ textParagraph: { text: escapeHtml(spec.noticeHtml) } });
+  }
+  widgets.push(scenarioFieldWidget(field));
+  widgets.push({
+    buttonList: {
+      buttons: [scenarioButton("CONTINUE", "SCENARIO_FIELD_SUBMIT", jobId, scenario, { fieldIndex: String(fieldIndex) }, [field.name])]
+    }
+  });
+  return card(`scenario-${jobId}-${scenario}-${fieldIndex}`, spec.title, `Step ${fieldIndex + 1} of ${spec.fields.length}`, widgets);
+}
+
+export function scenarioNoticeCard(spec: ScenarioSpec, scenario: ScenarioKey, jobId: string): ChatResponse {
+  const notice = spec.conditionalNotice!;
+  return card(`scenario-${jobId}-${scenario}-notice`, notice.title, spec.title, [
+    { textParagraph: { text: escapeHtml(notice.text) } },
+    { buttonList: { buttons: [scenarioButton("CONTINUE", "SCENARIO_NOTICE_ACK", jobId, scenario)] } }
+  ]);
+}
+
+export function scenarioPhotoCard(spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, received: number): ChatResponse {
+  const remaining = Math.max(0, spec.photoMin - received);
+  const widgets: any[] = [
+    { textParagraph: { text: escapeHtml(spec.photoLabel) } },
+    {
+      textParagraph: {
+        text: received > 0
+          ? `<b>${received}</b> of up to ${spec.photoMax} photo(s) received.`
+          : "Send the photo(s) directly into this chat conversation."
+      }
+    }
+  ];
+  if (remaining > 0) {
+    widgets.push({ textParagraph: { text: `At least ${remaining} more needed.` } });
+  } else {
+    widgets.push({
+      textParagraph: { text: received < spec.photoMax ? "Send another, or tap CONTINUE." : "" }
+    });
+    widgets.push({ buttonList: { buttons: [scenarioButton("CONTINUE", "SCENARIO_PHOTOS_CONTINUE", jobId, scenario)] } });
+  }
+  return card(`scenario-${jobId}-${scenario}-photos`, spec.title, "Photo evidence", widgets);
+}
+
+export function scenarioSignatureCard(spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, url: string): ChatResponse {
+  const widgets: any[] = [];
+  if (spec.signatureText) widgets.push({ textParagraph: { text: escapeHtml(spec.signatureText) } });
+  widgets.push({ textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } });
+  widgets.push({ buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", url)] } });
+  // No manual button: the server proactively pushes the submitted card the moment the
+  // customer signs (see scenario.engine.ts's finalizeScenario / scenario.routes.ts).
+  return card(`scenario-${jobId}-${scenario}-signature`, spec.title, "Waiting on signature", widgets);
+}
+
+export function scenarioSubmittedCard(spec: ScenarioSpec, jobId: string): ChatResponse {
+  return card(`scenario-${jobId}-${spec.key}-done`, `${spec.title} submitted`, `Job ${jobId}`, [
+    { textParagraph: { text: `${spec.title} has been recorded.` } },
+    { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", jobId, true)] } }
+  ]);
+}
+
+/** Dispatches to the right card for wherever a scenario's state machine currently is. */
+export function renderScenarioStep(
+  spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, step: ScenarioStepView
+): ChatResponse {
+  switch (step.kind) {
+    case "field":
+      return scenarioFieldCard(spec, scenario, jobId, step.fieldIndex);
+    case "notice":
+      return scenarioNoticeCard(spec, scenario, jobId);
+    case "photos":
+      return scenarioPhotoCard(spec, scenario, jobId, step.received);
+    case "signature":
+      return scenarioSignatureCard(spec, scenario, jobId, scenarioLinkFor(scenario, jobId));
+    case "done":
+      return scenarioSubmittedCard(spec, jobId);
+  }
 }

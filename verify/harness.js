@@ -51,7 +51,9 @@ const HEADERS = {
   StorageCheckIn: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Phone","Client Email","Client Present","Date","Photo URLs","Signature URL"],
   StorageCheckOut: ["Timestamp","Job ID","Driver","Container Number","Client Name","Client Email","Client Present At Dropoff","Date","Photo URLs","Signature URL"],
   ParkingLiability: ["Timestamp","Job ID","Driver","Address","Client Full Name","Photo URLs","Signature URL"],
-  LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"]
+  LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"],
+  PendingSignatures: ["Job ID","Message Name","Updated"],
+  ScenarioProgress: ["Key","Job ID","Scenario","Step","Fields JSON","Message Name","Updated"]
 };
 
 const tabs = {};
@@ -215,7 +217,7 @@ const cardTitle = r => JSON.stringify(r.message).match(/"title":"([^"]+)"/)?.[1]
 
   reset();
   r = await click("MENU_CHECK_IN");
-  report("WARM: open Check In form link");
+  report("WARM: tap Check In (first field card, asked step by step in Chat)");
   console.log(`  -> card: ${cardTitle(r)}`);
 
   // No standalone Finish Job menu action anymore — a job only completes via the classic

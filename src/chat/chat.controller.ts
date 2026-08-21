@@ -1,6 +1,6 @@
 import {
   ChatResponse, ChatResult, createResponse, errorResponse, evidenceFailedCard, evidencePendingCard, helpCard,
-  jobCard, mainMenuCard, noJobsCard, openFormCard, photoAckCard, updateResponse, workflowCard
+  jobCard, mainMenuCard, noJobsCard, photoAckCard, renderScenarioStep, updateResponse, workflowCard
 } from "./cards";
 import { parseCommand } from "./commands";
 import { getActiveJobForDriver, getNextJobForDriver } from "../jobs/jobs.service";
@@ -16,8 +16,11 @@ import { setContext, log } from "../utils/logger";
 import { PhaseTimer } from "../utils/timing";
 import { eventKeyFor, runOnce } from "./replay.guard";
 import { ScenarioKey, SCENARIOS } from "./scenario.spec";
-import { scenarioLinkFor } from "./scenario.link";
-import { commitWrites, getJob, getSetting, pendingSignatureWrite } from "../google/sheets";
+import {
+  acknowledgeScenarioNotice, continueFromScenarioPhotos, describeStep, isPhotosStep, receiveScenarioPhoto,
+  resolveOrStartScenario, submitScenarioField
+} from "./scenario.engine";
+import { commitWrites, getJob, getSetting, listScenarioProgressForJob, pendingSignatureWrite } from "../google/sheets";
 
 export interface GoogleChatEvent {
   type?: string;
@@ -97,12 +100,19 @@ async function withActiveJob(
   return run(job);
 }
 
+/**
+ * Menu tap for a scenario: resumes it if the driver already has it in progress,
+ * otherwise starts fresh, then renders whatever card that position calls for — the
+ * bot asks one field at a time in Chat itself now, matching the classic workflow's
+ * pattern, instead of opening a bundled web form (see chat/scenario.engine.ts).
+ */
 function scenarioMenuAction(scenario: ScenarioKey) {
   return async (event: GoogleChatEvent): Promise<ChatResponse> =>
     withActiveJob(event, async job => {
       const spec = SCENARIOS[scenario];
-      const url = scenarioLinkFor(scenario, job.jobId);
-      return openFormCard(job.jobId, spec.title, spec.menuDescription, url);
+      const progress = await resolveOrStartScenario(scenario, job.jobId, identifier(event), event.message?.name ?? "");
+      const step = await describeStep(spec, progress);
+      return renderScenarioStep(spec, scenario, job.jobId, step);
     });
 }
 
@@ -135,6 +145,41 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
               .map(f => f.attachmentDataRef?.resourceName)
               .filter((v): v is string => Boolean(v))
           });
+
+          // A photo belongs to whichever the driver's active job is actually waiting
+          // on: a scenario mid-flight (Check In/Check Out/Parking Liability/Liability
+          // Report), or the classic Start Job workflow's own photo steps. At most one
+          // scenario is normally "waiting on a photo" at a time; if more than one
+          // somehow is, the most recently touched one wins.
+          const { job: activeJob, driver } = await getActiveJobForDriver(identifier(event));
+          const scenarioWaiting = activeJob
+            ? (await listScenarioProgressForJob(activeJob.jobId, 0)).find(p => isPhotosStep(p.step))
+            : undefined;
+
+          if (activeJob && scenarioWaiting) {
+            const scenario = scenarioWaiting.scenario as ScenarioKey;
+            const spec = SCENARIOS[scenario];
+            return await runOnce(
+              eventKey,
+              { jobId: activeJob.jobId },
+              async () => {
+                const { received } = await receiveScenarioPhoto(scenario, activeJob, driver.email || driver.chatUserName, files);
+                timer.mark("photo_accept");
+                log.info("scenario photo accepted", { job_id: activeJob.jobId, scenario, received, ...timer.fields() });
+                const step = await describeStep(spec, scenarioWaiting);
+                return {
+                  result: createResponse(renderScenarioStep(spec, scenario, activeJob.jobId, step)),
+                  outcomeState: scenarioWaiting.step,
+                  jobId: activeJob.jobId
+                };
+              },
+              async replay => {
+                // Show the current real state, not a snapshot from before the retry.
+                const step = await describeStep(spec, { jobId: replay.jobId, scenario, step: "photos", fields: {}, messageName: "", updatedAt: "" });
+                return createResponse(renderScenarioStep(spec, scenario, replay.jobId, step));
+              }
+            );
+          }
 
           return await runOnce(
             eventKey,
@@ -186,6 +231,29 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (fn === "MENU_CHECK_OUT") return updateResponse(await scenarioMenuAction("checkout")(event));
         if (fn === "MENU_PARKING_LIABILITY") return updateResponse(await scenarioMenuAction("parking")(event));
         if (fn === "MENU_LIABILITY_REPORT") return updateResponse(await scenarioMenuAction("liability")(event));
+
+        if (fn === "SCENARIO_FIELD_SUBMIT" || fn === "SCENARIO_NOTICE_ACK" || fn === "SCENARIO_PHOTOS_CONTINUE") {
+          const scenario = actionParam(event, "scenario") as ScenarioKey;
+          const spec = SCENARIOS[scenario];
+          if (!spec) throw new ValidationError("This scenario is no longer available.");
+
+          return updateResponse(await withActiveJob(event, async job => {
+            const messageName = event.message?.name ?? "";
+            let progress;
+            if (fn === "SCENARIO_FIELD_SUBMIT") {
+              const fieldIndex = Number(actionParam(event, "fieldIndex"));
+              const field = spec.fields[fieldIndex];
+              const values = field ? (formInputs(event)[field.name] ?? []) : [];
+              progress = await submitScenarioField(scenario, job.jobId, fieldIndex, values, messageName);
+            } else if (fn === "SCENARIO_NOTICE_ACK") {
+              progress = await acknowledgeScenarioNotice(scenario, job.jobId, messageName);
+            } else {
+              progress = await continueFromScenarioPhotos(scenario, job.jobId, messageName);
+            }
+            const step = await describeStep(spec, progress);
+            return renderScenarioStep(spec, scenario, job.jobId, step);
+          }));
+        }
 
         const jobId = actionParam(event, "jobId");
         if (!jobId) throw new Error("Missing job ID in card action.");

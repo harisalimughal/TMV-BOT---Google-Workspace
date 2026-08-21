@@ -29,8 +29,6 @@ export interface ScenarioFieldSpec {
 export interface ScenarioSpec {
   key: ScenarioKey;
   title: string;
-  /** Shown on the intermediate "tap to open" card before the form link. */
-  menuDescription: string;
   /** Verbatim legal notice shown above the fields, if any (Parking Liability only). */
   noticeHtml?: string;
   /** Heading over the notice block — distinct from `title`, which stays the page/menu title. */
@@ -66,7 +64,6 @@ export const SCENARIOS: Record<ScenarioKey, ScenarioSpec> = {
   checkin: {
     key: "checkin",
     title: "Check In",
-    menuDescription: "Storage check-in: container number, photo evidence, client details and signature.",
     fields: [
       { name: "container_number", label: "Container Number", type: "text", required: true },
       { name: "client_name", label: "Cliente Name", type: "text", required: true },
@@ -87,7 +84,6 @@ export const SCENARIOS: Record<ScenarioKey, ScenarioSpec> = {
   checkout: {
     key: "checkout",
     title: "Check Out",
-    menuDescription: "Storage check-out: container number, photo evidence, client details and signature.",
     fields: [
       { name: "container_number", label: "Container Number", type: "text", required: true },
       { name: "client_name", label: "Cliente Name", type: "text", required: true },
@@ -107,7 +103,6 @@ export const SCENARIOS: Record<ScenarioKey, ScenarioSpec> = {
   parking: {
     key: "parking",
     title: "Parking Liability",
-    menuDescription: "Parking liability notice: address, client name, restriction photos and signature.",
     noticeHtml: PARKING_LIABILITY_NOTICE_TEXT,
     noticeTitle: PARKING_LIABILITY_NOTICE_TITLE,
     fields: [
@@ -126,7 +121,6 @@ export const SCENARIOS: Record<ScenarioKey, ScenarioSpec> = {
   liability: {
     key: "liability",
     title: "Liability Report",
-    menuDescription: "Liability for damage and accidents: damage categories, photos and signature.",
     fields: [
       {
         name: "damage_categories", label: "Damage Liability & Assembly Risk Notice", type: "select",
