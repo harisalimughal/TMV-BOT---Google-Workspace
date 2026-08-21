@@ -31,7 +31,11 @@ const TAB_SHEETS: Record<string, string> = {
   checkout: SHEETS.STORAGE_CHECK_OUT,
   parking: SHEETS.PARKING_LIABILITY,
   liability: SHEETS.LIABILITY_REPORT,
-  drivers: SHEETS.DRIVERS
+  drivers: SHEETS.DRIVERS,
+  // Every state transition (Start Job, each classic-flow step, Check In/Out, etc.) is
+  // already written here with a timestamp — this just exposes the existing audit trail
+  // rather than adding a new one.
+  activity: SHEETS.ACTIVITY
 };
 
 export function adminRouter(): Router {
@@ -70,18 +74,48 @@ export function adminRouter(): Router {
         listObjects(SHEETS.PARKING_LIABILITY, 0),
         listObjects(SHEETS.LIABILITY_REPORT, 0)
       ]);
-      const inProgress = bookings.filter(b => b.Status === "IN_PROGRESS").length;
-      const completed = bookings.filter(b => b.Status === "COMPLETED").length;
+      const countBy = (status: string) => bookings.filter(b => b.Status === status).length;
+      const ready = countBy("READY");
+      const inProgress = countBy("IN_PROGRESS");
+      const completed = countBy("COMPLETED");
+      const cancelled = countBy("CANCELLED");
+
+      // Monthly revenue: Total Charges is only ever set by the classic Start Job
+      // workflow's pricing steps, so a job that only ran Check In/Check Out (or
+      // hasn't finished the classic flow yet) has none. Base Price -- set at booking
+      // time for every job, regardless of how it's handled -- is the best available
+      // stand-in so those jobs aren't invisible on the earnings graph.
+      const money = (raw: unknown) => Number(String(raw ?? "").replace(/[£,\s]/g, "")) || 0;
+      const monthly = new Map<string, number>();
+      for (const b of bookings) {
+        const start = b["Booked Start"];
+        if (!start || b.Status === "CANCELLED") continue;
+        const month = start.slice(0, 7);
+        const revenue = money(b["Total Charges"]) || money(b["Base Price"]);
+        monthly.set(month, (monthly.get(month) ?? 0) + revenue);
+      }
+      const monthlyEarnings = [...monthly.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-12)
+        .map(([month, total]) => ({ month, total: Math.round(total * 100) / 100 }));
+
       res.status(200).json({
         kpis: [
-          { label: "Total jobs", value: bookings.length },
-          { label: "In progress", value: inProgress },
-          { label: "Completed", value: completed },
-          { label: "Check-ins", value: checkins.length },
-          { label: "Check-outs", value: checkouts.length },
-          { label: "Parking liability reports", value: parking.length },
-          { label: "Liability reports", value: liability.length }
-        ]
+          { label: "Total jobs", value: bookings.length, icon: "📦" },
+          { label: "In progress", value: inProgress, icon: "🚚" },
+          { label: "Completed", value: completed, icon: "✅" },
+          { label: "Check-ins", value: checkins.length, icon: "📥" },
+          { label: "Check-outs", value: checkouts.length, icon: "📤" },
+          { label: "Parking liability reports", value: parking.length, icon: "🅿️" },
+          { label: "Liability reports", value: liability.length, icon: "⚠️" }
+        ],
+        statusBreakdown: [
+          { label: "Ready", value: ready, color: "#94a3b8" },
+          { label: "In progress", value: inProgress, color: "#f59e0b" },
+          { label: "Completed", value: completed, color: "#22c55e" },
+          { label: "Cancelled", value: cancelled, color: "#ef4444" }
+        ],
+        monthlyEarnings
       });
     } catch (error) {
       log.error("admin dashboard load failed", error);

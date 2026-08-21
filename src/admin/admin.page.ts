@@ -11,6 +11,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { key: "parking", label: "Parking Liability" },
   { key: "liability", label: "Liability Report" },
   { key: "drivers", label: "Drivers" },
+  { key: "activity", label: "Activity Log" },
   { key: "settings", label: "Settings" }
 ];
 
@@ -70,10 +71,27 @@ export function dashboardShell(): string {
   .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
   #menuToggle { display: none; background: none; border: 1px solid #ccc; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
   h1 { font-size: 20px; margin: 0; }
-  .kpis { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 22px; }
-  .kpi { background: #fff; border-radius: 10px; padding: 16px 20px; min-width: 140px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-  .kpi .n { font-size: 24px; font-weight: 700; }
-  .kpi .l { font-size: 12px; color: #666; margin-top: 4px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-bottom: 26px; }
+  .kpi-card { display: flex; align-items: center; gap: 16px; background: #fff; border-radius: 14px; padding: 24px 22px; box-shadow: 0 1px 4px rgba(0,0,0,.07); min-height: 92px; }
+  .kpi-icon { font-size: 34px; line-height: 1; flex-shrink: 0; width: 56px; height: 56px; border-radius: 12px; background: #f0f4fb; display: flex; align-items: center; justify-content: center; }
+  .kpi-n { font-size: 30px; font-weight: 700; line-height: 1.1; }
+  .kpi-l { font-size: 13px; color: #666; margin-top: 4px; }
+  .charts-row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .chart-card { background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.07); flex: 1 1 320px; }
+  .chart-card-wide { flex: 2 1 480px; }
+  .chart-card h3 { margin: 0 0 16px; font-size: 15px; color: #333; }
+  .chart-flex { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .donut { width: 200px; height: 200px; flex-shrink: 0; }
+  .donut-total { font-size: 26px; font-weight: 700; fill: #1a1a1a; }
+  .legend { display: flex; flex-direction: column; gap: 10px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #333; }
+  .legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .legend-n { font-weight: 600; margin-left: 4px; }
+  .line-chart { width: 100%; height: auto; }
+  .chart-grid { stroke: #eee; stroke-width: 1; }
+  .chart-axis { font-size: 10px; fill: #888; }
+  .chart-area { fill: rgba(26,115,232,.08); }
+  .chart-empty { padding: 40px 0; text-align: center; color: #999; font-size: 13px; }
   .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
   .search { padding: 9px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; width: 260px; max-width: 100%; }
   .add-btn { padding: 9px 16px; font-size: 14px; font-weight: 600; border: none; border-radius: 8px; background: #1a73e8; color: #fff; cursor: pointer; }
@@ -207,13 +225,75 @@ export function dashboardShell(): string {
       }).catch(showError);
     }
 
+    function donutChart(data, size) {
+      var total = data.reduce(function (s, d) { return s + d.value; }, 0);
+      if (!total) return '<div class="chart-empty">No data yet</div>';
+      var r = size / 2 - 15, cx = size / 2, cy = size / 2, circumference = 2 * Math.PI * r;
+      var offset = 0;
+      var arcs = data.filter(function (d) { return d.value > 0; }).map(function (d) {
+        var dash = (d.value / total) * circumference;
+        var circle = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + d.color +
+          '" stroke-width="26" stroke-dasharray="' + dash + ' ' + (circumference - dash) +
+          '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"><title>' +
+          escapeHtml(d.label) + ': ' + d.value + '</title></circle>';
+        offset += dash;
+        return circle;
+      }).join('');
+      return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="donut">' + arcs +
+        '<text x="' + cx + '" y="' + cy + '" text-anchor="middle" dominant-baseline="middle" class="donut-total">' + total + '</text></svg>';
+    }
+
+    function lineChart(data, width, height) {
+      if (!data.length) return '<div class="chart-empty">No earnings data yet</div>';
+      var padL = 44, padB = 26, padT = 14, padR = 14;
+      var max = Math.max.apply(null, data.map(function (d) { return d.total; })) || 1;
+      var innerW = width - padL - padR, innerH = height - padT - padB;
+      var stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
+      var xy = data.map(function (d, i) {
+        return { x: padL + i * stepX, y: padT + innerH - (d.total / max) * innerH, d: d };
+      });
+      var points = xy.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+      var area = 'M' + padL + ',' + (padT + innerH) + ' L' + points.replace(/ /g, ' L') + ' L' + xy[xy.length - 1].x + ',' + (padT + innerH) + ' Z';
+      var dots = xy.map(function (p) {
+        return '<circle cx="' + p.x + '" cy="' + p.y + '" r="4" fill="#1a73e8"><title>' + p.d.month + ': £' + p.d.total.toFixed(2) + '</title></circle>';
+      }).join('');
+      var labels = xy.map(function (p) {
+        return '<text x="' + p.x + '" y="' + (height - 6) + '" text-anchor="middle" class="chart-axis">' + p.d.month.slice(5) + '</text>';
+      }).join('');
+      var gridY = [0, 0.5, 1].map(function (f) {
+        var y = padT + innerH * f;
+        return '<line x1="' + padL + '" y1="' + y + '" x2="' + (width - padR) + '" y2="' + y + '" class="chart-grid"></line>' +
+          '<text x="' + (padL - 8) + '" y="' + (y + 4) + '" text-anchor="end" class="chart-axis">£' + Math.round(max * (1 - f)) + '</text>';
+      }).join('');
+      return '<svg viewBox="0 0 ' + width + ' ' + height + '" class="line-chart">' + gridY +
+        '<path d="' + area + '" class="chart-area"></path>' +
+        '<polyline points="' + points + '" fill="none" stroke="#1a73e8" stroke-width="2.5"></polyline>' +
+        dots + labels + '</svg>';
+    }
+
     function loadDashboard() {
       fetch('/admin/api/dashboard').then(function (r) { return r.json(); }).then(function (data) {
         var kpis = data.kpis || [];
-        var html = '<div class="kpis">' + kpis.map(function (k) {
-          return '<div class="kpi"><div class="n">' + k.value + '</div><div class="l">' + escapeHtml(k.label) + '</div></div>';
+        var statusBreakdown = data.statusBreakdown || [];
+        var monthlyEarnings = data.monthlyEarnings || [];
+
+        var kpiHtml = '<div class="kpis">' + kpis.map(function (k) {
+          return '<div class="kpi-card"><div class="kpi-icon">' + (k.icon || '📊') + '</div>' +
+            '<div class="kpi-body"><div class="kpi-n">' + k.value + '</div><div class="kpi-l">' + escapeHtml(k.label) + '</div></div></div>';
         }).join('') + '</div>';
-        content.innerHTML = html;
+
+        var legendHtml = statusBreakdown.map(function (d) {
+          return '<div class="legend-row"><span class="legend-dot" style="background:' + d.color + '"></span>' +
+            escapeHtml(d.label) + '<span class="legend-n">' + d.value + '</span></div>';
+        }).join('');
+
+        var chartsHtml = '<div class="charts-row">' +
+          '<div class="chart-card"><h3>Job status breakdown</h3><div class="chart-flex">' +
+          donutChart(statusBreakdown, 200) + '<div class="legend">' + legendHtml + '</div></div></div>' +
+          '<div class="chart-card chart-card-wide"><h3>Monthly earnings</h3>' + lineChart(monthlyEarnings, 560, 220) + '</div>' +
+          '</div>';
+
+        content.innerHTML = kpiHtml + chartsHtml;
       }).catch(showError);
     }
 
