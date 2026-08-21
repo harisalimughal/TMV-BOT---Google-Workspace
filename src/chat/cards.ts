@@ -204,9 +204,10 @@ export function errorResponse(message: string, jobId = ""): ChatResponse {
 
 export function helpCard(): ChatResponse {
   return card("tmv-help", "TMV Driver Bot", "Google Chat operations workflow", [
-    { textParagraph: { text: "Type <b>Next Job</b> to receive your active or next unfinished job." } },
-    { textParagraph: { text: "Tapping Start Job on that job runs the full move workflow (photos, charges, payment, signature) step by step." } },
-    { textParagraph: { text: "Check In, Check Out, Parking Liability and Liability Report are separate, independent forms — open the menu (type <b>jobs</b>) and pick one any time, whether or not Start Job has been run." } }
+    { textParagraph: { text: "Tap below for the menu, or send any message." } },
+    { textParagraph: { text: "Next Job takes you to your active or next job; Start Job on that runs the full move workflow (photos, charges, payment, signature) step by step." } },
+    { textParagraph: { text: "Check In, Check Out, Parking Liability and Liability Report are separate, independent forms — pick one any time, whether or not Start Job has been run." } },
+    { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } }
   ]);
 }
 
@@ -268,7 +269,8 @@ export function jobCard(job: Job): ChatResponse {
 
 export function noJobsCard(): ChatResponse {
   return card("tmv-no-jobs", "No unfinished jobs", "You're up to date", [
-    { textParagraph: { text: "No eligible unfinished jobs were found for you today." } }
+    { textParagraph: { text: "No eligible unfinished jobs were found for you today." } },
+    { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } }
   ]);
 }
 
@@ -393,7 +395,7 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
         { decoratedText: { topLabel: "Finished", text: formatTime(job.actualFinish) } },
         { decoratedText: { topLabel: "Actual duration", text: `${job.actualMinutes} minutes` } },
         { decoratedText: { topLabel: "Total", text: formatPounds(job.totalCharges) } },
-        { textParagraph: { text: "Type <b>Next Job</b> to receive the next unfinished job." } }
+        { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } }
       ]);
 
     default:

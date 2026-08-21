@@ -329,6 +329,8 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("status column completed", statusOf(JOB_CLASSIC), "COMPLETED");
   check("finish timestamp set", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_CLASSIC, "Actual Finish")), true);
   check("completion card returned", title(doneCard), "Job completed");
+  check("completion card has a Main Menu button, not just typed text",
+    JSON.stringify(doneCard.message).includes('"Main Menu"'), true);
 
   console.log("\n" + "=".repeat(74));
   console.log("Menu scenarios run standalone -- no Start Job required or triggered");
