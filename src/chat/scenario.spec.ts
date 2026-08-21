@@ -1,11 +1,12 @@
 import { ScenarioFolderKey } from "../google/drive";
 import {
   CHECK_IN_SIGNATURE_TEXT, CHECK_OUT_SIGNATURE_TEXT, DAMAGE_CATEGORIES, LIABILITY_REPORT_SIGNATURE_TEXT,
-  PARKING_LIABILITY_NOTICE_TEXT, PARKING_LIABILITY_NOTICE_TITLE
+  OVERLOADING_LIABILITY_WAIVER_TEXT, OVERLOADING_LIABILITY_WAIVER_TITLE, PARKING_LIABILITY_NOTICE_TEXT,
+  PARKING_LIABILITY_NOTICE_TITLE
 } from "./scenario.text";
 
 export type ScenarioKey = "checkin" | "checkout" | "parking" | "liability";
-export type ScenarioFieldType = "text" | "tel" | "email" | "date" | "yesno" | "multiselect";
+export type ScenarioFieldType = "text" | "tel" | "email" | "date" | "yesno" | "multiselect" | "select";
 
 export interface ScenarioFieldSpec {
   /** Also the form field name and the sheet-write lookup key. */
@@ -13,10 +14,16 @@ export interface ScenarioFieldSpec {
   label: string;
   type: ScenarioFieldType;
   required: boolean;
-  /** multiselect only. */
+  /** multiselect/select only. */
   options?: string[];
-  /** Defaults to "Type here" (or "Tap to select" for multiselect). */
+  /** Defaults to "Type here" (or "Tap to select" for multiselect/select). */
   placeholder?: string;
+  /**
+   * select only. Renders a live "<prefix> <chosen option>" line under the field,
+   * updating as soon as the driver picks one — matches the mockup's "Tap to select"
+   * dropdown, which echoes the choice back next to "Waiver of Liability:".
+   */
+  echoPrefix?: string;
 }
 
 export interface ScenarioSpec {
@@ -38,6 +45,13 @@ export interface ScenarioSpec {
   photoLabel: string;
   photoMin: number;
   photoMax: number;
+  /**
+   * A notice block that only appears once a specific field is set to a specific value
+   * — the Liability Report's Overloading Liability Waiver, shown only when "Van
+   * Overloaded" is picked in the damage-category dropdown. Rendered right after
+   * `field`, hidden/shown live client-side as the driver changes their selection.
+   */
+  conditionalNotice?: { field: string; whenValue: string; title: string; text: string };
   /** Verbatim legal/confirmation paragraph shown above the signature pad, if any. */
   signatureText?: string;
   /** Every current scenario ends with a required signature, even ones with no
@@ -115,10 +129,14 @@ export const SCENARIOS: Record<ScenarioKey, ScenarioSpec> = {
     menuDescription: "Liability for damage and accidents: damage categories, photos and signature.",
     fields: [
       {
-        name: "damage_categories", label: "Damage Liability & Assembly Risk Notice", type: "multiselect",
-        required: true, options: DAMAGE_CATEGORIES
+        name: "damage_categories", label: "Damage Liability & Assembly Risk Notice", type: "select",
+        required: true, options: DAMAGE_CATEGORIES, placeholder: "Tap to select", echoPrefix: "Waiver of Liability:"
       }
     ],
+    conditionalNotice: {
+      field: "damage_categories", whenValue: "Van Overloaded",
+      title: OVERLOADING_LIABILITY_WAIVER_TITLE, text: OVERLOADING_LIABILITY_WAIVER_TEXT
+    },
     photoLabel: "Pictures — Take as much as need",
     photoMin: 1,
     photoMax: 8,

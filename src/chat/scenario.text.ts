@@ -25,6 +25,14 @@ export const LIABILITY_REPORT_SIGNATURE_TEXT =
   "list, as explained by the driver. The driver cannot take liability for items not properly packed or " +
   "protected, and such items or place are not covered by our insurance.";
 
+export const OVERLOADING_LIABILITY_WAIVER_TITLE = "Overloading Liability Waiver";
+
+export const OVERLOADING_LIABILITY_WAIVER_TEXT =
+  "By signing, you acknowledge that the driver has explained the need for two vans or multiple trips for " +
+  "safety and weight legal compliance. You assume full liability for any overloading fines and damage for " +
+  "the items loaded and additional costs, including extra van hire if required. The company and driver are " +
+  "not responsible for any penalties or delays caused by exceeding the legal weight limit.";
+
 export const DAMAGE_CATEGORIES = [
   "No protection provided", "Van Overloaded", "Fragile furniture", "Walls", "Ceiling", "Floor",
   "Table glass", "TV", "Artwork"

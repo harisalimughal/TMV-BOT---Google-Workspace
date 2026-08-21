@@ -350,6 +350,28 @@ const disabledButtons = r => {
   check("parking submit ok", parkingBody.ok, true);
   check("ParkingLiability row written", tabs.ParkingLiability.length - 1, 1);
 
+  console.log("\n" + "-".repeat(74));
+  console.log("Liability Report form: single-select damage category + conditional waiver");
+  console.log("-".repeat(74));
+  const liabilityLinkUrl = new URL(scenarioLinkFor("liability", JOB_STANDALONE));
+  const liabilityTarget = `http://127.0.0.1:${port}${liabilityLinkUrl.pathname}${liabilityLinkUrl.search}`;
+  const liabilityHtml = await (await fetch(liabilityTarget)).text();
+  check("liability form renders a single-select dropdown", liabilityHtml.includes("<select"), true);
+  check("liability form includes the Van Overloaded option", liabilityHtml.includes("Van Overloaded"), true);
+  check("liability form includes the conditional waiver, hidden by default",
+    /class="notice conditional-notice"[^>]*style="display:none"/.test(liabilityHtml), true);
+  check("liability form includes the waiver text", liabilityHtml.includes("Overloading Liability Waiver"), true);
+
+  const liabilitySubmit = await fetch(liabilityTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: { damage_categories: "Van Overloaded" }, photos: [png], signature: png })
+  });
+  const liabilityBody = await liabilitySubmit.json();
+  check("liability submit with a single selected category succeeds", liabilitySubmit.status, 200);
+  check("liability submit ok", liabilityBody.ok, true);
+  check("LiabilityReport row written", tabs.LiabilityReport.length - 1, 1);
+  check("LiabilityReport stores the selected category", tabs.LiabilityReport[1][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
+
   await new Promise((resolve, reject) => server.close(err => (err ? reject(err) : resolve())));
   // fetch's keep-alive pool can leave a socket to this server open past server.close()
   // (whose callback fires once it stops accepting new connections, not once every

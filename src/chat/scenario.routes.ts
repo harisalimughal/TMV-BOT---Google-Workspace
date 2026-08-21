@@ -46,6 +46,19 @@ function fieldHtml(field: ScenarioFieldSpec): string {
       <label>${escapeHtml(field.label)}${req}</label>
       <div class="multiselect" data-field="${field.name}">${options}</div>`;
   }
+  if (field.type === "select") {
+    const options = (field.options ?? []).map(opt => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`).join("");
+    const echo = field.echoPrefix
+      ? `<p class="echo" data-echo-for="${field.name}">${escapeHtml(field.echoPrefix)} <span>—</span></p>`
+      : "";
+    return `
+      <label for="f_${field.name}">${escapeHtml(field.label)}${req}</label>
+      <select id="f_${field.name}" name="f_${field.name}" data-field="${field.name}">
+        <option value="" disabled selected>${escapeHtml(field.placeholder ?? "Tap to select")}</option>
+        ${options}
+      </select>
+      ${echo}`;
+  }
   const inputType = field.type === "date" ? "date" : field.type === "tel" ? "tel" : field.type === "email" ? "email" : "text";
   return `
       <label for="f_${field.name}">${escapeHtml(field.label)}${req}</label>
@@ -72,6 +85,14 @@ function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
   let photoInserted = false;
   for (const field of spec.fields) {
     fieldsHtml += fieldHtml(field);
+    if (spec.conditionalNotice?.field === field.name) {
+      const cn = spec.conditionalNotice;
+      // Hidden until the client JS below sees the matching value selected.
+      fieldsHtml += `
+      <div class="notice conditional-notice" data-conditional-field="${escapeHtml(cn.field)}" data-conditional-value="${escapeHtml(cn.whenValue)}" style="display:none">
+        <h2>${escapeHtml(cn.title)}</h2><p>${escapeHtml(cn.text)}</p>
+      </div>`;
+    }
     if (spec.photoAfterField === field.name) {
       fieldsHtml += photoWidgetHtml(spec);
       photoInserted = true;
@@ -100,12 +121,14 @@ function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
   .notice p { font-size: 13px; line-height: 1.45; color: #7a2b27; margin: 0; }
   p.legal { font-size: 13px; color: #555; line-height: 1.45; }
   label { display: block; font-size: 14px; font-weight: 600; margin: 18px 0 6px; }
-  input[type=text], input[type=tel], input[type=email], input[type=date] {
-    width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px;
+  input[type=text], input[type=tel], input[type=email], input[type=date], select {
+    width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; background: #fff;
   }
   .yesno { display: flex; gap: 18px; }
   .radio, .checkbox { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 400; margin: 6px 0; }
   .multiselect { max-height: 220px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 8px 12px; }
+  p.echo { font-size: 13px; color: #666; margin: 8px 0 0; }
+  p.echo span { font-weight: 600; color: #1a1a1a; }
   #photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   #photos .thumb { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
   #photos .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -228,6 +251,9 @@ function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
       document.querySelectorAll('.multiselect[data-field]').forEach(function (group) {
         if (!group.querySelector('input:checked')) ok = false;
       });
+      document.querySelectorAll('select[data-field]').forEach(function (el) {
+        if (!el.value) ok = false;
+      });
       return ok;
     }
     function refreshSubmit() {
@@ -235,7 +261,28 @@ function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
       var sigOk = !HAS_SIGNATURE || hasDrawn;
       submitBtn.disabled = !(fieldsValid() && photosOk && sigOk);
     }
-    document.querySelectorAll('input').forEach(function (el) { el.addEventListener('input', refreshSubmit); el.addEventListener('change', refreshSubmit); });
+    document.querySelectorAll('input,select').forEach(function (el) { el.addEventListener('input', refreshSubmit); el.addEventListener('change', refreshSubmit); });
+
+    // A "select" field with an echoPrefix (e.g. the Liability Report damage picker)
+    // echoes the chosen option back next to its prefix as soon as it's picked, matching
+    // the "Waiver of Liability: <choice>" behaviour in the client's mockup.
+    document.querySelectorAll('select[data-field]').forEach(function (el) {
+      var echo = document.querySelector('.echo[data-echo-for="' + el.getAttribute('data-field') + '"]');
+      if (echo) {
+        var span = echo.querySelector('span');
+        el.addEventListener('change', function () { span.textContent = el.value || '—'; });
+      }
+      // Conditional notice blocks (e.g. the Liability Report's Overloading Liability
+      // Waiver) show only while their field currently holds the matching value.
+      var conditional = document.querySelector('.conditional-notice[data-conditional-field="' + el.getAttribute('data-field') + '"]');
+      if (conditional) {
+        var matchValue = conditional.getAttribute('data-conditional-value');
+        el.addEventListener('change', function () {
+          conditional.style.display = el.value === matchValue ? 'block' : 'none';
+          refreshSubmit();
+        });
+      }
+    });
 
     // ---- submit ----
     submitBtn.addEventListener('click', function () {
@@ -253,6 +300,9 @@ function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
         var values = [];
         group.querySelectorAll('input:checked').forEach(function (cb) { values.push(cb.value); });
         fields[group.getAttribute('data-field')] = values.join(' | ');
+      });
+      document.querySelectorAll('select[data-field]').forEach(function (el) {
+        fields[el.getAttribute('data-field')] = el.value;
       });
       var body = { fields: fields, photos: photos };
       if (HAS_SIGNATURE) body.signature = canvas.toDataURL('image/png');
