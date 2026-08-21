@@ -49,17 +49,39 @@ function fieldHtml(field: ScenarioFieldSpec): string {
   const inputType = field.type === "date" ? "date" : field.type === "tel" ? "tel" : field.type === "email" ? "email" : "text";
   return `
       <label for="f_${field.name}">${escapeHtml(field.label)}${req}</label>
-      <input type="${inputType}" id="f_${field.name}" name="f_${field.name}" placeholder="Type here">`;
+      <input type="${inputType}" id="f_${field.name}" name="f_${field.name}" placeholder="${escapeHtml(field.placeholder ?? "Type here")}">`;
+}
+
+function photoWidgetHtml(spec: ScenarioSpec): string {
+  return `
+      <label>${escapeHtml(spec.photoLabel)}${spec.photoMin > 0 ? " *" : ""}</label>
+      <div id="photos"></div>
+      <button id="addPhoto" type="button">📷 Upload an image</button>
+      <input type="file" id="fileInput" accept="image/*" capture="environment" ${spec.photoMax > 1 ? "multiple" : ""} style="display:none">`;
 }
 
 function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
   const notice = spec.noticeHtml
-    ? `<div class="notice"><h2>${escapeHtml(spec.title)}</h2><p>${escapeHtml(spec.noticeHtml)}</p></div>`
+    ? `<div class="notice"><h2>${escapeHtml(spec.noticeTitle ?? spec.title)}</h2><p>${escapeHtml(spec.noticeHtml)}</p></div>`
     : "";
-  const fieldsHtml = spec.fields.map(fieldHtml).join("");
-  const signatureBlock = spec.signatureText
+
+  // The photo picker renders right after `photoAfterField` (Check In/Check Out put it
+  // straight after the container number, matching the client's field order) — or after
+  // every field, the default, which already matches Parking Liability/Liability Report.
+  let fieldsHtml = "";
+  let photoInserted = false;
+  for (const field of spec.fields) {
+    fieldsHtml += fieldHtml(field);
+    if (spec.photoAfterField === field.name) {
+      fieldsHtml += photoWidgetHtml(spec);
+      photoInserted = true;
+    }
+  }
+  if (!photoInserted) fieldsHtml += photoWidgetHtml(spec);
+
+  const signatureBlock = spec.hasSignature
     ? `
-      <p class="legal">${escapeHtml(spec.signatureText)}</p>
+      ${spec.signatureText ? `<p class="legal">${escapeHtml(spec.signatureText)}</p>` : ""}
       <label>Sign below with your finger or the cursor</label>
       <canvas id="pad"></canvas>`
     : "";
@@ -102,10 +124,6 @@ function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
       ${notice ? "" : `<h1>${escapeHtml(spec.title)}</h1>`}
       ${notice}
       ${fieldsHtml}
-      <label>${escapeHtml(spec.photoLabel)}${spec.photoMin > 0 ? " *" : ""}</label>
-      <div id="photos"></div>
-      <button id="addPhoto" type="button">📷 Upload ${spec.photoMax > 1 ? "photos" : "a photo"}</button>
-      <input type="file" id="fileInput" accept="image/*" capture="environment" ${spec.photoMax > 1 ? "multiple" : ""} style="display:none">
       ${signatureBlock}
       <div class="actions"><button class="primary" id="submit" type="button" disabled>Send</button></div>
       <div id="status"></div>
@@ -118,7 +136,7 @@ function formPage(spec: ScenarioSpec, job: { customerName: string }): string {
   <script>
   (function () {
     var PHOTO_MIN = ${spec.photoMin}, PHOTO_MAX = ${spec.photoMax};
-    var HAS_SIGNATURE = ${spec.signatureText ? "true" : "false"};
+    var HAS_SIGNATURE = ${spec.hasSignature ? "true" : "false"};
     var photos = [];
     var submitBtn = document.getElementById('submit');
     var statusEl = document.getElementById('status');
@@ -352,7 +370,7 @@ export function scenarioRouter(): Router {
     }
 
     let signatureBuffer: Buffer | null = null;
-    if (spec.signatureText) {
+    if (spec.hasSignature) {
       const raw = typeof req.body?.signature === "string" ? req.body.signature : "";
       const match = raw.match(/^data:image\/png;base64,(.+)$/);
       if (!match) return res.status(400).json({ error: "A signature is required." });

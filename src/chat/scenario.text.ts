@@ -12,6 +12,8 @@ export const CHECK_OUT_SIGNATURE_TEXT =
   "condition. You have checked and received all items listed. We hold no further responsibility or " +
   "liability for these items after receipt.";
 
+export const PARKING_LIABILITY_NOTICE_TITLE = "Penalty Charge Liability Notice";
+
 export const PARKING_LIABILITY_NOTICE_TEXT =
   "(PCN) In the event a fine is received, You will cover the cost directly, ensuring the company and " +
   "drivers are not held liable. (Penalty Charge Notice) fines typically start at £60 and can go up to " +

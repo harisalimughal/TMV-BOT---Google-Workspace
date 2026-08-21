@@ -323,6 +323,33 @@ const disabledButtons = r => {
   const badLinkRes = await fetch(target.replace(/sig=[^&]+/, "sig=deadbeef"));
   check("tampered signature rejected", badLinkRes.status, 410);
 
+  console.log("\n" + "-".repeat(74));
+  console.log("Parking Liability form: requires a signature even with no legal paragraph");
+  console.log("-".repeat(74));
+  const parkingLinkUrl = new URL(scenarioLinkFor("parking", JOB_STANDALONE));
+  const parkingTarget = `http://127.0.0.1:${port}${parkingLinkUrl.pathname}${parkingLinkUrl.search}`;
+  const parkingHtml = await (await fetch(parkingTarget)).text();
+  check("parking form GET includes a signature canvas", parkingHtml.includes('id="pad"'), true);
+
+  const parkingNoSig = await fetch(parkingTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fields: { address: "12 High Street", client_name: "Barry Thompson" }, photos: [png]
+    })
+  });
+  check("parking submit without a signature is rejected", parkingNoSig.status, 400);
+
+  const parkingWithSig = await fetch(parkingTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fields: { address: "12 High Street", client_name: "Barry Thompson" }, photos: [png], signature: png
+    })
+  });
+  const parkingBody = await parkingWithSig.json();
+  check("parking submit with a signature succeeds", parkingWithSig.status, 200);
+  check("parking submit ok", parkingBody.ok, true);
+  check("ParkingLiability row written", tabs.ParkingLiability.length - 1, 1);
+
   await new Promise((resolve, reject) => server.close(err => (err ? reject(err) : resolve())));
   // fetch's keep-alive pool can leave a socket to this server open past server.close()
   // (whose callback fires once it stops accepting new connections, not once every
