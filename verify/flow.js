@@ -257,8 +257,12 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   await photo(); await drain();
   check("empty-van photo advances to client details", stateOf(JOB_CLASSIC), "WAITING_CLIENT_DETAILS");
 
-  await clickWithInputs("SUBMIT_CLIENT_DETAILS", JOB_CLASSIC, { client_name_postcode: si("Barry, N15 6UQ") });
+  const signatureStepCard = await clickWithInputs("SUBMIT_CLIENT_DETAILS", JOB_CLASSIC, { client_name_postcode: si("Barry, N15 6UQ") });
   check("client details advance to signature step", stateOf(JOB_CLASSIC), "WAITING_CLIENT_CONFIRMATION");
+  // onClose: RELOAD was assumed to auto-refresh this card once the customer signs;
+  // confirmed live in Chat that it doesn't reliably do that, so CHECK AGAIN is back.
+  check("signature step has a manual CHECK AGAIN fallback button",
+    JSON.stringify(signatureStepCard.message).includes('"CHECK AGAIN"'), true);
 
   // The customer signature is captured on their own device (see chat/signature.routes.ts)
   // rather than as a Chat form submission -- simulating it directly is the equivalent of

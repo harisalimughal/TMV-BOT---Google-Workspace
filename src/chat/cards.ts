@@ -73,9 +73,9 @@ const MENU_COLORS = {
  * Opens as a layered overlay window rather than a full new browser tab — the closest
  * thing Chat's platform has to "a pop-up in the same window", since cards themselves
  * cannot embed arbitrary content like a signature canvas or a photo picker. onClose:
- * RELOAD asks Chat to re-render the card that opened it once the overlay closes — the
- * mechanism the signature step and the scenario forms both rely on to advance
- * automatically with no manual "check again"/"back to menu" tap needed.
+ * RELOAD is set (it doesn't hurt), but confirmed live that it doesn't reliably
+ * auto-refresh the card that opened it — every caller still needs its own manual
+ * "check again"/"back to menu" button as the real way forward.
  */
 function overlayLinkButton(text: string, url: string) {
   return {
@@ -363,14 +363,15 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
       ]);
 
     case WorkflowState.WAITING_CLIENT_CONFIRMATION:
-      // No "CHECK AGAIN" fallback button: the signature pad's overlay closes with
-      // onClose: RELOAD, which re-renders this card automatically once the customer
-      // finishes signing — by then the state has already moved on to the next step, so
-      // the reload shows it without the driver needing to tap anything.
+      // onClose: RELOAD on the overlay button was assumed to auto-refresh this card
+      // once the customer finishes signing — confirmed live in Chat that it doesn't
+      // reliably do that, so CHECK AGAIN is back as the actual way forward.
       return card(id, "9. Client Signature", "Customer completion confirmation", [
         { textParagraph: { text: escapeHtml(confirmationText) } },
         { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
-        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } }
+        { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } },
+        { textParagraph: { text: "Once they've signed, tap below to continue." } },
+        { buttonList: { buttons: [button("CHECK AGAIN", "RESUME_JOB", job.jobId)] } }
       ]);
 
     case WorkflowState.WAITING_ORGANIZED_PHOTO:
