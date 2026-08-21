@@ -63,9 +63,9 @@ async function showCurrentOrNext(event: GoogleChatEvent, sync = false): Promise<
 /**
  * Shared by every MENU_* / FINISH_JOB_CONFIRM click: fresh-reads the driver's active
  * job and, if there isn't one, replies with noActiveJobCard() instead of running the
- * requested action. This is the server-side half of the menu-gating story — the
- * client-side `disabled` flag on the button is the other half, but isn't trusted
- * alone (see cards.ts's menuButton()).
+ * requested action. Menu buttons are never rendered disabled (see cards.ts's
+ * mainMenuCard()), so this server-side check is the only thing standing between a
+ * premature tap and running the scenario/finish flow with no job behind it.
  */
 async function withActiveJob(
   event: GoogleChatEvent,

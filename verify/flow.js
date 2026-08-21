@@ -145,9 +145,7 @@ const disabledButtons = r => {
 
   const menuFromSpace = await handleChatEvent({ type: "ADDED_TO_SPACE", user: USER });
   check("bot added to space -> menu shown", title(menuFromSpace), "TMV Driver Bot");
-  check("Check In disabled before start", disabledButtons(menuFromSpace).includes("Check In"), true);
-  check("Finish Job disabled before start", disabledButtons(menuFromSpace).includes("Finish Job"), true);
-  check("Next Job stays enabled before start", disabledButtons(menuFromSpace).includes("Next Job"), false);
+  check("nothing disabled before start (buttons always enabled)", disabledButtons(menuFromSpace).length, 0);
 
   const blocked = await click("MENU_CHECK_IN");
   check("scenario blocked without an active job", title(blocked), "Start a job first");
@@ -168,8 +166,7 @@ const disabledButtons = r => {
 
   const menuAfter = await click("RESUME_JOB");
   check("active job -> full menu shown", title(menuAfter), "TMV Driver Bot");
-  check("Check In enabled after start", disabledButtons(menuAfter).includes("Check In"), false);
-  check("Finish Job enabled after start", disabledButtons(menuAfter).includes("Finish Job"), false);
+  check("nothing disabled after start either", disabledButtons(menuAfter).length, 0);
 
   console.log("\n" + "-".repeat(74));
   console.log("Scenario link generation (all 4)");

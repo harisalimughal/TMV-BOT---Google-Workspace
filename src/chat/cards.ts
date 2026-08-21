@@ -126,20 +126,24 @@ export function helpCard(): ChatResponse {
 
 /**
  * Entry-point menu. Shown when the bot is added to a space, whenever a driver types
- * "jobs" / "next job" / "help" / "start", and after every menu action completes. Only
- * "Next Job" is enabled until a job is actually started — the other five stay
- * disabled (see menuButton()) until `job.status === IN_PROGRESS`.
+ * "jobs" / "next job" / "help" / "start", and after every menu action completes.
+ *
+ * All six buttons are always enabled — a driver can tap Check In, Finish Job, etc.
+ * before a job is started or between steps, with no greyed-out state to fight with
+ * on Chat clients that may render `disabled` inconsistently. Each handler still
+ * re-checks job.status server-side on a fresh read and replies with noActiveJobCard()
+ * if tapped with nothing active, so this is a UI simplification, not a removal of the
+ * underlying guard. Re-introduce per-button gating here if the client asks for it later.
  */
 export function mainMenuCard(job: Job | null): ChatResponse {
-  const active = job?.status === "IN_PROGRESS";
   const jobId = job?.jobId ?? "";
   return card("tmv-main-menu", "TMV Driver Bot", "What do you want to do?", [
     { buttonList: { buttons: [menuButton("Next Job", "RESUME_JOB", jobId, true)] } },
-    { buttonList: { buttons: [menuButton("Check In", "MENU_CHECK_IN", jobId, active)] } },
-    { buttonList: { buttons: [menuButton("Check Out", "MENU_CHECK_OUT", jobId, active)] } },
-    { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, active)] } },
-    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, active)] } },
-    { buttonList: { buttons: [menuButton("Finish Job", "FINISH_JOB_CONFIRM", jobId, active, "OUTLINED")] } }
+    { buttonList: { buttons: [menuButton("Check In", "MENU_CHECK_IN", jobId, true)] } },
+    { buttonList: { buttons: [menuButton("Check Out", "MENU_CHECK_OUT", jobId, true)] } },
+    { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, true)] } },
+    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true)] } },
+    { buttonList: { buttons: [menuButton("Finish Job", "FINISH_JOB_CONFIRM", jobId, true, "OUTLINED")] } }
   ]);
 }
 
