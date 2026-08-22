@@ -15,6 +15,8 @@ import { drainInlineQueue, registerInlineDispatcher } from "./queue/queue.servic
 import { scenarioRouter } from "./chat/scenario.routes";
 import { signatureRouter } from "./chat/signature.routes";
 import { adminRouter } from "./admin/admin.routes";
+// Dashboard router mounted from isolated dashboard directory
+const dashboardRouter: () => express.Router = require("../dashboard/server/router").dashboardRouter;
 
 const app = express();
 app.disable("x-powered-by");
@@ -135,6 +137,8 @@ app.post("/internal/sync", async (req, res) => {
     }
   });
 });
+
+app.use("/ops", dashboardRouter());
 
 app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
   log.error("unhandled express error", error);
