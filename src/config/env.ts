@@ -75,6 +75,16 @@ export const env = {
   // Hard ceilings so a slow Google call can never hold a driver on a spinner.
   mediaDownloadTimeoutMs: numberEnv("TMV_MEDIA_DOWNLOAD_TIMEOUT_MS", 15_000),
   emailTimeoutMs: numberEnv("TMV_EMAIL_TIMEOUT_MS", 5_000),
+  smsTimeoutMs: numberEnv("TMV_SMS_TIMEOUT_MS", 5_000),
+
+  /**
+   * Firetext (firetext.co.uk) sends the "your move has started" customer SMS, alongside
+   * the equivalent email. Both blank (the default) means SMS sending is simply skipped
+   * -- same as a job with no customerEmail already skips the email.
+   */
+  firetextApiKey: process.env.FIRETEXT_API_KEY?.trim() || "",
+  /** Sender ID shown as the "from" on the text -- 3-11 alphanumeric characters, no spaces. */
+  firetextSenderId: process.env.FIRETEXT_SENDER_ID?.trim() || "",
 
   // ---------------------------------------------------------------------------
   // Background processing

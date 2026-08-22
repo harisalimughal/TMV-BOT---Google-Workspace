@@ -302,6 +302,11 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("double-tap START_JOB keeps the same timestamp", fieldOf(JOB_CLASSIC, "Actual Start"), startedAt);
   await drain();
   check("exactly one start email sent", calls.email ?? 0, 1);
+  // Firetext isn't configured in this test env (no FIRETEXT_API_KEY/SENDER_ID) -- the
+  // SMS task must still enqueue and process cleanly as a no-op, not throw or crash the
+  // drain, and must not record a fake "sent" outcome.
+  check("start SMS task no-ops cleanly when Firetext isn't configured",
+    tabs.ActivityLog.slice(1).some(r => r[HEADERS.ActivityLog.indexOf("Action")] === "CLIENT_START_SMS_SENT"), false);
 
   await photo(); await drain();
   check("arrival photo advances to loaded-photo step", stateOf(JOB_CLASSIC), "WAITING_LOADED_PHOTO");

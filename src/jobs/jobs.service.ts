@@ -4,7 +4,7 @@ import {
   activityWrite, commitWrites, getDriver, getJob, jobWrite, listJobs, SheetWrite, workflowWrite
 } from "../google/sheets";
 import { enqueue } from "../queue/queue.service";
-import { SendJobStartedEmailTask } from "../queue/queue.types";
+import { SendJobStartedEmailTask, SendJobStartedSmsTask } from "../queue/queue.types";
 import { WorkflowState } from "../workflow/workflow.states";
 import { DriverProfile, Job, JobStatus } from "./job.types";
 import { syncTodayBookings } from "./booking.service";
@@ -215,6 +215,14 @@ export async function startJob(jobId: string, identifier: string): Promise<Job> 
       jobId: job.jobId,
       driverEmail: driver.email || driver.chatUserName
     } satisfies SendJobStartedEmailTask);
+    // Same background pattern for the SMS -- the handler itself no-ops if Firetext
+    // isn't configured or the job has no phone number, so this is safe to enqueue
+    // unconditionally.
+    await enqueue({
+      type: "SEND_JOB_STARTED_SMS",
+      jobId: job.jobId,
+      driverEmail: driver.email || driver.chatUserName
+    } satisfies SendJobStartedSmsTask);
 
     return job;
   });

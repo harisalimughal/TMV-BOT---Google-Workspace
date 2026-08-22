@@ -6,7 +6,7 @@
  * in the queue through a config change or a retry still operates on current state.
  */
 
-export type TaskType = "PROCESS_JOB_IMAGE" | "SEND_JOB_STARTED_EMAIL" | "SWEEP_STALE_EVIDENCE";
+export type TaskType = "PROCESS_JOB_IMAGE" | "SEND_JOB_STARTED_EMAIL" | "SEND_JOB_STARTED_SMS" | "SWEEP_STALE_EVIDENCE";
 
 export interface ProcessJobImageTask {
   type: "PROCESS_JOB_IMAGE";
@@ -21,16 +21,24 @@ export interface SendJobStartedEmailTask {
   driverEmail: string;
 }
 
+export interface SendJobStartedSmsTask {
+  type: "SEND_JOB_STARTED_SMS";
+  jobId: string;
+  /** Deduplication scope: one start SMS per job, ever. */
+  driverEmail: string;
+}
+
 export interface SweepStaleEvidenceTask {
   type: "SWEEP_STALE_EVIDENCE";
 }
 
-export type QueueTask = ProcessJobImageTask | SendJobStartedEmailTask | SweepStaleEvidenceTask;
+export type QueueTask = ProcessJobImageTask | SendJobStartedEmailTask | SendJobStartedSmsTask | SweepStaleEvidenceTask;
 
 /** Worker HTTP paths. Cloud Tasks targets these directly. */
 export const TASK_ROUTES: Record<TaskType, string> = {
   PROCESS_JOB_IMAGE: "/internal/tasks/process-image",
   SEND_JOB_STARTED_EMAIL: "/internal/tasks/send-email",
+  SEND_JOB_STARTED_SMS: "/internal/tasks/send-sms",
   SWEEP_STALE_EVIDENCE: "/internal/tasks/sweep-evidence"
 };
 
@@ -47,6 +55,8 @@ export function taskDedupeId(task: QueueTask): string {
       return `image-${task.evidenceId}`;
     case "SEND_JOB_STARTED_EMAIL":
       return `startmail-${task.jobId}`;
+    case "SEND_JOB_STARTED_SMS":
+      return `startsms-${task.jobId}`;
     case "SWEEP_STALE_EVIDENCE":
       // Time-bucketed: the sweep is meant to recur, so it must not dedupe forever.
       return `sweep-${Math.floor(Date.now() / 60_000)}`;
@@ -57,7 +67,12 @@ export function taskDedupeId(task: QueueTask): string {
 
 export function isQueueTask(value: unknown): value is QueueTask {
   const type = (value as { type?: unknown })?.type;
-  return type === "PROCESS_JOB_IMAGE" || type === "SEND_JOB_STARTED_EMAIL" || type === "SWEEP_STALE_EVIDENCE";
+  return (
+    type === "PROCESS_JOB_IMAGE" ||
+    type === "SEND_JOB_STARTED_EMAIL" ||
+    type === "SEND_JOB_STARTED_SMS" ||
+    type === "SWEEP_STALE_EVIDENCE"
+  );
 }
 
 /**
