@@ -414,13 +414,11 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("photo step asks for evidence, not the next field yet", hasText(checkInPhotosEmpty, "Evidence that the items have been loaded."), true);
   check("no CONTINUE button until the minimum photo count is met", hasText(checkInPhotosEmpty, "CONTINUE"), false);
 
-  const checkInAfterPhoto = await photo();
-  check("sending a photo advances the received count immediately (no drain needed)",
-    hasText(checkInAfterPhoto, "<b>1</b> of up to 1 photo(s) received."), true);
-  check("CONTINUE appears once the minimum is met", hasText(checkInAfterPhoto, "CONTINUE"), true);
-
-  const checkInField1 = await continuePhotos(JOB_STANDALONE, "checkin");
-  check("continuing from photos resumes the REMAINING fields, not signature", subtitle(checkInField1), "Step 2 of 6");
+  // Check In's photoMin === photoMax === 1, so there's nothing left to offer once the
+  // one required photo is in -- the driver is auto-advanced straight to the next field
+  // rather than being made to tap CONTINUE on a card with no other option.
+  const checkInField1 = await photo();
+  check("the single required photo auto-advances -- no manual CONTINUE needed", subtitle(checkInField1), "Step 2 of 6");
   check("resumed field is Client Name", hasText(checkInField1, "Client Name"), true);
 
   const checkInField2 = await submitField(JOB_STANDALONE, "checkin", 1, "client_name", "Barry Thompson");
@@ -501,9 +499,8 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const checkOutField0 = await menuTap("MENU_CHECK_OUT", JOB_STANDALONE, "checkout");
   check("Check Out step 1 of 5", subtitle(checkOutField0), "Step 1 of 5");
   await submitField(JOB_STANDALONE, "checkout", 0, "container_number", "C-999");
-  await photo();
-  const checkOutField1 = await continuePhotos(JOB_STANDALONE, "checkout");
-  check("Check Out resumes remaining fields after its photo step", subtitle(checkOutField1), "Step 2 of 5");
+  const checkOutField1 = await photo();
+  check("Check Out's single required photo also auto-advances", subtitle(checkOutField1), "Step 2 of 5");
   await submitField(JOB_STANDALONE, "checkout", 1, "client_name", "Barry Thompson");
   await submitField(JOB_STANDALONE, "checkout", 2, "client_email", "barry@example.test");
   await submitField(JOB_STANDALONE, "checkout", 3, "client_present", "No");

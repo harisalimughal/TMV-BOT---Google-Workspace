@@ -181,10 +181,22 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
                 const { received } = await receiveScenarioPhoto(scenario, activeJob, driver.email || driver.chatUserName, files);
                 timer.mark("photo_accept");
                 log.info("scenario photo accepted", { job_id: activeJob.jobId, scenario, received, ...timer.fields() });
-                const step = await describeStep(spec, scenarioWaiting);
+
+                // Once the max is reached there's nothing left to offer -- for Check
+                // In/Check Out (photoMin === photoMax === 1) that's every single time, so
+                // making the driver tap CONTINUE on a card with no other option was pure
+                // friction (and a trap: sending one more photo by habit just got rejected
+                // with "already sent the maximum", with no visible way forward). Parking
+                // Liability/Liability Report still show the manual button, since a driver
+                // there really can choose to send more before continuing.
+                const messageName = event.message?.name ?? scenarioWaiting.messageName;
+                const progress = received >= spec.photoMax
+                  ? await continueFromScenarioPhotos(scenario, activeJob.jobId, messageName)
+                  : scenarioWaiting;
+                const step = await describeStep(spec, progress);
                 return {
                   result: createResponse(renderScenarioStep(spec, scenario, activeJob.jobId, step)),
-                  outcomeState: scenarioWaiting.step,
+                  outcomeState: progress.step,
                   jobId: activeJob.jobId
                 };
               },
