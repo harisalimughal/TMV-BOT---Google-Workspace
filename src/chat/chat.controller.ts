@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import {
   ChatResponse, ChatResult, createResponse, errorResponse, evidenceFailedCard, evidencePendingCard, helpCard,
   jobCard, mainMenuCard, noJobsCard, photoAckCard, renderScenarioStep, updateResponse, workflowCard
@@ -60,7 +61,19 @@ function formInputs(event: GoogleChatEvent): Record<string, string[]> {
   const result: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(source)) {
     const strings = value?.stringInputs?.value;
-    if (Array.isArray(strings)) result[key] = strings.map(String);
+    if (Array.isArray(strings)) {
+      result[key] = strings.map(String);
+      continue;
+    }
+    // A dateTimePicker (DATE_ONLY) field's submission comes back shaped completely
+    // differently from every other widget -- a millisecond epoch for UTC midnight of
+    // the chosen calendar date, not a string. Read with the UTC zone so e.g. a driver
+    // west of Greenwich picking "15 Aug" doesn't get shifted back to "14 Aug" by a
+    // local-timezone conversion.
+    const dateMs = value?.dateInput?.msSinceEpoch ?? value?.dateTimeInput?.msSinceEpoch;
+    if (dateMs !== undefined && dateMs !== null && dateMs !== "") {
+      result[key] = [DateTime.fromMillis(Number(dateMs), { zone: "utc" }).toFormat("dd/MM/yyyy")];
+    }
   }
   return result;
 }

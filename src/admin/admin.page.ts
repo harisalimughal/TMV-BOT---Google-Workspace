@@ -459,14 +459,44 @@ export function dashboardShell(): string {
       document.getElementById('modalBg').classList.add('open');
     }
 
+    // Photo URLs / Signature URL cells hold one or more Drive webViewLinks (pipe-joined
+    // for Photo URLs) -- shown as raw text before, which meant a driver's photo was a
+    // wall of unclickable-looking URLs instead of something you could actually glance
+    // at. The file id lives right inside that URL's stable ".../file/d/<id>/..." shape,
+    // so it can be pulled out client-side and pointed at the same authenticated
+    // thumbnail proxy the Finished Jobs tab uses -- no server changes needed here.
+    var DRIVE_LINK_COLUMNS = ['Photo URLs', 'Signature URL'];
+    function driveThumbsHtml(cellValue) {
+      var ids = String(cellValue || '').split('|').map(function (s) { return s.trim(); }).filter(Boolean)
+        .map(function (u) { var m = u.match(/\/d\/([A-Za-z0-9_-]+)/); return m ? m[1] : null; })
+        .filter(Boolean);
+      if (!ids.length) return '<span class="muted">—</span>';
+      return '<div class="thumb-row">' + ids.map(function (id) {
+        var src = '/admin/api/drive-file/' + id;
+        return '<img class="thumb" src="' + src + '" data-full="' + src + '">';
+      }).join('') + '</div>';
+    }
+    function bindThumbClicks(root) {
+      Array.prototype.forEach.call(root.querySelectorAll('.thumb'), function (img) {
+        img.addEventListener('click', function (e) {
+          e.stopPropagation();
+          window.open(img.getAttribute('data-full'), '_blank');
+        });
+      });
+    }
+
     function renderRows(columns, rows) {
       var tbody = document.getElementById('tbody');
       if (!tbody) return;
       tbody.innerHTML = rows.map(function (row, i) {
         return '<tr class="clickable" data-i="' + i + '">' +
-          columns.map(function (c) { return '<td>' + escapeHtml(String(row[c] || '')) + '</td>'; }).join('') +
+          columns.map(function (c) {
+            if (DRIVE_LINK_COLUMNS.indexOf(c) !== -1) return '<td>' + driveThumbsHtml(row[c]) + '</td>';
+            return '<td>' + escapeHtml(String(row[c] || '')) + '</td>';
+          }).join('') +
           '</tr>';
       }).join('');
+      bindThumbClicks(tbody);
       Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function (tr) {
         tr.addEventListener('click', function () {
           openDetail(columns, rows[Number(tr.getAttribute('data-i'))]);
@@ -478,9 +508,11 @@ export function dashboardShell(): string {
       var modal = document.getElementById('modal');
       modal.innerHTML = '<h3>Details</h3>' +
         columns.map(function (c) {
-          return '<div class="row"><div class="k">' + escapeHtml(c) + '</div><div class="v">' + escapeHtml(String(row[c] || '—')) + '</div></div>';
+          var v = DRIVE_LINK_COLUMNS.indexOf(c) !== -1 ? driveThumbsHtml(row[c]) : escapeHtml(String(row[c] || '—'));
+          return '<div class="row"><div class="k">' + escapeHtml(c) + '</div><div class="v">' + v + '</div></div>';
         }).join('') +
         '<button class="close" id="modalClose">Close</button>';
+      bindThumbClicks(modal);
       document.getElementById('modalClose').addEventListener('click', closeModal);
       document.getElementById('modalBg').classList.add('open');
     }

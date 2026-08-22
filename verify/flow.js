@@ -233,6 +233,12 @@ const scenarioClick = (fn, jobId, scenario, extra = {}, formInputsObj = {}) => h
 });
 const submitField = (jobId, scenario, fieldIndex, fieldName, ...values) =>
   scenarioClick("SCENARIO_FIELD_SUBMIT", jobId, scenario, { fieldIndex: String(fieldIndex) }, { [fieldName]: si(...values) });
+// Real Chat submits a dateTimePicker (DATE_ONLY) field as a UTC-midnight epoch, not
+// text -- a completely different shape from every other widget (see
+// chat.controller.ts's formInputs()), so this needs its own helper rather than si().
+const submitDateField = (jobId, scenario, fieldIndex, fieldName, msSinceEpoch) =>
+  scenarioClick("SCENARIO_FIELD_SUBMIT", jobId, scenario, { fieldIndex: String(fieldIndex) },
+    { [fieldName]: { dateInput: { msSinceEpoch: String(msSinceEpoch) } } });
 const ackNotice = (jobId, scenario) => scenarioClick("SCENARIO_NOTICE_ACK", jobId, scenario);
 const continuePhotos = (jobId, scenario) => scenarioClick("SCENARIO_PHOTOS_CONTINUE", jobId, scenario);
 
@@ -421,7 +427,9 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const checkInField5 = await submitField(JOB_STANDALONE, "checkin", 4, "client_present", "Yes");
   check("step 6 of 6 (date)", subtitle(checkInField5), "Step 6 of 6");
 
-  const checkInSig = await submitField(JOB_STANDALONE, "checkin", 5, "date", "2026-08-15");
+  // Real Chat submits this field as a dateTimePicker epoch, not typed text -- 15 Aug
+  // 2026, UTC midnight.
+  const checkInSig = await submitDateField(JOB_STANDALONE, "checkin", 5, "date", Date.UTC(2026, 7, 15));
   check("final field goes straight to signature -- photo step is not asked again", title(checkInSig), "Check In");
   check("signature step subtitle", subtitle(checkInSig), "Waiting on signature");
   check("signature step shows the verbatim Check In confirmation text", hasText(checkInSig, CHECK_IN_SIGNATURE_TEXT), true);
@@ -451,6 +459,8 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("StorageCheckIn row written", tabs.StorageCheckIn.length - 1, 1);
   check("StorageCheckIn captured the container number entered in Chat",
     tabs.StorageCheckIn[1][HEADERS.StorageCheckIn.indexOf("Container Number")], "C-123");
+  check("StorageCheckIn's date column has the date picker's value, formatted dd/MM/yyyy",
+    tabs.StorageCheckIn[1][HEADERS.StorageCheckIn.indexOf("Date")], "15/08/2026");
   check("job still not started after a scenario submit", statusOf(JOB_STANDALONE), "READY");
 
   check("signing pushed the submitted card into Chat automatically", lastChatPatch !== null, true);
@@ -476,7 +486,7 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   await submitField(JOB_STANDALONE, "checkout", 1, "client_name", "Barry Thompson");
   await submitField(JOB_STANDALONE, "checkout", 2, "client_email", "barry@example.test");
   await submitField(JOB_STANDALONE, "checkout", 3, "client_present", "No");
-  const checkOutSig = await submitField(JOB_STANDALONE, "checkout", 4, "date", "2026-08-16");
+  const checkOutSig = await submitDateField(JOB_STANDALONE, "checkout", 4, "date", Date.UTC(2026, 7, 16));
   check("Check Out reaches signature with the verbatim Check Out confirmation text",
     hasText(checkOutSig, CHECK_OUT_SIGNATURE_TEXT), true);
   await drain();
@@ -488,6 +498,8 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   });
   check("check-out sign POST status", checkOutPostRes.status, 200);
   check("StorageCheckOut row written", tabs.StorageCheckOut.length - 1, 1);
+  check("StorageCheckOut's date column has the date picker's value, formatted dd/MM/yyyy",
+    tabs.StorageCheckOut[1][HEADERS.StorageCheckOut.indexOf("Date")], "16/08/2026");
 
   console.log("\n" + "-".repeat(74));
   console.log("Parking Liability: notice on field 1, bare signature (no legal paragraph), 4-photo cap");

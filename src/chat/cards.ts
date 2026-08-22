@@ -449,6 +449,12 @@ function scenarioFieldWidget(field: ScenarioFieldSpec): any {
       }
     };
   }
+  if (field.type === "date") {
+    // A real calendar picker instead of a plain text box the driver had to type a date
+    // into by hand — Chat submits this back as a UTC-midnight epoch, not text (see
+    // chat.controller.ts's formInputs(), which converts it to dd/MM/yyyy).
+    return { dateTimePicker: { name: field.name, label: field.label, type: "DATE_ONLY" } };
+  }
   return { textInput: { name: field.name, label: field.label, hintText: field.placeholder ?? "Type here", type: "SINGLE_LINE" } };
 }
 
