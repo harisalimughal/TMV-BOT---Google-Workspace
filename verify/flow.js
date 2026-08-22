@@ -548,6 +548,15 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("dropdown includes the last (longest) category added",
     dropdown?.items?.some(i => i.value === "Lift Got No Protection – Damage Responsibility Notice"), true);
 
+  // Chat's dropdown has no hover-tooltip for a long item -- it just gets cut off
+  // mid-word. The "(e.g., ...)" examples are dropped from the on-screen label only;
+  // the full original text must still be what actually gets submitted and stored.
+  const glassware = dropdown?.items?.find(i => i.value.startsWith("Glassware"));
+  check("long option's stored value keeps the full original text", glassware?.value, "Glassware (e.g., glasses, plates, mirrors, vases)");
+  check("long option's on-screen label drops the parenthetical so it doesn't truncate", glassware?.text, "Glassware");
+  const shortOption = dropdown?.items?.find(i => i.value === "Van Overloaded");
+  check("a short option's label is untouched", shortOption?.text, "Van Overloaded");
+
   const liabilityNotice = await submitField(JOB_STANDALONE, "liability", 0, "damage_categories", "Van Overloaded");
   check("picking Van Overloaded shows the conditional Overloading Liability Waiver", title(liabilityNotice), OVERLOADING_LIABILITY_WAIVER_TITLE);
   check("waiver shows the verbatim waiver text", hasText(liabilityNotice, OVERLOADING_LIABILITY_WAIVER_TEXT), true);

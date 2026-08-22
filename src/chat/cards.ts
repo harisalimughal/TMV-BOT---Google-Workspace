@@ -442,10 +442,15 @@ function scenarioFieldWidget(field: ScenarioFieldSpec): any {
     // options (see scenario.text.ts), which would render as an unusably long scrolling
     // radio-button stack on mobile — a real dropdown matches the "Tap to select" mockup
     // and stays usable at any list length.
+    // Chat's own dropdown/checkbox widget has no hover-tooltip or wrapping affordance
+    // for a long item -- it just gets cut off mid-word (e.g. "Glassware (e.g., glasses,
+    // plates..."). Nothing in the card JSON controls that rendering, so instead the
+    // "(e.g., ...)" examples are dropped from what's DISPLAYED only; `value` (what's
+    // actually submitted and stored) stays the full original text either way.
     return {
       selectionInput: {
         name: field.name, label: field.label, type: field.type === "select" ? "DROPDOWN" : "CHECK_BOX",
-        items: (field.options ?? []).map(opt => ({ text: opt, value: opt }))
+        items: (field.options ?? []).map(opt => ({ text: opt.split(" (e.g.,")[0], value: opt }))
       }
     };
   }
