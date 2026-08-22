@@ -127,6 +127,14 @@ export function dashboardShell(): string {
   .modal-actions .close { flex: 1; margin-top: 0; }
   .modal-actions .primary { flex: 1; padding: 10px; border: none; border-radius: 8px; background: #1a73e8; color: #fff; font-weight: 600; cursor: pointer; }
   .modal .error { color: #b3261e; font-size: 13px; margin-top: 10px; min-height: 16px; }
+  .btn-spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.5); border-top-color: #fff; border-radius: 50%; vertical-align: -2px; margin-right: 7px; animation: tmv-spin .7s linear infinite; }
+  @keyframes tmv-spin { to { transform: rotate(360deg); } }
+  .modal-actions .primary:disabled { opacity: .75; cursor: default; }
+  .modal-success { text-align: center; padding: 8px 4px 4px; }
+  .modal-success .tick { width: 56px; height: 56px; margin: 0 auto 14px; }
+  .modal-success h3 { margin: 0 0 6px; }
+  .modal-success p { color: #666; font-size: 13px; margin: 0 0 18px; }
+  .modal-success .close { width: 100%; padding: 10px; border: none; border-radius: 8px; background: #eee; cursor: pointer; }
   @media (max-width: 720px) {
     #menuToggle { display: inline-block; }
     .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 20; margin-left: -220px; }
@@ -357,7 +365,7 @@ export function dashboardShell(): string {
 
     var ADD_FORMS = {
       jobs: {
-        title: 'Add job', endpoint: '/admin/api/jobs',
+        title: 'Add job', successLabel: 'Job added', endpoint: '/admin/api/jobs',
         fields: [
           { name: 'customerName', label: 'Customer name', type: 'text', required: true, placeholder: 'e.g. John Smith' },
           { name: 'customerEmail', label: 'Customer email', type: 'email', placeholder: 'e.g. john@example.com' },
@@ -374,7 +382,7 @@ export function dashboardShell(): string {
         ]
       },
       drivers: {
-        title: 'Add driver', endpoint: '/admin/api/drivers',
+        title: 'Add driver', successLabel: 'Driver added', endpoint: '/admin/api/drivers',
         fields: [
           { name: 'initials', label: 'Initials (used to match jobs to this driver)', type: 'text',
             required: true, attrs: 'maxlength="5" pattern="[A-Za-z]{1,5}" title="1-5 letters, e.g. JD"', placeholder: 'e.g. JD' },
@@ -442,21 +450,41 @@ export function dashboardShell(): string {
           payload[f.name] = f.type === 'checkbox' ? el.checked : el.value.trim();
         });
         var submitBtn = e.target.querySelector('button[type=submit]');
+        var cancelBtn = document.getElementById('modalCancel');
+        var originalLabel = submitBtn.textContent;
         submitBtn.disabled = true;
+        cancelBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="btn-spinner"></span>Saving…';
         fetch(form.endpoint, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         }).then(function (r) {
           if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || 'Failed to save.'); });
           return r.json();
         }).then(function () {
-          closeModal();
           loadTable(tab);
+          showSavedModal(form.successLabel || (form.title + ' saved'));
         }).catch(function (err) {
           document.getElementById('formError').textContent = err.message;
           submitBtn.disabled = false;
+          cancelBtn.disabled = false;
+          submitBtn.textContent = originalLabel;
         });
       });
       document.getElementById('modalBg').classList.add('open');
+    }
+
+    function showSavedModal(message) {
+      var modal = document.getElementById('modal');
+      modal.innerHTML =
+        '<div class="modal-success">' +
+        '<svg class="tick" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="none" stroke="#22c55e" stroke-width="3"></circle>' +
+        '<path fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M14 27l7 7 17-17"></path></svg>' +
+        '<h3>' + escapeHtml(message) + '</h3>' +
+        '<p>You can close this now.</p>' +
+        '<button class="close" id="savedClose">Close</button>' +
+        '</div>';
+      document.getElementById('savedClose').addEventListener('click', closeModal);
+      setTimeout(closeModal, 1600);
     }
 
     // Photo URLs / Signature URL cells hold one or more Drive webViewLinks (pipe-joined
