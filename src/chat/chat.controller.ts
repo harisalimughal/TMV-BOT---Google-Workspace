@@ -21,7 +21,9 @@ import {
   acknowledgeScenarioNotice, continueFromScenarioPhotos, describeStep, isPhotosStep, receiveScenarioPhoto,
   resolveOrStartScenario, submitScenarioField
 } from "./scenario.engine";
-import { commitWrites, getJob, getSetting, listScenarioProgressForJob, pendingSignatureWrite } from "../google/sheets";
+import {
+  commitWrites, getJob, getScenarioProgress, getSetting, listScenarioProgressForJob, pendingSignatureWrite
+} from "../google/sheets";
 
 export interface GoogleChatEvent {
   type?: string;
@@ -187,8 +189,13 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
                 };
               },
               async replay => {
-                // Show the current real state, not a snapshot from before the retry.
-                const step = await describeStep(spec, { jobId: replay.jobId, scenario, step: "photos", fields: {}, messageName: "", updatedAt: "" });
+                // Show the current real state, not a snapshot from before the retry --
+                // re-read rather than fabricate, so startedAt (and thus the photo count)
+                // reflects the real attempt, not a synthetic stand-in.
+                const current = await getScenarioProgress(replay.jobId, scenario, 0);
+                const step = current
+                  ? await describeStep(spec, current)
+                  : ({ kind: "photos", received: 0 } as const);
                 return createResponse(renderScenarioStep(spec, scenario, replay.jobId, step));
               }
             );

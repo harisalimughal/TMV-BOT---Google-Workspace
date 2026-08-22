@@ -53,7 +53,7 @@ const HEADERS = {
   ParkingLiability: ["Timestamp","Job ID","Driver","Address","Client Full Name","Photo URLs","Signature URL"],
   LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"],
   PendingSignatures: ["Job ID","Message Name","Updated"],
-  ScenarioProgress: ["Key","Job ID","Scenario","Step","Fields JSON","Message Name","Updated"]
+  ScenarioProgress: ["Key","Job ID","Scenario","Step","Fields JSON","Message Name","Started","Updated"]
 };
 
 const tabs = {};

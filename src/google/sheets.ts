@@ -89,7 +89,7 @@ export const SCHEMA: Record<string, string[]> = {
   // One row per (job, scenario) currently being filled in via Chat cards — see
   // chat/scenario.engine.ts. "Key" is "<jobId>::<scenario>", the upsert key, since a
   // driver could in principle be partway through more than one scenario on the same job.
-  [SHEETS.SCENARIO_PROGRESS]: ["Key", "Job ID", "Scenario", "Step", "Fields JSON", "Message Name", "Updated"]
+  [SHEETS.SCENARIO_PROGRESS]: ["Key", "Job ID", "Scenario", "Step", "Fields JSON", "Message Name", "Started", "Updated"]
 };
 
 // ---------------------------------------------------------------------------
@@ -310,6 +310,15 @@ export interface ScenarioProgressRecord {
   /** The Chat message currently showing this scenario's card, for the same
    *  proactive-push pattern the classic flow's signature step uses. */
   messageName: string;
+  /**
+   * When THIS attempt began (set once by initScenario, carried through unchanged by
+   * every other step-advancing write). Used to scope "how many photos have been
+   * received" to the current attempt only — without it, a driver redoing an
+   * already-submitted scenario on the same job would inherit the previous attempt's
+   * photo count (same Job ID + evidence type), showing photos as already received
+   * before they'd sent anything this time.
+   */
+  startedAt: string;
   updatedAt: string;
 }
 
@@ -330,12 +339,13 @@ function rowToScenarioProgress(row: Record<string, string>): ScenarioProgressRec
     step: row["Step"] ?? "",
     fields,
     messageName: row["Message Name"] ?? "",
+    startedAt: row["Started"] ?? "",
     updatedAt: row["Updated"] ?? ""
   };
 }
 
 export function scenarioProgressWrite(record: {
-  jobId: string; scenario: string; step: string; fields: Record<string, string>; messageName: string;
+  jobId: string; scenario: string; step: string; fields: Record<string, string>; messageName: string; startedAt: string;
 }): SheetWrite {
   const key = scenarioProgressKey(record.jobId, record.scenario);
   return {
@@ -348,6 +358,7 @@ export function scenarioProgressWrite(record: {
       "Step": record.step,
       "Fields JSON": JSON.stringify(record.fields),
       "Message Name": record.messageName,
+      "Started": record.startedAt,
       "Updated": new Date().toISOString()
     }
   };

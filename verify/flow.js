@@ -45,7 +45,7 @@ const HEADERS = {
   ParkingLiability: ["Timestamp","Job ID","Driver","Address","Client Full Name","Photo URLs","Signature URL"],
   LiabilityReport: ["Timestamp","Job ID","Driver","Damage Categories","Photo URLs","Signature URL"],
   PendingSignatures: ["Job ID","Message Name","Updated"],
-  ScenarioProgress: ["Key","Job ID","Scenario","Step","Fields JSON","Message Name","Updated"]
+  ScenarioProgress: ["Key","Job ID","Scenario","Step","Fields JSON","Message Name","Started","Updated"]
 };
 const tabs = {};
 for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
@@ -477,6 +477,22 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
 
   const checkInBadLink = await fetch(checkInTarget.replace(/sig=[^&]+/, "sig=deadbeef"));
   check("tampered signature link rejected", checkInBadLink.status, 410);
+
+  console.log("\n" + "-".repeat(74));
+  console.log("Check In redo on the same job: must NOT inherit the finished attempt's photo count");
+  console.log("-".repeat(74));
+  // A driver redoing Check In on a job that already has a completed Check In (the one
+  // just above) used to see "1 of up to 1 photo(s) received" immediately, before
+  // sending anything this time -- countScenarioPhotos() counted every COMPLETED
+  // CheckIn-type evidence row for the job, from every past attempt, not just this one.
+  const checkInRedoField0 = await menuTap("MENU_CHECK_IN", JOB_STANDALONE, "checkin");
+  check("redoing Check In starts fresh at field 1, not stuck on 'done'", subtitle(checkInRedoField0), "Step 1 of 6");
+
+  const checkInRedoPhotos = await submitField(JOB_STANDALONE, "checkin", 0, "container_number", "C-456");
+  check("redo's photo step shows the empty-state prompt, not a stale received count",
+    hasText(checkInRedoPhotos, "Send the photo(s) directly into this chat conversation."), true);
+  check("redo's photo step does NOT show the previous attempt's '1 of up to 1' count",
+    hasText(checkInRedoPhotos, "of up to 1 photo(s) received."), false);
 
   console.log("\n" + "-".repeat(74));
   console.log("Check Out: same pattern, lighter walkthrough");

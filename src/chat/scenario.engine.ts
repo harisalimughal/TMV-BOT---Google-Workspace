@@ -60,15 +60,22 @@ function afterPhotosStep(spec: ScenarioSpec, step: string): string {
   return spec.hasSignature ? "signature" : "done";
 }
 
-export async function countScenarioPhotos(jobId: string, folderKey: string): Promise<number> {
+/**
+ * Only counts photos received since `sinceIso` (the current attempt's startedAt) — a
+ * job's evidence rows accumulate across every past attempt at a scenario, and without
+ * this a redo would inherit a previous attempt's already-uploaded photos.
+ */
+export async function countScenarioPhotos(jobId: string, folderKey: string, sinceIso: string): Promise<number> {
   const evidence = await listEvidenceForJob(jobId, 0);
-  return evidence.filter(e => e.evidenceType === folderKey).length;
+  return evidence.filter(e => e.evidenceType === folderKey && e.receivedAt >= sinceIso).length;
 }
 
 /** What card to show for a job's current position in a scenario. */
 export async function describeStep(spec: ScenarioSpec, progress: ScenarioProgressRecord): Promise<ScenarioStepView> {
   const step = progress.step;
-  if (isPhotosStep(step)) return { kind: "photos", received: await countScenarioPhotos(progress.jobId, spec.folderKey) };
+  if (isPhotosStep(step)) {
+    return { kind: "photos", received: await countScenarioPhotos(progress.jobId, spec.folderKey, progress.startedAt) };
+  }
   if (step === "signature") return { kind: "signature" };
   if (step === "done") return { kind: "done" };
   if (step.startsWith("notice:")) return { kind: "notice" };
@@ -83,7 +90,7 @@ export async function initScenario(
   scenario: ScenarioKey, jobId: string, driver: string, messageName: string
 ): Promise<ScenarioProgressRecord> {
   const spec = SCENARIOS[scenario];
-  const record = { jobId, scenario, step: "0", fields: {}, messageName };
+  const record = { jobId, scenario, step: "0", fields: {}, messageName, startedAt: new Date().toISOString() };
   await commitWrites([
     scenarioProgressWrite(record),
     activityWrite({ jobId, driver, action: `${scenario.toUpperCase()}_STARTED`, detail: spec.title })
@@ -102,7 +109,7 @@ export async function resolveOrStartScenario(
 ): Promise<ScenarioProgressRecord> {
   const existing = await getScenarioProgress(jobId, scenario, 0);
   if (existing && existing.step !== "done") {
-    const record = { jobId, scenario, step: existing.step, fields: existing.fields, messageName };
+    const record = { jobId, scenario, step: existing.step, fields: existing.fields, messageName, startedAt: existing.startedAt };
     await commitWrites([scenarioProgressWrite(record)]);
     return { ...record, updatedAt: new Date().toISOString() };
   }
@@ -129,7 +136,7 @@ export async function submitScenarioField(
   const triggersNotice = spec.conditionalNotice?.field === field.name && spec.conditionalNotice.whenValue === value;
   const step = triggersNotice ? `notice:${fieldIndex}` : nextFieldStep(spec, fieldIndex);
 
-  const record = { jobId, scenario, step, fields, messageName };
+  const record = { jobId, scenario, step, fields, messageName, startedAt: progress?.startedAt || new Date().toISOString() };
   await commitWrites([scenarioProgressWrite(record)]);
   return { ...record, updatedAt: new Date().toISOString() };
 }
@@ -143,7 +150,10 @@ export async function acknowledgeScenarioNotice(
     throw new ValidationError("This step is no longer valid — tap Main Menu and try again.");
   }
   const fieldIndex = Number(progress.step.slice("notice:".length));
-  const record = { jobId, scenario, step: nextFieldStep(spec, fieldIndex), fields: progress.fields, messageName };
+  const record = {
+    jobId, scenario, step: nextFieldStep(spec, fieldIndex), fields: progress.fields, messageName,
+    startedAt: progress.startedAt
+  };
   await commitWrites([scenarioProgressWrite(record)]);
   return { ...record, updatedAt: new Date().toISOString() };
 }
@@ -163,7 +173,7 @@ export async function receiveScenarioPhoto(
     throw new ValidationError("This scenario isn't waiting on a photo right now. Tap Main Menu to check its current step.");
   }
 
-  const existing = await countScenarioPhotos(job.jobId, spec.folderKey);
+  const existing = await countScenarioPhotos(job.jobId, spec.folderKey, progress.startedAt);
   const room = spec.photoMax - existing;
   if (room <= 0) {
     throw new ValidationError(`You've already sent the maximum of ${spec.photoMax} photo(s) — tap CONTINUE on the card above.`);
@@ -192,11 +202,11 @@ export async function continueFromScenarioPhotos(
   if (!progress || !isPhotosStep(progress.step)) {
     throw new ValidationError("This step is no longer valid — tap Main Menu and try again.");
   }
-  const received = await countScenarioPhotos(jobId, spec.folderKey);
+  const received = await countScenarioPhotos(jobId, spec.folderKey, progress.startedAt);
   if (received < spec.photoMin) throw new ValidationError(`Attach at least ${spec.photoMin} photo(s) before continuing.`);
 
   const step = afterPhotosStep(spec, progress.step);
-  const record = { jobId, scenario, step, fields: progress.fields, messageName };
+  const record = { jobId, scenario, step, fields: progress.fields, messageName, startedAt: progress.startedAt };
   await commitWrites([scenarioProgressWrite(record)]);
   return { ...record, updatedAt: new Date().toISOString() };
 }
@@ -248,7 +258,11 @@ export async function finalizeScenario(
   const job = await getJob(jobId, 0);
   if (!job) throw new ValidationError(`Job ${jobId} was not found.`);
 
-  const evidence = (await listEvidenceForJob(jobId, 0)).filter(e => e.evidenceType === spec.folderKey);
+  // Scoped to this attempt only (receivedAt >= startedAt) -- otherwise a redo of an
+  // already-submitted scenario would pick up stale photos left over from the earlier
+  // attempt's evidence rows, which share the same Job ID and evidence type.
+  const evidence = (await listEvidenceForJob(jobId, 0))
+    .filter(e => e.evidenceType === spec.folderKey && e.receivedAt >= progress.startedAt);
   const stillProcessing = evidence.filter(e => e.status === EvidenceStatus.RECEIVED || e.status === EvidenceStatus.PROCESSING);
   if (stillProcessing.length) {
     throw new ValidationError(`Still uploading ${stillProcessing.length} photo(s) — wait a few seconds and try again.`);
@@ -267,7 +281,7 @@ export async function finalizeScenario(
 
   await commitWrites([
     writeScenarioRow(spec, jobId, driver, progress.fields, photoUrls, sigFile.fileUrl),
-    scenarioProgressWrite({ jobId, scenario, step: "done", fields: {}, messageName: "" }),
+    scenarioProgressWrite({ jobId, scenario, step: "done", fields: {}, messageName: "", startedAt: progress.startedAt }),
     driverFlowWrite({ jobId, driver, field: spec.title, value: "Submitted", state: job.currentState }),
     activityWrite({
       jobId, driver, action: `${spec.title.toUpperCase().replace(/\s+/g, "_")}_SUBMITTED`,
