@@ -66,7 +66,7 @@ export const SCENARIOS: Record<ScenarioKey, ScenarioSpec> = {
     title: "Check In",
     fields: [
       { name: "container_number", label: "Container Number", type: "text", required: true },
-      { name: "client_name", label: "Cliente Name", type: "text", required: true },
+      { name: "client_name", label: "Client Name", type: "text", required: true },
       { name: "client_phone", label: "Client phone", type: "tel", required: true },
       { name: "client_email", label: "Client Email", type: "email", required: true },
       { name: "client_present", label: "Is the client present ?", type: "yesno", required: true },
@@ -86,7 +86,7 @@ export const SCENARIOS: Record<ScenarioKey, ScenarioSpec> = {
     title: "Check Out",
     fields: [
       { name: "container_number", label: "Container Number", type: "text", required: true },
-      { name: "client_name", label: "Cliente Name", type: "text", required: true },
+      { name: "client_name", label: "Client Name", type: "text", required: true },
       { name: "client_email", label: "Client Email", type: "email", required: true },
       { name: "client_present", label: "Is the client present at drop-off ?", type: "yesno", required: true },
       { name: "date", label: "DD/MM/YY", type: "date", required: true, placeholder: "Select" }

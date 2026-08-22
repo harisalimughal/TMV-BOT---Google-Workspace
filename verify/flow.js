@@ -421,7 +421,7 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
 
   const checkInField1 = await continuePhotos(JOB_STANDALONE, "checkin");
   check("continuing from photos resumes the REMAINING fields, not signature", subtitle(checkInField1), "Step 2 of 6");
-  check("resumed field is Cliente Name", hasText(checkInField1, "Cliente Name"), true);
+  check("resumed field is Client Name", hasText(checkInField1, "Client Name"), true);
 
   const checkInField2 = await submitField(JOB_STANDALONE, "checkin", 1, "client_name", "Barry Thompson");
   check("step 3 of 6 (Client phone)", subtitle(checkInField2), "Step 3 of 6");
