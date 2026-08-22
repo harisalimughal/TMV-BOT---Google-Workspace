@@ -62,7 +62,7 @@ export function dashboardShell(): string {
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f0f2f5; color: #1a1a1a; }
   .app { display: flex; min-height: 100vh; }
-  .sidebar { width: 220px; flex-shrink: 0; background: #1a2233; color: #cfd6e4; padding: 16px 0; transition: margin-left .2s; }
+  .sidebar { width: 220px; flex-shrink: 0; background: #1a2233; color: #cfd6e4; padding: 16px 0; transition: margin-left .2s; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
   .sidebar h2 { color: #fff; font-size: 16px; margin: 0 18px 18px; }
   .nav-item { display: block; width: 100%; text-align: left; padding: 11px 18px; background: none; border: none; color: inherit; font-size: 14px; cursor: pointer; }
   .nav-item:hover { background: #232d43; }
