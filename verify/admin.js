@@ -134,6 +134,26 @@ function check(label, actual, expected) {
   const authed = { headers: { Cookie: cookie } };
 
   console.log("\n" + "=".repeat(70));
+  console.log("Served dashboard page: the inline <script> must actually parse");
+  console.log("=".repeat(70));
+  // Everything above and below this only ever exercises the JSON APIs directly -- never
+  // what a real browser loads and runs. dashboardShell() builds its whole page,
+  // including the <script> block, as one big TS template literal: a stray single-escaped
+  // "\/" anywhere in there silently collapses to "/" once TS evaluates the string
+  // (ordinary JS string-escaping, nothing to do with regex), which can turn "//x" into a
+  // line comment and truncate the rest of the script -- exactly what shipped and broke
+  // the live admin panel ("Unexpected token '.'"). new Function() parses without
+  // executing, so this catches that class of bug without needing a real browser.
+  const dashboardRes = await fetch(`${base}/admin`, authed);
+  check("dashboard page status", dashboardRes.status, 200);
+  const dashboardHtml = await dashboardRes.text();
+  const scriptMatch = dashboardHtml.match(/<script>([\s\S]*?)<\/script>/);
+  check("dashboard page has an inline <script>", Boolean(scriptMatch), true);
+  let scriptSyntaxError = null;
+  try { new Function(scriptMatch[1]); } catch (error) { scriptSyntaxError = error; }
+  check("dashboard's inline script has no syntax error", scriptSyntaxError ? scriptSyntaxError.message : null, null);
+
+  console.log("\n" + "=".repeat(70));
   console.log("Finished Jobs: joins Bookings x Drivers x Evidence x Signatures");
   console.log("=".repeat(70));
 

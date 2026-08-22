@@ -468,7 +468,7 @@ export function dashboardShell(): string {
     var DRIVE_LINK_COLUMNS = ['Photo URLs', 'Signature URL'];
     function driveThumbsHtml(cellValue) {
       var ids = String(cellValue || '').split('|').map(function (s) { return s.trim(); }).filter(Boolean)
-        .map(function (u) { var m = u.match(/\/d\/([A-Za-z0-9_-]+)/); return m ? m[1] : null; })
+        .map(function (u) { var m = u.match(/\\/d\\/([A-Za-z0-9_-]+)/); return m ? m[1] : null; })
         .filter(Boolean);
       if (!ids.length) return '<span class="muted">—</span>';
       return '<div class="thumb-row">' + ids.map(function (id) {
