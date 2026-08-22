@@ -96,6 +96,9 @@ export function dashboardShell(): string {
   .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
   .search { padding: 9px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; width: 260px; max-width: 100%; }
   .add-btn { padding: 9px 16px; font-size: 14px; font-weight: 600; border: none; border-radius: 8px; background: #1a73e8; color: #fff; cursor: pointer; }
+  .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn-outline { padding: 9px 14px; font-size: 13px; font-weight: 600; border: 1px solid #cfd6e4; border-radius: 8px; background: #fff; color: #1a2233; cursor: pointer; }
+  .btn-outline:hover { background: #f5f7fb; }
   .table-wrap { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; }
   th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #eee; }
@@ -208,6 +211,57 @@ export function dashboardShell(): string {
       return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
+    // ---------------------------------------------------------------------------
+    // Export: CSV is a plain client-side Blob download. PDF has no library involved --
+    // it opens a clean printable page and calls window.print(), so "Save as PDF" comes
+    // from the browser's own print dialog rather than a new dependency.
+    // ---------------------------------------------------------------------------
+    function csvValue(v) {
+      var s = v == null ? '' : String(v);
+      if (/[",\\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+    function downloadCsv(filename, columns, rows) {
+      var lines = [columns.map(csvValue).join(',')];
+      rows.forEach(function (row) {
+        lines.push(columns.map(function (c) { return csvValue(row[c]); }).join(','));
+      });
+      // Leading BOM so Excel opens UTF-8 (£, —, etc.) correctly instead of mangling it.
+      var blob = new Blob(['﻿' + lines.join('\\r\\n')], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    }
+    function exportPdf(title, columns, rows, cellHtml) {
+      var win = window.open('', '_blank');
+      if (!win) { alert('Please allow pop-ups for this site to export as PDF.'); return; }
+      var html = '<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(title) + '</title><style>' +
+        'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:24px;color:#1a1a1a;}' +
+        'h1{font-size:18px;margin:0 0 4px;}' +
+        '.meta{color:#666;font-size:12px;margin:0 0 18px;}' +
+        'table{border-collapse:collapse;width:100%;font-size:11px;}' +
+        'th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top;}' +
+        'th{background:#f5f5f5;}' +
+        '.thumb{width:34px;height:34px;object-fit:cover;border-radius:4px;margin:1px;display:inline-block;}' +
+        '.muted{color:#999;}' +
+        '@media print { body{padding:0;} a{color:inherit;text-decoration:none;} }' +
+        '</style></head><body>' +
+        '<h1>' + escapeHtml(title) + '</h1>' +
+        '<p class="meta">Exported ' + escapeHtml(new Date().toLocaleString('en-GB')) + ' — ' + rows.length + ' record(s)</p>' +
+        '<table><thead><tr>' + columns.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        rows.map(function (row) {
+          return '<tr>' + columns.map(function (c) {
+            return '<td>' + (cellHtml ? cellHtml(c, row) : escapeHtml(String(row[c] == null ? '' : row[c]))) + '</td>';
+          }).join('') + '</tr>';
+        }).join('') +
+        '</tbody></table>' +
+        '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\\/script>' +
+        '</body></html>';
+      win.document.open(); win.document.write(html); win.document.close();
+    }
+
     function loadFinishedJobs() {
       fetch('/admin/api/finished-jobs').then(function (r) {
         if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || 'Failed to load.'); });
@@ -219,6 +273,10 @@ export function dashboardShell(): string {
           return;
         }
         content.innerHTML =
+          '<div class="toolbar"><span></span><div class="toolbar-right">' +
+          '<button class="btn-outline" id="exportCsvBtn">Export CSV</button>' +
+          '<button class="btn-outline" id="exportPdfBtn">Export PDF</button>' +
+          '</div></div>' +
           '<div class="table-wrap"><table><thead><tr>' +
           '<th>#</th><th>Driver</th><th>Customer</th><th>Pickup → Drop-off</th><th>Started</th><th>Finished</th><th>Total</th><th>Photos</th><th>Signature</th><th>Folder</th>' +
           '</tr></thead><tbody>' +
@@ -250,6 +308,43 @@ export function dashboardShell(): string {
           '</tbody></table></div>';
         Array.prototype.forEach.call(content.querySelectorAll('.thumb'), function (img) {
           img.addEventListener('click', function () { window.open(img.getAttribute('data-full'), '_blank'); });
+        });
+
+        var FINISHED_COLUMNS = ['#', 'Driver', 'Customer', 'Pickup', 'Drop-off', 'Started', 'Finished', 'Total', 'Photos', 'Signature', 'Folder'];
+        document.getElementById('exportCsvBtn').addEventListener('click', function () {
+          var rows = jobs.map(function (j, i) {
+            return {
+              '#': i + 1, 'Driver': j.driverName, 'Customer': j.customerName, 'Pickup': j.pickup, 'Drop-off': j.dropoff,
+              'Started': formatDate(j.actualStart), 'Finished': formatDate(j.actualFinish),
+              'Total': j.totalCharges ? ('£' + j.totalCharges) : '',
+              'Photos': j.photos.map(function (p) { return location.origin + p.thumbUrl; }).join(' | '),
+              'Signature': j.signature ? (location.origin + j.signature.thumbUrl) : '',
+              'Folder': j.driveFolderUrl || ''
+            };
+          });
+          downloadCsv('finished-jobs.csv', FINISHED_COLUMNS, rows);
+        });
+        document.getElementById('exportPdfBtn').addEventListener('click', function () {
+          var rows = jobs.map(function (j, i) { return { j: j, i: i }; });
+          exportPdf('Finished Jobs', FINISHED_COLUMNS, rows, function (c, row) {
+            var j = row.j, i = row.i;
+            if (c === '#') return String(i + 1);
+            if (c === 'Driver') return escapeHtml(j.driverName);
+            if (c === 'Customer') return escapeHtml(j.customerName);
+            if (c === 'Pickup') return escapeHtml(j.pickup);
+            if (c === 'Drop-off') return escapeHtml(j.dropoff);
+            if (c === 'Started') return escapeHtml(formatDate(j.actualStart));
+            if (c === 'Finished') return escapeHtml(formatDate(j.actualFinish));
+            if (c === 'Total') return j.totalCharges ? ('£' + escapeHtml(String(j.totalCharges))) : '<span class="muted">—</span>';
+            if (c === 'Photos') {
+              return j.photos.length
+                ? j.photos.map(function (p) { return '<img class="thumb" src="' + p.thumbUrl + '">'; }).join('')
+                : '<span class="muted">—</span>';
+            }
+            if (c === 'Signature') return j.signature ? '<img class="thumb" src="' + j.signature.thumbUrl + '">' : '<span class="muted">—</span>';
+            if (c === 'Folder') return j.driveFolderUrl ? '<a href="' + escapeHtml(j.driveFolderUrl) + '">Open</a>' : '<span class="muted">—</span>';
+            return '';
+          });
         });
       }).catch(showError);
     }
@@ -407,8 +502,12 @@ export function dashboardShell(): string {
         if (!currentRows.length) {
           content.innerHTML = '<div class="toolbar"><input class="search" placeholder="Search…" disabled>' + addBtn + '</div><div class="table-wrap"><div class="empty">No records yet.</div></div>';
         } else {
+          var exportBtns =
+            '<button class="btn-outline" id="exportCsvBtn">Export CSV</button>' +
+            '<button class="btn-outline" id="exportPdfBtn">Export PDF</button>';
           content.innerHTML =
-            '<div class="toolbar"><input class="search" id="searchBox" placeholder="Search…">' + addBtn + '</div>' +
+            '<div class="toolbar"><input class="search" id="searchBox" placeholder="Search…">' +
+            '<div class="toolbar-right">' + exportBtns + addBtn + '</div></div>' +
             '<div class="table-wrap"><table><thead><tr>' +
             columns.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') +
             '</tr></thead><tbody id="tbody"></tbody></table></div>';
@@ -419,6 +518,16 @@ export function dashboardShell(): string {
               return columns.some(function (c) { return String(row[c] || '').toLowerCase().indexOf(q) !== -1; });
             });
             renderRows(columns, filtered);
+          });
+          document.getElementById('exportCsvBtn').addEventListener('click', function () {
+            downloadCsv(tab + '.csv', columns, currentRows);
+          });
+          document.getElementById('exportPdfBtn').addEventListener('click', function () {
+            var meta = TABS.filter(function (t) { return t.key === tab; })[0];
+            exportPdf(meta ? meta.label : tab, columns, currentRows, function (c, row) {
+              if (DRIVE_LINK_COLUMNS.indexOf(c) !== -1) return driveThumbsHtml(row[c]);
+              return escapeHtml(String(row[c] == null ? '' : row[c]));
+            });
           });
         }
         if (addForm) {
