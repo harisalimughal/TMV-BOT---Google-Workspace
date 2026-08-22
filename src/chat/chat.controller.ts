@@ -10,7 +10,7 @@ import {
   reopenPhotoStep, retryFailedEvidence
 } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
-import { WorkflowState } from "../workflow/workflow.states";
+import { PHOTO_STATES, WorkflowState } from "../workflow/workflow.states";
 import { PermanentTaskError } from "../queue/queue.types";
 import { ChatAttachment, EvidenceType } from "../jobs/job.types";
 import { setContext, log } from "../utils/logger";
@@ -167,32 +167,38 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
           // scenario is normally "waiting on a photo" at a time; if more than one
           // somehow is, the most recently touched one wins.
           const { job: activeJob, driver } = await getActiveJobForDriver(identifier(event));
-          const scenarioWaiting = activeJob
-            ? (await listScenarioProgressForJob(activeJob.jobId, 0)).find(p => isPhotosStep(p.step))
-            : undefined;
+          const scenarioProgressList = activeJob ? await listScenarioProgressForJob(activeJob.jobId, 0) : [];
+          const scenarioWaiting = scenarioProgressList.find(p => isPhotosStep(p.step));
+          const classicWaiting = Boolean(activeJob && PHOTO_STATES.has(activeJob.currentState as WorkflowState));
+          // Neither actually wants this photo (it moved past its own photo step already,
+          // e.g. via the auto-advance above, or a redelivery arriving after the fact) --
+          // rather than falling through to the classic flow's "not expecting a photo"
+          // error, which has nothing to do with a stray send here, just show wherever
+          // this scenario actually is now. receiveScenarioPhoto() already renders that
+          // gracefully for a non-photos-step progress record, with no write attempted.
+          const scenarioTarget = scenarioWaiting ??
+            (!classicWaiting ? scenarioProgressList.find(p => p.step !== "done") : undefined);
 
-          if (activeJob && scenarioWaiting) {
-            const scenario = scenarioWaiting.scenario as ScenarioKey;
+          if (activeJob && scenarioTarget) {
+            const scenario = scenarioTarget.scenario as ScenarioKey;
             const spec = SCENARIOS[scenario];
             return await runOnce(
               eventKey,
               { jobId: activeJob.jobId },
               async () => {
-                const { received } = await receiveScenarioPhoto(scenario, activeJob, driver.email || driver.chatUserName, files);
+                // receiveScenarioPhoto never blocks: a stray/duplicate photo (redelivery,
+                // or one sent out of habit) always resolves to a legitimate current card
+                // rather than a dead-end error, and auto-advances once the max is reached
+                // -- for Check In/Check Out (photoMin === photoMax === 1) that's every
+                // time, so there's never a manual CONTINUE to tap there. Parking
+                // Liability/Liability Report still show it, since a driver there can
+                // genuinely choose to send more before continuing.
+                const messageName = event.message?.name ?? scenarioTarget.messageName;
+                const progress = await receiveScenarioPhoto(
+                  scenario, activeJob, driver.email || driver.chatUserName, files, messageName
+                );
                 timer.mark("photo_accept");
-                log.info("scenario photo accepted", { job_id: activeJob.jobId, scenario, received, ...timer.fields() });
-
-                // Once the max is reached there's nothing left to offer -- for Check
-                // In/Check Out (photoMin === photoMax === 1) that's every single time, so
-                // making the driver tap CONTINUE on a card with no other option was pure
-                // friction (and a trap: sending one more photo by habit just got rejected
-                // with "already sent the maximum", with no visible way forward). Parking
-                // Liability/Liability Report still show the manual button, since a driver
-                // there really can choose to send more before continuing.
-                const messageName = event.message?.name ?? scenarioWaiting.messageName;
-                const progress = received >= spec.photoMax
-                  ? await continueFromScenarioPhotos(scenario, activeJob.jobId, messageName)
-                  : scenarioWaiting;
+                log.info("scenario photo accepted", { job_id: activeJob.jobId, scenario, step: progress.step, ...timer.fields() });
                 const step = await describeStep(spec, progress);
                 return {
                   result: createResponse(renderScenarioStep(spec, scenario, activeJob.jobId, step)),

@@ -421,6 +421,16 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("the single required photo auto-advances -- no manual CONTINUE needed", subtitle(checkInField1), "Step 2 of 6");
   check("resumed field is Client Name", hasText(checkInField1, "Client Name"), true);
 
+  // Reported live: a stray extra photo arriving after the scenario already moved past
+  // its photo step (a habit resend, or Chat redelivering the same message) used to hit
+  // a dead-end "already sent the maximum" error card with no button anywhere. It must
+  // never block -- there's always a legitimate current card to fall back to.
+  const checkInStrayPhoto = await photo();
+  check("a stray extra photo never blocks -- it just shows wherever the scenario actually is now",
+    subtitle(checkInStrayPhoto), "Step 2 of 6");
+  check("stray photo's card is the same real current step, not a dead-end error",
+    title(checkInStrayPhoto) !== "TMV — Action blocked", true);
+
   const checkInField2 = await submitField(JOB_STANDALONE, "checkin", 1, "client_name", "Barry Thompson");
   check("step 3 of 6 (Client phone)", subtitle(checkInField2), "Step 3 of 6");
   const checkInField3 = await submitField(JOB_STANDALONE, "checkin", 2, "client_phone", "07123456789");
