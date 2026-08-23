@@ -437,6 +437,19 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("step 4 of 6 (Client Email)", subtitle(checkInField3), "Step 4 of 6");
   const checkInField4 = await submitField(JOB_STANDALONE, "checkin", 3, "client_email", "barry@example.test");
   check("step 5 of 6 (Is the client present ?)", subtitle(checkInField4), "Step 5 of 6");
+
+  // Reported live: tapping CONTINUE on a yesno field without picking Yes/No got
+  // rejected onto a generic "Action blocked" card whose only button (RETRY) jumped to
+  // the classic flow's job/menu card, losing the scenario entirely -- the driver had to
+  // start Check In over from scratch instead of just picking an option and continuing.
+  const checkInFieldRejected = await submitField(JOB_STANDALONE, "checkin", 4, "client_present");
+  check("submitting a required field with no value re-shows the SAME step, not a generic error card",
+    subtitle(checkInFieldRejected), "Step 5 of 6");
+  check("the same step's error shows the field is required",
+    hasText(checkInFieldRejected, "Is the client present ?"), true);
+  check("the rejected submit did not advance anything -- still Check In, not a dead-end card",
+    title(checkInFieldRejected), "Check In");
+
   const checkInField5 = await submitField(JOB_STANDALONE, "checkin", 4, "client_present", "Yes");
   check("step 6 of 6 (date)", subtitle(checkInField5), "Step 6 of 6");
 

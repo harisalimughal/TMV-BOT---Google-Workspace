@@ -353,7 +353,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         return createResponse(helpCard());
     }
   } catch (error) {
-    return { message: errorCard(error, event, timer), update: isClick };
+    return { message: await errorCard(error, event, timer), update: isClick };
   }
 }
 
@@ -364,7 +364,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
  * schema problem, a Google 500 — is logged in full and replaced with a generic message,
  * because internal detail is neither useful nor safe on a driver's phone.
  */
-function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTimer): ChatResponse {
+async function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTimer): Promise<ChatResponse> {
   const jobId = actionParam(event, "jobId");
 
   if (error instanceof EvidencePendingError) {
@@ -377,6 +377,24 @@ function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTimer): C
   }
   if (error instanceof ValidationError || error instanceof PermanentTaskError) {
     log.info("action rejected", { job_id: jobId, event_type: event.type, reason: error.message, ...timer.fields() });
+
+    // A rejected scenario field/notice/photos submit never wrote anything — the
+    // ScenarioProgress row is exactly where it was. Re-show that same step with the
+    // error on it, rather than a generic "Action blocked" card whose only button
+    // (RETRY -> RESUME_JOB) jumped to the classic flow's job/menu card and lost the
+    // scenario entirely, forcing the driver to start the whole thing over.
+    const fn = actionName(event);
+    const isScenarioAction = fn === "SCENARIO_FIELD_SUBMIT" || fn === "SCENARIO_NOTICE_ACK" || fn === "SCENARIO_PHOTOS_CONTINUE";
+    if (isScenarioAction && jobId) {
+      const scenario = actionParam(event, "scenario") as ScenarioKey;
+      const spec = SCENARIOS[scenario];
+      const progress = spec ? await getScenarioProgress(jobId, scenario, 0) : null;
+      if (spec && progress) {
+        const step = await describeStep(spec, progress);
+        return renderScenarioStep(spec, scenario, jobId, step, error.message);
+      }
+    }
+
     return errorResponse(error.message, jobId);
   }
 
