@@ -24,7 +24,7 @@ export function ReportsPage() {
         {/* Full Jobs CSV */}
         <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs flex flex-col justify-between">
           <div>
-            <div className="w-10 h-10 rounded-xl bg-navy-900 text-tmv-cyan flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-navy-900 text-tmv-cyan flex items-center justify-center mb-4">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-bold text-ink mb-1">Complete Jobs Workbook (CSV)</h3>
@@ -34,7 +34,7 @@ export function ReportsPage() {
           </div>
           <button
             onClick={downloadAllJobsCsv}
-            className="w-full py-2.5 px-4 rounded-xl bg-navy-900 text-white text-xs font-semibold hover:bg-navy-800 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-2xl bg-navy-900 text-white text-xs font-semibold hover:bg-navy-800 transition flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4 text-tmv-cyan" />
             Download Complete CSV
@@ -44,7 +44,7 @@ export function ReportsPage() {
         {/* Finished Jobs CSV */}
         <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs flex flex-col justify-between">
           <div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-900 text-status-green flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-900 text-status-green flex items-center justify-center mb-4">
               <CheckCircle2 className="w-5 h-5 text-status-green" />
             </div>
             <h3 className="text-sm font-bold text-ink mb-1">Completed Jobs Audit (CSV)</h3>
@@ -54,7 +54,7 @@ export function ReportsPage() {
           </div>
           <button
             onClick={downloadCompletedJobsCsv}
-            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-2xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
             Download Completed Jobs CSV

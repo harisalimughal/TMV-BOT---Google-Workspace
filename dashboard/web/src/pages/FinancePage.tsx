@@ -27,7 +27,7 @@ export function FinancePage() {
 
   if (error || !data) {
     return (
-      <div className="p-8 text-center text-status-red bg-paper rounded border border-line shadow-card">
+      <div className="p-8 text-center text-status-red bg-paper rounded shadow-card border border-transparent">
         Failed to load financial records.
       </div>
     );
@@ -61,31 +61,31 @@ export function FinancePage() {
 
       {/* 5 KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        <div className="p-4 bg-paper rounded border border-line shadow-card">
+        <div className="p-4 bg-paper rounded shadow-card border border-transparent">
           <span className="text-xs text-muted font-medium block mb-1">Total Revenue</span>
           <span className="text-2xl font-semibold font-mono text-ink block">{summary.totalRevenueFormatted}</span>
           <span className="text-[11px] text-muted">All billable charges</span>
         </div>
 
-        <div className="p-4 bg-paper rounded border border-line shadow-card">
+        <div className="p-4 bg-paper rounded shadow-card border border-transparent">
           <span className="text-xs text-muted font-medium block mb-1">Base Price</span>
           <span className="text-2xl font-semibold font-mono text-ink block">£{summary.basePricePounds.toFixed(2)}</span>
           <span className="text-[11px] text-muted">Booked baseline</span>
         </div>
 
-        <div className="p-4 bg-paper rounded border border-line shadow-card">
+        <div className="p-4 bg-paper rounded shadow-card border border-transparent">
           <span className="text-xs text-muted font-medium block mb-1">Extra Charges</span>
           <span className="text-2xl font-semibold font-mono text-ink block">£{summary.extraChargesPounds.toFixed(2)}</span>
           <span className="text-[11px] text-muted">Congestion / Tunnel</span>
         </div>
 
-        <div className="p-4 bg-paper rounded border border-line shadow-card">
+        <div className="p-4 bg-paper rounded shadow-card border border-transparent">
           <span className="text-xs text-muted font-medium block mb-1">Overtime</span>
           <span className="text-2xl font-semibold font-mono text-ink block">£{summary.overtimePounds.toFixed(2)}</span>
           <span className="text-[11px] text-muted">£55 per 30 mins</span>
         </div>
 
-        <div className="p-4 bg-paper rounded border border-line shadow-card">
+        <div className="p-4 bg-paper rounded shadow-card border border-transparent">
           <span className="text-xs text-muted font-medium block mb-1">Cash Collected</span>
           <span className="text-2xl font-semibold font-mono text-status-green block">£{summary.cashPounds.toFixed(2)}</span>
           <span className="text-[11px] text-muted">Physical cash</span>
@@ -138,7 +138,7 @@ export function FinancePage() {
       )}
 
       {/* Revenue Component Timeline Chart */}
-      <div className="p-5 bg-paper rounded border border-line shadow-card">
+      <div className="p-5 bg-paper rounded shadow-card border border-transparent">
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-ink">Revenue Streams Breakdown</h3>
           <p className="text-xs text-muted">Base vs Extra Charges vs Overtime over time</p>

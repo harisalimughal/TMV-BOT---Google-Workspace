@@ -603,7 +603,7 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
         {/* LEAFLET MAP CANVAS (8 Columns) */}
         <div className="lg:col-span-8 relative bg-surface border-b lg:border-b-0 lg:border-r border-line overflow-hidden">
           {/* FLOATING MAP CONTROLS (Top-Right) */}
-          <div className="absolute top-3 right-3 z-[400] flex flex-col gap-1.5 bg-paper/95 backdrop-blur-xs p-1 rounded border border-line shadow-card">
+          <div className="absolute top-3 right-3 z-[400] flex flex-col gap-1.5 bg-paper/95 backdrop-blur-xs p-1 rounded shadow-card border border-transparent">
             <button
               onClick={() => mapInstanceRef.current?.zoomIn()}
               className="p-1.5 rounded hover:bg-surface text-ink transition"

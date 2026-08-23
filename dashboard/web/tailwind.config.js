@@ -7,15 +7,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: "#F7F8FA",
+        bg: "#F4F7FE",
         paper: "#FFFFFF",
-        surface: "#F2F4F7",
-        "surface-2": "#EAECF0",
-        line: "#E6E9EF",
-        "line-strong": "#D3D8E0",
-        ink: "#101828",
-        "ink-2": "#475467",
-        muted: "#98A2B3",
+        surface: "#F4F7FE",
+        "surface-2": "#E2E8F0",
+        line: "#E2E8F0",
+        "line-strong": "#CBD5E1",
+        ink: "#2B3674",
+        "ink-2": "#707EAE",
+        muted: "#A3AED0",
         brand: {
           DEFAULT: "#1B75BC",
           soft: "#EAF2FB",
@@ -28,31 +28,31 @@ export default {
         },
         accent: "#29ABE2",
         status: {
-          green: "#067647",
-          "green-bg": "#ECFDF3",
-          amber: "#B54708",
-          "orange": "#B54708",
-          "orange-bg": "#FFFAEB",
-          "amber-bg": "#FFFAEB",
-          red: "#B42318",
-          "red-bg": "#FEF3F2",
-          purple: "#5925DC",
-          "purple-bg": "#F4F3FF",
-          pink: "#C11574",
-          "pink-bg": "#FDF2FA",
-          grey: "#475467",
-          "grey-bg": "#F2F4F7"
+          green: "#05CD99",
+          "green-bg": "#E6FAF5",
+          amber: "#FFCE20",
+          "orange": "#FFCE20",
+          "orange-bg": "#FFFBEB",
+          "amber-bg": "#FFFBEB",
+          red: "#EE5D50",
+          "red-bg": "#FEECEB",
+          purple: "#7390FF",
+          "purple-bg": "#F4F7FE",
+          pink: "#E31A1A",
+          "pink-bg": "#FCE8E8",
+          grey: "#707EAE",
+          "grey-bg": "#F4F7FE"
         }
       },
       fontSize: {
-        xs: ["11px", { lineHeight: "16px" }],
-        sm: ["13px", { lineHeight: "18px" }],
-        base: ["14px", { lineHeight: "20px" }],
-        md: ["16px", { lineHeight: "24px" }],
-        lg: ["18px", { lineHeight: "26px" }],
-        xl: ["20px", { lineHeight: "28px" }],
-        "2xl": ["24px", { lineHeight: "32px" }],
-        "3xl": ["28px", { lineHeight: "36px" }]
+        xs: ["12px", { lineHeight: "18px", fontWeight: "500" }],
+        sm: ["14px", { lineHeight: "20px", fontWeight: "500" }],
+        base: ["15px", { lineHeight: "24px", fontWeight: "500" }],
+        md: ["16px", { lineHeight: "26px", fontWeight: "500" }],
+        lg: ["18px", { lineHeight: "28px", fontWeight: "700" }],
+        xl: ["24px", { lineHeight: "32px", fontWeight: "700" }],
+        "2xl": ["28px", { lineHeight: "36px", fontWeight: "700" }],
+        "3xl": ["34px", { lineHeight: "42px", fontWeight: "700" }]
       },
       spacing: {
         "0.5": "2px",
@@ -70,22 +70,26 @@ export default {
         "10": "40px",
         "12": "48px",
         "14": "56px",
-        "16": "64px"
+        "16": "64px",
+        "18": "72px",
+        "20": "80px"
       },
       borderRadius: {
-        sm: "4px",
-        md: "6px",
-        DEFAULT: "8px",
-        lg: "12px",
+        sm: "8px",
+        md: "12px",
+        DEFAULT: "16px",
+        lg: "20px",
+        xl: "24px",
+        "2xl": "30px",
         pill: "9999px"
       },
       fontFamily: {
-        sans: ["Archivo", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        sans: ["DM Sans", "Archivo", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
         mono: ["'IBM Plex Mono'", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "monospace"]
       },
       boxShadow: {
-        card: "0 1px 2px rgba(16, 24, 40, 0.06)",
-        pop: "0 8px 24px rgba(16, 24, 40, 0.10)"
+        card: "0px 18px 40px rgba(112, 144, 176, 0.12)",
+        pop: "0px 20px 50px rgba(112, 144, 176, 0.18)"
       },
       transitionDuration: {
         fast: "120ms",
