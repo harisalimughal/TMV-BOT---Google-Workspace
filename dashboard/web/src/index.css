@@ -1,15 +1,16 @@
 @import "leaflet/dist/leaflet.css";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   /* CORE LAYOUT */
-  --bg: #F8FAFC;
+  --bg: #EFEFEF;
   --paper: #FFFFFF;
-  --surface: #F1F5F9;
+  --surface: #EFEFEF;
   --surface-hover: #E2E8F0;
-  --line: #E2E8F0;
+  --line: #F3F4F6;
   --line-strong: #CBD5E1;
 
   /* TYPOGRAPHY */
@@ -81,7 +82,7 @@
 
 body {
   margin: 0;
-  font-family: 'Archivo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
   background-color: var(--bg);
   -webkit-font-smoothing: antialiased;

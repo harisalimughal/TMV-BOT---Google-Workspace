@@ -134,7 +134,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
     <div className="flex min-h-screen bg-bg text-ink selection:bg-brand-soft selection:text-brand font-sans antialiased">
       {/* 1. HIGH-TICKET SIDEBAR */}
       <aside
-        className={`bg-paper text-ink flex flex-col justify-between border-r border-line transition-all duration-300 z-30 sticky top-0 h-screen ${
+          className={`bg-bg text-ink flex flex-col justify-between transition-all duration-300 z-30 sticky top-0 h-screen ${
           collapsed ? "w-16" : "w-[260px]"
         }`}
       >
@@ -189,11 +189,11 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                 <button
                   key={item.id}
                   onClick={() => onSelectSection(item.id!)}
-                  className={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-nav transition group ${
-                    isActive
-                      ? "text-brand font-semibold bg-brand-soft"
-                      : "text-muted hover:bg-surface-hover hover:text-ink"
-                  }`}
+                  className={`w-full h-11 flex items-center gap-3 px-4 rounded-full text-[14px] font-medium transition group ${
+                      isActive
+                        ? "text-ink font-semibold bg-white shadow-sm"
+                        : "text-muted hover:bg-white/50 hover:text-ink"
+                    }`}
                   title={collapsed ? item.label : undefined}
                 >
 
