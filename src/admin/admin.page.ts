@@ -116,6 +116,7 @@ export function dashboardShell(): string {
   .pill-pending { background: #fef3c7; color: #92400e; }
   .pill-skipped { background: #f1f1f1; color: #888; }
   .pill-disabled { background: #e5e7eb; color: #4b5563; }
+  .tick-badge { display: inline-block; color: #16a34a; font-weight: 700; cursor: help; }
   .loading { padding: 30px; text-align: center; color: #888; font-size: 14px; }
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   .modal-bg.open { display: flex; }
@@ -578,13 +579,13 @@ export function dashboardShell(): string {
             '<div class="table-wrap"><table><thead><tr>' +
             columns.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') +
             '</tr></thead><tbody id="tbody"></tbody></table></div>';
-          renderRows(columns, currentRows);
+          renderRows(columns, currentRows, tab);
           document.getElementById('searchBox').addEventListener('input', function (e) {
             var q = e.target.value.trim().toLowerCase();
             var filtered = !q ? currentRows : currentRows.filter(function (row) {
               return columns.some(function (c) { return String(row[c] || '').toLowerCase().indexOf(q) !== -1; });
             });
-            renderRows(columns, filtered);
+            renderRows(columns, filtered, tab);
           });
           document.getElementById('exportCsvBtn').addEventListener('click', function () {
             downloadCsv(tab + '.csv', columns, currentRows);
@@ -689,13 +690,16 @@ export function dashboardShell(): string {
       });
     }
 
-    function renderRows(columns, rows) {
+    function renderRows(columns, rows, tab) {
       var tbody = document.getElementById('tbody');
       if (!tbody) return;
       tbody.innerHTML = rows.map(function (row, i) {
         return '<tr class="clickable" data-i="' + i + '">' +
           columns.map(function (c) {
             if (DRIVE_LINK_COLUMNS.indexOf(c) !== -1) return '<td>' + driveThumbsHtml(row[c]) + '</td>';
+            if (tab === 'jobs' && c === 'Job ID' && row['Status'] === 'COMPLETED') {
+              return '<td><span class="tick-badge" title="This job is finished">&#10003;</span> ' + escapeHtml(String(row[c] || '')) + '</td>';
+            }
             return '<td>' + escapeHtml(String(row[c] || '')) + '</td>';
           }).join('') +
           '</tr>';
