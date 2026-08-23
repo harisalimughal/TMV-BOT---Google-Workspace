@@ -527,7 +527,7 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-green opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-status-green"></span>
             </span>
-            <h3 className="text-sm font-semibold text-ink">Live London Fleet GPS</h3>
+            <h3 className="text-btn text-ink">Live London Fleet GPS</h3>
           </div>
           <span className="hidden sm:inline-block h-4 w-px bg-line" />
           <div className="flex items-center gap-1.5 text-xs text-muted font-mono">
@@ -642,7 +642,7 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
                     {activeSelected.driverInitials}
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-ink leading-tight flex items-center gap-1.5">
+                    <h4 className="text-btn text-ink leading-tight flex items-center gap-1.5">
                       {activeSelected.driver}
                     </h4>
                     <span className="text-xs font-mono text-muted">{activeSelected.regPlate}</span>
@@ -760,7 +760,7 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center py-10 text-muted">
               <Compass className="w-10 h-10 text-muted mb-3 opacity-40 animate-spin-slow" />
-              <h4 className="text-xs font-semibold text-ink">London Fleet Radar Active</h4>
+              <h4 className="text-btn text-ink">London Fleet Radar Active</h4>
               <p className="text-[11px] text-muted mt-1 max-w-[200px]">
                 Click on any vehicle marker on the map to track live GPS telemetry and route navigation.
               </p>

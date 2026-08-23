@@ -278,20 +278,11 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* 2. HEADER */}
-        <header className="h-[64px] bg-paper border-b border-line px-8 flex items-center justify-between sticky top-0 z-20">
-          {/* Left: Page Title & Breadcrumb */}
-          <div className="flex flex-col justify-center">
-            <span className="text-nav text-muted mb-0.5">Pages / {currentNav.label}</span>
-            <h1 className="text-page-title text-ink">
-              {currentNav.label}
-            </h1>
-          </div>
-
-          {/* Right: Search & Controls */}
+        {/* 2. TOP GLOBAL HEADER */}
+        <header className="h-[56px] bg-paper border-b border-line px-6 flex items-center justify-between sticky top-0 z-20">
+          {/* Left: Global Search */}
           <div className="flex items-center gap-4">
-            {/* Search input */}
-            <div className="relative hidden md:block w-[240px]">
+            <div className="relative hidden md:block w-[320px]">
               <Search className="w-4 h-4 text-muted absolute left-3 top-2.5 pointer-events-none" />
               <input
                 type="text"
@@ -301,6 +292,10 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                 className="w-full h-9 pl-9 pr-3 bg-surface border border-line rounded-lg text-sm text-ink placeholder:text-muted focus:bg-paper focus:border-brand cursor-pointer transition"
               />
             </div>
+          </div>
+
+          {/* Right: Controls */}
+          <div className="flex items-center gap-4">
 
             <div className="flex items-center gap-2">
               <button
@@ -338,7 +333,33 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
         </header>
 
         {/* Page Main Content Area */}
-        <main className="flex-1 p-8 overflow-y-auto">{children}</main>
+        {/* 3. PAGE HEADER & CONTENT */}
+        <div className="flex-1 overflow-y-auto flex flex-col">
+          {/* Section Header */}
+          <div className="bg-paper border-b border-line px-8 py-5 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="text-brand">
+                <currentNav.icon className="w-6 h-6" />
+              </div>
+              <h1 className="text-page-title text-ink tracking-tight">
+                {currentNav.label}
+              </h1>
+            </div>
+            
+            {/* Contextual actions could go here (e.g. Settings, Permissions) */}
+            <div className="flex items-center gap-3">
+              {currentNav.isLive && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-status-green-bg border border-status-green/20 rounded-lg text-status-green font-medium text-sm">
+                  <span className="w-2 h-2 rounded-full bg-status-green animate-pulse" />
+                  Live System Active
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Page Content */}
+          <main className="flex-1 p-8">{children}</main>
+        </div>
 
         {/* Live Real-time Operations Event Ticker */}
         <LiveActivityTicker />

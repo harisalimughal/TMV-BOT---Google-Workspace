@@ -87,7 +87,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
                 WD
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-ink">Warren Davis</h4>
+                <h4 className="text-btn text-ink">Warren Davis</h4>
                 <span className="text-[10px] font-mono text-muted">TMV 24 LON</span>
               </div>
             </div>
@@ -112,7 +112,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
                 MD
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-ink">Mark Davis</h4>
+                <h4 className="text-btn text-ink">Mark Davis</h4>
                 <span className="text-[10px] font-mono text-muted">TMV 21 WES</span>
               </div>
             </div>
@@ -137,7 +137,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
                 JS
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-ink">John Smith</h4>
+                <h4 className="text-btn text-ink">John Smith</h4>
                 <span className="text-[10px] font-mono text-muted">TMV 19 CIT</span>
               </div>
             </div>
@@ -162,7 +162,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
                 RS
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-ink">Robert Scott</h4>
+                <h4 className="text-btn text-ink">Robert Scott</h4>
                 <span className="text-[10px] font-mono text-muted">TMV 23 SOU</span>
               </div>
             </div>

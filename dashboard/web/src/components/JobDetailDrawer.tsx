@@ -118,7 +118,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
             </div>
             <div>
               <span className="text-[11px] text-muted block mb-0.5">Driver & Crew</span>
-              <span className="text-xs font-semibold text-ink block">{job.driverName}</span>
+              <span className="text-btn text-ink block">{job.driverName}</span>
               <span className="text-[10px] text-muted">{job.crewSize} Crew</span>
             </div>
             <div>
@@ -263,7 +263,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
         <div className="p-4 border-t border-line bg-surface/50 flex items-center justify-between gap-3">
           <button
             onClick={handlePdfDownload}
-            className="h-9 px-4 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-brand-dark transition flex items-center gap-1.5 shadow-sm"
+            className="h-9 px-4 rounded-lg bg-brand text-white text-btn hover:bg-brand-dark transition flex items-center gap-1.5 shadow-sm"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download Certified PDF</span>

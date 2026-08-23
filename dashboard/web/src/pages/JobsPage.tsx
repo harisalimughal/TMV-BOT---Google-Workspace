@@ -398,7 +398,7 @@ export function JobsPage() {
                       <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center mx-auto mb-2 text-muted">
                         <FileText className="w-5 h-5 opacity-60" />
                       </div>
-                      <p className="text-sm font-semibold text-ink">No moves found</p>
+                      <p className="text-btn text-ink">No moves found</p>
                       <p className="text-xs text-muted">No moves match your filter criteria or search query.</p>
                     </td>
                   </tr>
@@ -570,7 +570,7 @@ export function JobsPage() {
                             onClick={e => { e.stopPropagation(); setDrawerJob(job); }}
                           >
                             <button
-                              className="px-2 py-1 rounded bg-surface hover:bg-brand hover:text-white text-brand text-xs font-semibold transition flex items-center gap-1 mx-auto"
+                              className="px-2 py-1 rounded bg-surface hover:bg-brand hover:text-white text-brand text-btn transition flex items-center gap-1 mx-auto"
                               title="Open Detailed Move Drawer"
                             >
                               <Eye className="w-3 h-3" />

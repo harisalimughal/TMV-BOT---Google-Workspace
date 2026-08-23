@@ -64,7 +64,7 @@ export function OverviewPage({ onSelectSection }: Props) {
     return (
       <div className="p-8 bg-paper border border-line rounded-lg text-center shadow-card">
         <AlertTriangle className="w-6 h-6 text-status-red mx-auto mb-2" />
-        <h3 className="text-sm font-semibold text-ink">Failed to load overview data</h3>
+        <h3 className="text-btn text-ink">Failed to load overview data</h3>
         <p className="text-xs text-muted mt-1">Please check connection or click Sync to refresh.</p>
       </div>
     );
@@ -97,7 +97,7 @@ export function OverviewPage({ onSelectSection }: Props) {
           {onSelectSection && (
             <button
               onClick={() => onSelectSection("live_fleet")}
-              className="h-9 px-3.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-xs font-semibold hover:opacity-95 transition shadow-sm flex items-center gap-1.5"
+              className="h-9 px-3.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-btn hover:opacity-95 transition shadow-sm flex items-center gap-1.5"
             >
               <Navigation className="w-3.5 h-3.5" />
               <span>Open Live Fleet GPS</span>

@@ -34,7 +34,7 @@ export function ReportsPage() {
           </div>
           <button
             onClick={downloadAllJobsCsv}
-            className="w-full py-2.5 px-4 rounded-lg bg-navy-900 text-white text-xs font-semibold hover:bg-navy-800 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-lg bg-navy-900 text-white text-btn hover:bg-navy-800 transition flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4 text-tmv-cyan" />
             Download Complete CSV
@@ -54,7 +54,7 @@ export function ReportsPage() {
           </div>
           <button
             onClick={downloadCompletedJobsCsv}
-            className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 text-white text-btn hover:bg-emerald-700 transition flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
             Download Completed Jobs CSV

@@ -41,7 +41,7 @@ export function ShortcutsModal({ isOpen, onClose }: Props) {
         <div className="flex items-center justify-between px-5 py-3 border-b border-line bg-surface/50">
           <div className="flex items-center gap-2">
             <Keyboard className="w-4 h-4 text-brand" />
-            <h3 className="text-sm font-semibold text-ink">Keyboard Shortcuts</h3>
+            <h3 className="text-btn text-ink">Keyboard Shortcuts</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded text-muted hover:text-ink hover:bg-surface transition">
             <X className="w-4 h-4" />

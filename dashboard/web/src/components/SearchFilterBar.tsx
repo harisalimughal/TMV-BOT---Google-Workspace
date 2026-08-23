@@ -123,7 +123,7 @@ export function SearchFilterBar({
       {onExportCsv && (
         <button
           onClick={onExportCsv}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-navy-900 text-white text-xs font-semibold hover:bg-navy-800 transition shadow-sm ml-auto"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-navy-900 text-white text-btn hover:bg-navy-800 transition shadow-sm ml-auto"
         >
           <Download className="w-4 h-4 text-tmv-cyan" />
           Export CSV

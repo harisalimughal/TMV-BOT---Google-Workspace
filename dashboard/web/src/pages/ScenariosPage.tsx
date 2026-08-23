@@ -127,7 +127,7 @@ export function ScenariosPage({ kind }: Props) {
       {!isLoading && isError && (
         <div className="p-8 bg-paper border border-line rounded text-center space-y-3 shadow-card">
           <AlertCircle className="w-6 h-6 text-status-red mx-auto" />
-          <h3 className="text-sm font-semibold text-ink">Failed to load {config.title} records</h3>
+          <h3 className="text-btn text-ink">Failed to load {config.title} records</h3>
           <p className="text-xs text-muted max-w-md mx-auto">
             {error instanceof Error ? error.message : "The operations server encountered an error retrieving this tab."}
           </p>
@@ -145,7 +145,7 @@ export function ScenariosPage({ kind }: Props) {
           <div className="w-10 h-10 rounded-pill bg-surface flex items-center justify-center mx-auto text-muted mb-2">
             <FileText className="w-5 h-5 opacity-60" />
           </div>
-          <h3 className="text-sm font-semibold text-ink">No {config.title} records</h3>
+          <h3 className="text-btn text-ink">No {config.title} records</h3>
           <p className="text-xs text-muted max-w-md mx-auto">{config.emptyHint}</p>
         </div>
       )}
@@ -331,7 +331,7 @@ export function ScenariosPage({ kind }: Props) {
                             <div className="p-6 bg-paper rounded border border-line shadow-card space-y-4 max-w-3xl">
                               <div className="flex items-center justify-between border-b border-line pb-3">
                                 <div>
-                                  <h4 className="text-sm font-semibold text-ink font-mono">{item.jobId} Dossier</h4>
+                                  <h4 className="text-btn text-ink font-mono">{item.jobId} Dossier</h4>
                                   <span className="text-xs text-muted font-mono">{formattedTime}</span>
                                 </div>
                                 {item.eventLabel && (

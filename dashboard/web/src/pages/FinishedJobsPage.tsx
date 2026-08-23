@@ -153,7 +153,7 @@ export function FinishedJobsPage() {
                       <div className="w-10 h-10 rounded-pill bg-surface flex items-center justify-center mx-auto mb-2 text-muted">
                         <FileText className="w-5 h-5 opacity-60" />
                       </div>
-                      <p className="text-sm font-semibold text-ink">No finished jobs</p>
+                      <p className="text-btn text-ink">No finished jobs</p>
                       <p className="text-xs text-muted">No delivered jobs match the timeframe.</p>
                     </td>
                   </tr>

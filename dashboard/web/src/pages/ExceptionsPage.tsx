@@ -48,7 +48,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
     return (
       <div className="p-8 text-center text-status-red bg-paper rounded-lg border border-line shadow-card">
         <AlertCircle className="w-6 h-6 mx-auto mb-2 text-status-red" />
-        <h3 className="text-sm font-semibold text-ink">Failed to load exceptions</h3>
+        <h3 className="text-btn text-ink">Failed to load exceptions</h3>
         <button
           onClick={() => refetch()}
           className="mt-3 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-medium hover:bg-brand-dark transition"
@@ -202,7 +202,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
       <div className="bg-paper rounded-lg border border-line shadow-card overflow-hidden">
         <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-surface/80 backdrop-blur-xs border-b border-line text-muted text-xs font-semibold sticky top-0 z-20">
+            <thead className="bg-surface/80 backdrop-blur-xs border-b border-line text-muted text-btn sticky top-0 z-20">
               <tr className="h-10">
                 <th className="py-2 px-3 w-8 text-center border-r border-line">
                   <input type="checkbox" className="rounded text-brand" />
@@ -224,7 +224,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
                     <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center mx-auto mb-2 text-status-green">
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
-                    <p className="text-sm font-semibold text-ink">Zero exceptions found</p>
+                    <p className="text-btn text-ink">Zero exceptions found</p>
                     <p className="text-xs text-muted">All moves in this filter scope are running smoothly.</p>
                   </td>
                 </tr>
@@ -285,7 +285,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
                     {ex.jobId !== "UNKNOWN" && onOpenJob ? (
                       <button
                         onClick={() => onOpenJob(ex.jobId)}
-                        className="px-2.5 py-1 rounded-lg bg-surface hover:bg-brand hover:text-white text-brand text-xs font-semibold transition"
+                        className="px-2.5 py-1 rounded-lg bg-surface hover:bg-brand hover:text-white text-brand text-btn transition"
                       >
                         Inspect
                       </button>

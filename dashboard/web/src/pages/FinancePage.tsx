@@ -97,7 +97,7 @@ export function FinancePage() {
         <div className="p-4 bg-paper rounded border border-status-red/30 shadow-card space-y-3">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-status-red" />
-            <h3 className="text-xs font-semibold text-status-red">
+            <h3 className="text-btn text-status-red">
               {unreconciledJobs.length} Unreconciled Invoices
             </h3>
           </div>
@@ -140,7 +140,7 @@ export function FinancePage() {
       {/* Revenue Component Timeline Chart */}
       <div className="p-5 bg-paper rounded border border-line shadow-card">
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-ink">Revenue Streams Breakdown</h3>
+          <h3 className="text-btn text-ink">Revenue Streams Breakdown</h3>
           <p className="text-xs text-muted">Base vs Extra Charges vs Overtime over time</p>
         </div>
 
