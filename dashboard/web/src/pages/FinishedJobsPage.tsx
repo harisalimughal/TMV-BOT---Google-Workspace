@@ -36,13 +36,13 @@ export function FinishedJobsPage() {
   return (
     <div className="space-y-4 max-w-full">
       {/* Toolbar Row */}
-      <div className="bg-paper p-3 rounded border border-line flex flex-wrap items-center justify-between gap-3 shadow-card">
+      <div className="bg-paper p-3 rounded border border-line flex flex-wrap items-center justify-between gap-3 shadow-sm hover:shadow-md transition">
         <div className="flex items-center gap-3">
           <div className="flex items-center p-0.5 bg-surface rounded border border-line text-[13px]">
             <button
               onClick={() => setViewMode("table")}
               className={`flex items-center gap-1 px-2.5 py-1 rounded text-[13px] font-medium transition ${
-                viewMode === "table" ? "bg-paper text-ink shadow-card font-semibold" : "text-muted hover:text-ink"
+                viewMode === "table" ? "bg-paper text-ink shadow-sm hover:shadow-md transition font-semibold" : "text-muted hover:text-ink"
               }`}
             >
               <TableIcon className="w-3.5 h-3.5" /> Table
@@ -50,7 +50,7 @@ export function FinishedJobsPage() {
             <button
               onClick={() => setViewMode("cards")}
               className={`flex items-center gap-1 px-2.5 py-1 rounded text-[13px] font-medium transition ${
-                viewMode === "cards" ? "bg-paper text-ink shadow-card font-semibold" : "text-muted hover:text-ink"
+                viewMode === "cards" ? "bg-paper text-ink shadow-sm hover:shadow-md transition font-semibold" : "text-muted hover:text-ink"
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" /> Cards
@@ -74,7 +74,7 @@ export function FinishedJobsPage() {
 
       {/* Main Table View */}
       {viewMode === "table" && (
-        <div className="bg-paper rounded border border-line-strong shadow-card overflow-hidden">
+        <div className="bg-paper rounded-xl border border-line shadow-sm hover:shadow-md transition overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
             <table className="w-full text-left text-[13px] border-collapse">
               <thead className="bg-surface border-b border-line-strong text-muted text-[13px] font-medium sticky top-0 z-20">
@@ -153,7 +153,7 @@ export function FinishedJobsPage() {
                       <div className="w-10 h-10 rounded-pill bg-surface flex items-center justify-center mx-auto mb-2 text-muted">
                         <FileText className="w-5 h-5 opacity-60" />
                       </div>
-                      <p className="text-btn text-ink">No finished jobs</p>
+                      <p className="text-[12px] font-semibold text-ink">No finished jobs</p>
                       <p className="text-[13px] text-muted">No delivered jobs match the timeframe.</p>
                     </td>
                   </tr>

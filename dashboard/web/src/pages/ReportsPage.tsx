@@ -15,46 +15,46 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="bg-paper p-5 rounded-lg border border-line">
+      <div className="bg-surface p-0">
         <h2 className="text-xl font-bold text-ink tracking-tight">Reports</h2>
-        <p className="text-xs text-muted mt-0.5">Downloadable operational datasets and certified export files</p>
+        <p className="text-[13px] text-muted mt-0.5">Downloadable operational datasets and certified export files</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Full Jobs CSV */}
-        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs flex flex-col justify-between">
+        <div className="p-6 bg-paper rounded-xl border border-line shadow-sm hover:shadow-md transition flex flex-col justify-between">
           <div>
-            <div className="w-10 h-10 rounded-lg bg-navy-900 text-tmv-cyan flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-lg bg-brand-dark text-white flex items-center justify-center mb-4">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-bold text-ink mb-1">Complete Jobs Workbook (CSV)</h3>
-            <p className="text-xs text-muted mb-4">
+            <p className="text-[13px] text-muted mb-4">
               Full dataset including scheduled start, actual timing variance, financials, driver mapping and evidence status.
             </p>
           </div>
           <button
             onClick={downloadAllJobsCsv}
-            className="w-full py-2.5 px-4 rounded-lg bg-navy-900 text-white text-btn hover:bg-navy-800 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-lg bg-brand-dark text-white text-[12px] font-semibold hover:bg-brand transition flex items-center justify-center gap-2"
           >
-            <Download className="w-4 h-4 text-tmv-cyan" />
+            <Download className="w-4 h-4 text-white" />
             Download Complete CSV
           </button>
         </div>
 
         {/* Finished Jobs CSV */}
-        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs flex flex-col justify-between">
+        <div className="p-6 bg-paper rounded-xl border border-line shadow-sm hover:shadow-md transition flex flex-col justify-between">
           <div>
-            <div className="w-10 h-10 rounded-lg bg-emerald-900 text-status-green flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-lg bg-status-green-bg text-status-green flex items-center justify-center mb-4">
               <CheckCircle2 className="w-5 h-5 text-status-green" />
             </div>
             <h3 className="text-sm font-bold text-ink mb-1">Completed Jobs Audit (CSV)</h3>
-            <p className="text-xs text-muted mb-4">
+            <p className="text-[13px] text-muted mb-4">
               Filtered to completed jobs with financial totals, customer sign-off names and Drive folder URLs.
             </p>
           </div>
           <button
             onClick={downloadCompletedJobsCsv}
-            className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 text-white text-btn hover:bg-emerald-700 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-lg bg-status-green text-white text-[12px] font-semibold hover:bg-status-green transition flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
             Download Completed Jobs CSV
