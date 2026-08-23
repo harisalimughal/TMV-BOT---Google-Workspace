@@ -151,17 +151,17 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
             {!collapsed && (
               <div className="flex items-center overflow-hidden">
                 <img
-                  src="/tmv-wide-logo.png"
+                  src="/tmv-new-logo.png"
                   alt="The Man Van"
-                  className="h-8 w-auto object-contain flex-shrink-0"
+                  className="h-14 w-auto object-contain flex-shrink-0"
                 />
               </div>
             )}
             {collapsed && (
               <img
-                src="/tmv-mascot.png"
+                src="/tmv-new-logo.png"
                 alt="TMV"
-                className="w-7 h-7 rounded-lg object-contain bg-surface border border-line p-0.5 mx-auto shadow-2xs"
+                className="w-8 h-8 rounded-lg object-contain bg-surface border border-line p-0.5 mx-auto shadow-2xs"
                 title="The Man Van Operations"
               />
             )}

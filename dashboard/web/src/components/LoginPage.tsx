@@ -61,9 +61,9 @@ export function LoginPage({ onSuccess }: Props) {
         {/* Header with Official Logo */}
         <div className="text-center mb-6">
           <img
-            src="/tmv-wide-logo.png"
+            src="/tmv-new-logo.png"
             alt="The Man Van - Helping you move forward"
-            className="h-16 mx-auto mb-4 object-contain"
+            className="h-24 mx-auto mb-4 object-contain"
           />
           <h1 className="text-base font-bold text-ink">Operations Dashboard</h1>
           <p className="text-xs text-muted mt-0.5">Enter password to access live London dispatch & audit</p>

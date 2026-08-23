@@ -61,9 +61,9 @@ export function PaperJobReport({ job, onClose }: Props) {
       <div className="flex items-center justify-between pb-4 mb-6 border-b border-line">
         <div className="flex items-center gap-3.5">
           <img
-            src="/tmv-wide-logo.png"
+            src="/tmv-new-logo.png"
             alt="The Man Van"
-            className="h-10 object-contain rounded"
+            className="h-16 object-contain rounded"
           />
           <div>
             <div className="flex items-center gap-2">
