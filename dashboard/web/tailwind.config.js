@@ -7,32 +7,33 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: "#F5F6F8",
+        // Core Layout
+        bg: "#F8FAFC",
         paper: "#FFFFFF",
-        surface: "#F9FAFB",
-        "surface-2": "#F3F4F6",
-        line: "#E5E7EB",
-        "line-strong": "#D1D5DB",
-        ink: "#1A1A2E",
-        "ink-2": "#6B7280",
-        muted: "#9CA3AF",
+        surface: "#F1F5F9",
+        "surface-hover": "#E2E8F0",
+        
+        // Borders
+        line: "#E2E8F0",
+        "line-strong": "#CBD5E1",
+        
+        // Typography
+        ink: "#0F172A",
+        "ink-2": "#475569",
+        muted: "#64748B",
+        
+        // Brand & Action
         brand: {
-          DEFAULT: "#3B82F6",
+          DEFAULT: "#2563EB",
           soft: "#EFF6FF",
-          dark: "#2563EB"
+          dark: "#1D4ED8"
         },
-        tmv: {
-          blue: "#3B82F6",
-          "blue-dark": "#2563EB",
-          cyan: "#38BDF8"
-        },
-        accent: "#38BDF8",
+        
+        // Status & Accents
         status: {
           green: "#10B981",
           "green-bg": "#ECFDF5",
           amber: "#F59E0B",
-          "orange": "#F59E0B",
-          "orange-bg": "#FFFBEB",
           "amber-bg": "#FFFBEB",
           red: "#EF4444",
           "red-bg": "#FEF2F2",
@@ -40,47 +41,27 @@ export default {
           "purple-bg": "#F5F3FF",
           pink: "#EC4899",
           "pink-bg": "#FDF2F8",
-          grey: "#6B7280",
-          "grey-bg": "#F3F4F6"
+          grey: "#64748B",
+          "grey-bg": "#F8FAFC"
         }
       },
       fontSize: {
-        xs: ["12px", { lineHeight: "16px", letterSpacing: "0.02em" }],
-        sm: ["13px", { lineHeight: "18px", letterSpacing: "0.01em" }],
-        base: ["14px", { lineHeight: "21px" }],
-        md: ["15px", { lineHeight: "24px" }],
-        lg: ["16px", { lineHeight: "24px" }],
-        xl: ["20px", { lineHeight: "28px" }],
-        "2xl": ["24px", { lineHeight: "32px", fontWeight: "700" }],
-        "3xl": ["28px", { lineHeight: "36px", fontWeight: "700" }]
-      },
-      spacing: {
-        "0.5": "2px",
-        "1": "4px",
-        "1.5": "6px",
-        "2": "8px",
-        "2.5": "10px",
-        "3": "12px",
-        "3.5": "14px",
-        "4": "16px",
-        "5": "20px",
-        "6": "24px",
-        "7": "28px",
-        "8": "32px",
-        "10": "40px",
-        "12": "48px",
-        "14": "56px",
-        "16": "64px",
-        "18": "72px",
-        "20": "80px"
+        // Typography System
+        "hero": ["32px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "page-title": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "700" }],
+        "section-title": ["18px", { lineHeight: "24px", fontWeight: "600" }],
+        "card-title": ["15px", { lineHeight: "20px", fontWeight: "600" }],
+        "body": ["14px", { lineHeight: "20px", fontWeight: "450" }],
+        "nav": ["13px", { lineHeight: "16px", fontWeight: "500" }],
+        "btn": ["13px", { lineHeight: "16px", fontWeight: "600" }],
+        "label": ["12px", { lineHeight: "16px", fontWeight: "500", letterSpacing: "0.01em" }],
+        "meta": ["11px", { lineHeight: "14px", fontWeight: "500", letterSpacing: "0.02em" }]
       },
       borderRadius: {
-        sm: "4px",
-        md: "6px",
         DEFAULT: "8px",
+        md: "6px",
         lg: "12px",
         xl: "16px",
-        "2xl": "24px",
         pill: "9999px"
       },
       fontFamily: {
@@ -88,13 +69,11 @@ export default {
         mono: ["'IBM Plex Mono'", "ui-monospace", "SFMono-Regular", "monospace"]
       },
       boxShadow: {
-        card: "0 1px 3px rgba(0,0,0,0.06)",
-        pop: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
-      },
-      transitionDuration: {
-        fast: "120ms",
-        base: "200ms",
-        expand: "240ms"
+        // Elevation System
+        flat: "none",
+        primary: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+        elevated: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+        floating: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
       }
     }
   },

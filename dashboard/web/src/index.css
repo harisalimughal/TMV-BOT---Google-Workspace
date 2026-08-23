@@ -4,23 +4,26 @@
 @tailwind utilities;
 
 :root {
-  /* LIGHT MODE (Default) */
-  --bg: #F5F6F8;
+  /* CORE LAYOUT */
+  --bg: #F8FAFC;
   --paper: #FFFFFF;
-  --surface: #F9FAFB;
-  --surface-2: #F3F4F6;
-  --line: #E5E7EB;
-  --line-strong: #D1D5DB;
+  --surface: #F1F5F9;
+  --surface-hover: #E2E8F0;
+  --line: #E2E8F0;
+  --line-strong: #CBD5E1;
 
-  --ink: #1A1A2E;
-  --ink-2: #6B7280;
-  --muted: #9CA3AF;
+  /* TYPOGRAPHY */
+  --ink: #0F172A;
+  --ink-2: #475569;
+  --muted: #64748B;
 
-  --brand: #3B82F6;
+  /* BRAND */
+  --brand: #2563EB;
   --brand-soft: #EFF6FF;
-  --brand-dark: #2563EB;
+  --brand-dark: #1D4ED8;
   --accent: #38BDF8;
 
+  /* STATUS */
   --green: #10B981;
   --green-bg: #ECFDF5;
   --amber: #F59E0B;
@@ -31,13 +34,14 @@
   --purple-bg: #F5F3FF;
   --pink: #EC4899;
   --pink-bg: #FDF2F8;
-  --grey: #6B7280;
-  --grey-bg: #F3F4F6;
+  --grey: #64748B;
+  --grey-bg: #F8FAFC;
 
+  /* SHAPES */
   --r: 8px;
   --r-pill: 9999px;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-pop: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-primary: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* DARK MODE */

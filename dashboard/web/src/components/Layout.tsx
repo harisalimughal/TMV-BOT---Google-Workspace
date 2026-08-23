@@ -182,7 +182,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                 return (
                   <div
                     key={idx}
-                    className="pt-5 pb-2 px-3 text-xs font-bold text-ink-2 uppercase tracking-wide"
+                    className="pt-5 pb-2 px-3 text-meta text-muted uppercase"
                   >
                     {item.label}
                   </div>
@@ -196,17 +196,13 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                 <button
                   key={item.id}
                   onClick={() => onSelectSection(item.id!)}
-                  className={`w-full h-11 flex items-center gap-3 px-3 rounded-lg font-medium transition group relative ${
+                  className={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-nav transition group ${
                     isActive
-                      ? "text-brand font-bold bg-brand-soft/50"
-                      : "text-muted hover:bg-surface hover:text-ink"
+                      ? "text-brand font-semibold bg-brand-soft"
+                      : "text-muted hover:bg-surface-hover hover:text-ink"
                   }`}
                   title={collapsed ? item.label : undefined}
                 >
-                  {/* Active indicator (right side) */}
-                  {isActive && !collapsed && (
-                    <div className="absolute right-0 top-2 bottom-2 w-1 bg-brand rounded-l-full" />
-                  )}
 
                   <Icon
                     className={`w-4 h-4 flex-shrink-0 transition-transform ${
@@ -285,9 +281,9 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
         {/* 2. HEADER */}
         <header className="h-[64px] bg-paper border-b border-line px-8 flex items-center justify-between sticky top-0 z-20">
           {/* Left: Page Title & Breadcrumb */}
-          <div className="flex flex-col justify-center gap-1">
-            <span className="text-sm font-medium text-muted">Pages / {currentNav.label}</span>
-            <h1 className="text-3xl font-bold text-ink leading-none tracking-tight">
+          <div className="flex flex-col justify-center">
+            <span className="text-nav text-muted mb-0.5">Pages / {currentNav.label}</span>
+            <h1 className="text-page-title text-ink">
               {currentNav.label}
             </h1>
           </div>

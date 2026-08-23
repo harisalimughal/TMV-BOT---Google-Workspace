@@ -107,18 +107,18 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
       </div>
 
-      {/* 2. WORLD-CLASS KPI METRIC CARDS (4-Up Grid) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 2. WORLD-CLASS KPI METRIC CARDS (Ribbon) */}
+      <div className="bg-paper border border-line rounded-lg shadow-primary grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-line">
         {/* Gross Invoiced */}
-        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
           <div>
-            <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
+            <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Gross Invoiced</span>
               <div className="w-6 h-6 rounded-md bg-brand-soft text-brand flex items-center justify-center">
                 <Banknote className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-[28px] font-bold text-ink font-mono tracking-tight leading-tight my-1">
+            <div className="text-hero text-ink my-2">
               £{totalRevenue.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
@@ -132,15 +132,15 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Total Bookings */}
-        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
           <div>
-            <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
+            <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Total Move Volume</span>
               <div className="w-6 h-6 rounded-md bg-brand-soft text-brand flex items-center justify-center">
                 <Truck className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-[28px] font-bold text-ink font-mono tracking-tight leading-tight my-1">
+            <div className="text-hero text-ink my-2">
               {kpis.totalJobs} <span className="text-sm font-normal text-muted">moves</span>
             </div>
           </div>
@@ -154,15 +154,15 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Completion Rate */}
-        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
           <div>
-            <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
+            <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Completion Rate</span>
               <div className="w-6 h-6 rounded-md bg-status-green-bg text-status-green flex items-center justify-center">
                 <CheckCircle2 className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-[28px] font-bold text-ink font-mono tracking-tight leading-tight my-1">
+            <div className="text-hero text-ink my-2">
               {completionRate}%
             </div>
           </div>
@@ -176,15 +176,15 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Punctuality / Delay */}
-        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
           <div>
-            <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
+            <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Average Arrival Delay</span>
               <div className="w-6 h-6 rounded-md bg-surface text-ink-2 flex items-center justify-center">
                 <Clock className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-[28px] font-bold text-ink font-mono tracking-tight leading-tight my-1">
+            <div className="text-hero text-ink my-2">
               +{kpis.avgDelayMinutes} <span className="text-sm font-normal text-muted">mins</span>
             </div>
           </div>

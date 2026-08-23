@@ -277,7 +277,7 @@ export function JobsPage() {
         <div className="bg-paper rounded-lg border border-line shadow-card overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-surface/80 backdrop-blur-xs border-b border-line text-muted text-xs font-semibold sticky top-0 z-20">
+              <thead className="bg-surface border-b border-line text-meta text-muted uppercase sticky top-0 z-20">
                 <tr className="h-10">
                   <th className="py-2 px-3 w-8 text-center border-r border-line">
                     <input type="checkbox" className="rounded text-brand" />
