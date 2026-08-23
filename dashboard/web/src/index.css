@@ -243,16 +243,20 @@ body {
   aside, header, .no-print, button {
     display: none !important;
   }
-  body, main {
-    background: white !important;
-    padding: 0 !important;
-    margin: 0 !important;
+  body * {
+    visibility: hidden;
+  }
+  .paper-sheet, .paper-sheet * {
+    visibility: visible;
   }
   .paper-sheet {
-    box-shadow: none !important;
-    border: none !important;
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100% !important;
     max-width: 100% !important;
     padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 }

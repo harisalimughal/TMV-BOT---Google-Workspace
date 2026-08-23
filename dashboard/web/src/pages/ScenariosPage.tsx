@@ -17,6 +17,7 @@ import { fetchScenarios } from "../api/client";
 import { ScenarioItem } from "../types";
 import { ThumbnailPreview } from "../components/ThumbnailPreview";
 import { PhotoModal } from "../components/PhotoModal";
+import { PaperScenarioReport } from "../components/PaperScenarioReport";
 import { formatLondonDateTime } from "../utils/date";
 
 interface Props {
@@ -326,60 +327,19 @@ export function ScenariosPage({ kind }: Props) {
 
                       {/* Expanded Report Row */}
                       {isExpanded && (
-                        <tr>
-                          <td colSpan={10} className="p-6 bg-bg border-b border-line">
-                            <div className="p-6 bg-paper rounded border border-line shadow-card space-y-4 max-w-3xl">
-                              <div className="flex items-center justify-between border-b border-line pb-3">
-                                <div>
-                                  <h4 className="text-btn text-ink font-mono">{item.jobId} Dossier</h4>
-                                  <span className="text-xs text-muted font-mono">{formattedTime}</span>
-                                </div>
-                                {item.eventLabel && (
-                                  <span className="px-2 py-0.5 rounded-pill bg-status-amber-bg text-status-amber text-xs font-medium font-mono">
-                                    {item.eventLabel}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                                <div>
-                                  <span className="text-[11px] font-medium text-muted block mb-1">Client Name</span>
-                                  <span className="font-semibold text-ink">{clientName}</span>
-                                </div>
-                                <div>
-                                  <span className="text-[11px] font-medium text-muted block mb-1">Container Number</span>
-                                  <span className="font-mono text-ink">{containerNum}</span>
-                                </div>
-                                <div>
-                                  <span className="text-[11px] font-medium text-muted block mb-1">Driver</span>
-                                  <span className="font-mono text-ink">{driverInitials}</span>
-                                </div>
-                                <div>
-                                  <span className="text-[11px] font-medium text-muted block mb-1">Client Present</span>
-                                  <span className="text-ink">{item.clientPresent || "Not recorded"}</span>
-                                </div>
-                              </div>
-
-                              {item.photos && item.photos.length > 0 && (
-                                <div className="pt-3 border-t border-line">
-                                  <span className="text-[11px] font-medium text-muted block mb-2">Photographs</span>
-                                  <div className="flex flex-wrap gap-2">
-                                    {item.photos.map((p: any, pIdx: number) => (
-                                      <ThumbnailPreview
-                                        key={p.fileId || pIdx}
-                                        src={p.thumbUrl}
-                                        alt={`Photograph #${pIdx + 1}, job ${item.jobId}`}
-                                        size="lg"
-                                        onClick={() => setActivePhoto({ title: `${item.jobId} - Photo #${pIdx + 1}`, url: p.thumbUrl })}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+  <tr>
+    <td colSpan={10} className="p-0 bg-bg border-b border-line relative">
+      <div className="absolute top-4 right-8 z-10 print:hidden flex gap-2">
+        <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-paper border border-line rounded-md text-btn hover:bg-surface text-ink shadow-sm transition">
+          Print PDF
+        </button>
+      </div>
+      <div className="print:block p-4">
+        <PaperScenarioReport item={item} kind={kind} />
+      </div>
+    </td>
+  </tr>
+)}
                     </React.Fragment>
                   );
                 })}
