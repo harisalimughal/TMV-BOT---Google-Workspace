@@ -115,10 +115,10 @@ export function JobsPage() {
       <div className="bg-paper p-3.5 rounded-lg border border-line flex flex-wrap items-center justify-between gap-3 shadow-card">
         <div className="flex flex-wrap items-center gap-3">
           {/* View Toggle Segmented Control */}
-          <div className="flex items-center p-0.5 bg-surface rounded-lg border border-line text-xs">
+          <div className="flex items-center p-0.5 bg-surface rounded-lg border border-line text-[13px]">
             <button
               onClick={() => setViewMode("table")}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[13px] font-medium transition ${
                 viewMode === "table" ? "bg-paper text-ink shadow-card font-semibold" : "text-muted hover:text-ink"
               }`}
             >
@@ -126,7 +126,7 @@ export function JobsPage() {
             </button>
             <button
               onClick={() => setViewMode("cards")}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[13px] font-medium transition ${
                 viewMode === "cards" ? "bg-paper text-ink shadow-card font-semibold" : "text-muted hover:text-ink"
               }`}
             >
@@ -141,7 +141,7 @@ export function JobsPage() {
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search moves, postcodes, clients..."
-              className="w-full h-8 pl-3 pr-7 bg-surface border border-line rounded-lg text-xs text-ink placeholder:text-muted focus:bg-paper focus:border-brand transition"
+              className="w-full h-8 pl-3 pr-7 bg-surface border border-line rounded-lg text-[13px] text-ink placeholder:text-muted focus:bg-paper focus:border-brand transition"
             />
             {search && (
               <button
@@ -178,7 +178,7 @@ export function JobsPage() {
           {/* Filter Trigger Button with Count Badge */}
           <button
             onClick={() => setFilterDrawerOpen(!filterDrawerOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] font-medium transition ${
               activeFilterCount > 0
                 ? "bg-brand-soft border-brand/30 text-brand"
                 : "bg-surface border-line text-ink-2 hover:bg-surface-2"
@@ -199,7 +199,7 @@ export function JobsPage() {
 
         <div className="flex items-center gap-3">
           {/* Record Count */}
-          <span className="text-xs text-muted font-mono">
+          <span className="text-[13px] text-muted font-mono">
             {isLoading ? "Loading..." : `${data?.pagination?.total || 0} moves recorded`}
           </span>
 
@@ -216,13 +216,13 @@ export function JobsPage() {
 
       {/* Expanded Filter Panel */}
       {filterDrawerOpen && (
-        <div className="p-4 bg-paper rounded-lg border border-line flex flex-wrap items-center gap-4 text-xs shadow-card">
+        <div className="p-4 bg-paper rounded-lg border border-line flex flex-wrap items-center gap-4 text-[13px] shadow-card">
           <div className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-muted">Status Filter</span>
             <select
               value={status}
               onChange={e => { setStatus(e.target.value); setPage(1); }}
-              className="h-8 px-2.5 bg-surface border border-line rounded-lg text-xs text-ink"
+              className="h-8 px-2.5 bg-surface border border-line rounded-lg text-[13px] text-ink"
             >
               <option value="ALL">All Statuses</option>
               <option value="IN_PROGRESS">In Progress</option>
@@ -237,7 +237,7 @@ export function JobsPage() {
             <select
               value={driver}
               onChange={e => { setDriver(e.target.value); setPage(1); }}
-              className="h-8 px-2.5 bg-surface border border-line rounded-lg text-xs text-ink font-mono"
+              className="h-8 px-2.5 bg-surface border border-line rounded-lg text-[13px] text-ink font-mono"
             >
               <option value="ALL">All Drivers</option>
               <option value="WD">WD &bull; Warren Davis</option>
@@ -252,7 +252,7 @@ export function JobsPage() {
             <select
               value={payMethod}
               onChange={e => { setPayMethod(e.target.value); setPage(1); }}
-              className="h-8 px-2.5 bg-surface border border-line rounded-lg text-xs text-ink"
+              className="h-8 px-2.5 bg-surface border border-line rounded-lg text-[13px] text-ink"
             >
               <option value="ALL">All Payment Types</option>
               <option value="CARD">Card</option>
@@ -264,7 +264,7 @@ export function JobsPage() {
           {activeFilterCount > 0 && (
             <button
               onClick={resetFilters}
-              className="mt-4 text-xs text-muted hover:text-status-red underline font-medium"
+              className="mt-4 text-[13px] text-muted hover:text-status-red underline font-medium"
             >
               Reset all filters
             </button>
@@ -276,20 +276,20 @@ export function JobsPage() {
       {viewMode === "table" && (
         <div className="bg-paper rounded-lg border border-line shadow-card overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-surface border-b border-line text-meta text-muted uppercase sticky top-0 z-20">
+            <table className="w-full text-left text-[13px] border-collapse">
+              <thead className="bg-surface border-b border-line text-[12px] font-medium text-muted  sticky top-0 z-20">
                 <tr className="h-10">
-                  <th className="py-2 px-3 w-8 text-center border-r border-line">
+                  <th className="py-2 px-3 w-8 text-center ">
                     <input type="checkbox" className="rounded text-brand" />
                   </th>
-                  <th className="py-2 px-2 w-8 text-center font-mono text-[11px] text-muted border-r border-line">
+                  <th className="py-2 px-2 w-8 text-center font-mono text-[11px] text-muted ">
                     #
                   </th>
 
                   {/* Frozen Identity Column */}
                   <th
                     onClick={() => handleSort("jobId")}
-                    className="py-2 px-3 w-56 cursor-pointer hover:text-ink font-semibold sticky left-0 bg-surface z-30 border-r border-line-strong shadow-xs select-none"
+                    className="py-2 px-3 w-56 cursor-pointer hover:text-ink font-semibold sticky left-0 bg-surface z-30  shadow-xs select-none"
                   >
                     <div className="flex items-center justify-between">
                       <span>Job ID &amp; Driver</span>
@@ -299,7 +299,7 @@ export function JobsPage() {
 
                   <th
                     onClick={() => handleSort("bookedStart")}
-                    className="py-2 px-3 w-40 cursor-pointer hover:text-ink font-semibold border-r border-line select-none"
+                    className="py-2 px-3 w-40 cursor-pointer hover:text-ink font-semibold  select-none"
                   >
                     <div className="flex items-center justify-between">
                       <span>Timing (London)</span>
@@ -307,21 +307,21 @@ export function JobsPage() {
                     </div>
                   </th>
 
-                  <th className="py-2 px-3 w-48 font-semibold border-r border-line">
+                  <th className="py-2 px-3 w-48 font-semibold ">
                     Customer
                   </th>
 
-                  <th className="py-2 px-3 min-w-[200px] font-semibold border-r border-line">
+                  <th className="py-2 px-3 min-w-[200px] font-semibold ">
                     Pickup Address
                   </th>
 
-                  <th className="py-2 px-3 min-w-[200px] font-semibold border-r border-line">
+                  <th className="py-2 px-3 min-w-[200px] font-semibold ">
                     Dropoff Destination
                   </th>
 
                   <th
                     onClick={() => handleSort("status")}
-                    className="py-2 px-3 w-32 cursor-pointer hover:text-ink font-semibold border-r border-line select-none"
+                    className="py-2 px-3 w-32 cursor-pointer hover:text-ink font-semibold  select-none"
                   >
                     <div className="flex items-center justify-between">
                       <span>Status</span>
@@ -331,7 +331,7 @@ export function JobsPage() {
 
                   <th
                     onClick={() => handleSort("delayMinutes")}
-                    className="py-2 px-3 w-28 cursor-pointer hover:text-ink font-semibold border-r border-line select-none"
+                    className="py-2 px-3 w-28 cursor-pointer hover:text-ink font-semibold  select-none"
                   >
                     <div className="flex items-center justify-between">
                       <span>Punctuality</span>
@@ -339,17 +339,17 @@ export function JobsPage() {
                     </div>
                   </th>
 
-                  <th className="py-2 px-3 w-36 font-semibold border-r border-line text-center">
+                  <th className="py-2 px-3 w-36 font-semibold  text-center">
                     Photographs
                   </th>
 
-                  <th className="py-2 px-3 w-28 font-semibold border-r border-line text-center">
+                  <th className="py-2 px-3 w-28 font-semibold  text-center">
                     Signature
                   </th>
 
                   <th
                     onClick={() => handleSort("totalCharges")}
-                    className="py-2 px-3 w-28 cursor-pointer hover:text-ink font-semibold border-r border-line text-right font-mono select-none"
+                    className="py-2 px-3 w-28 cursor-pointer hover:text-ink font-semibold  text-right font-mono select-none"
                   >
                     <div className="flex items-center justify-end gap-1">
                       <span>Total (£)</span>
@@ -365,19 +365,19 @@ export function JobsPage() {
                 {isLoading && (
                   <>
                     {[...Array(8)].map((_, i) => (
-                      <tr key={i} className="h-[52px] animate-pulse">
-                        <td className="py-3 px-3 text-center border-r border-line"><div className="w-3.5 h-3.5 bg-surface rounded mx-auto" /></td>
-                        <td className="py-3 px-2 text-center border-r border-line"><div className="w-3 h-3 bg-surface rounded mx-auto" /></td>
-                        <td className="py-3 px-3 border-r border-line-strong sticky left-0 bg-paper"><div className="w-24 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-24 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-28 h-6 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-36 h-6 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-36 h-6 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-20 h-5 bg-surface rounded-full" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-16 h-5 bg-surface rounded-full" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-20 h-7 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-16 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-14 h-4 bg-surface rounded ml-auto" /></td>
+                      <tr key={i} className="h-14 animate-pulse">
+                        <td className="py-3 px-3 text-center "><div className="w-3.5 h-3.5 bg-surface rounded mx-auto" /></td>
+                        <td className="py-3 px-2 text-center "><div className="w-3 h-3 bg-surface rounded mx-auto" /></td>
+                        <td className="py-3 px-3  sticky left-0 bg-paper"><div className="w-24 h-4 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-24 h-4 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-28 h-6 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-36 h-6 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-36 h-6 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-20 h-5 bg-surface rounded-full" /></td>
+                        <td className="py-3 px-3 "><div className="w-16 h-5 bg-surface rounded-full" /></td>
+                        <td className="py-3 px-3 "><div className="w-20 h-7 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-16 h-4 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-14 h-4 bg-surface rounded ml-auto" /></td>
                         <td className="py-3 px-3"><div className="w-12 h-6 bg-surface rounded mx-auto" /></td>
                       </tr>
                     ))}
@@ -399,7 +399,7 @@ export function JobsPage() {
                         <FileText className="w-5 h-5 opacity-60" />
                       </div>
                       <p className="text-btn text-ink">No moves found</p>
-                      <p className="text-xs text-muted">No moves match your filter criteria or search query.</p>
+                      <p className="text-[13px] text-muted">No moves match your filter criteria or search query.</p>
                     </td>
                   </tr>
                 )}
@@ -415,26 +415,26 @@ export function JobsPage() {
                       <React.Fragment key={job.jobId}>
                         <tr
                           onClick={() => setDrawerJob(job)}
-                          className={`h-[52px] cursor-pointer transition select-none group ${
+                          className={`h-14 cursor-pointer transition select-none group ${
                             isExpanded ? "bg-brand-soft" : "hover:bg-surface/80"
                           }`}
                         >
                           {/* Checkbox */}
                           <td
-                            className="py-2.5 px-3 text-center border-r border-line"
+                            className="py-2.5 px-3 text-center "
                             onClick={e => e.stopPropagation()}
                           >
                             <input type="checkbox" className="rounded text-brand" />
                           </td>
 
                           {/* Row Number */}
-                          <td className="py-2.5 px-2 text-center font-mono text-[11px] text-muted border-r border-line">
+                          <td className="py-2.5 px-2 text-center font-mono text-[11px] text-muted ">
                             {rowNumber}
                           </td>
 
                           {/* FROZEN IDENTITY COLUMN */}
                           <td
-                            className={`py-2.5 px-3 border-r border-line-strong sticky left-0 z-10 transition ${
+                            className={`py-2.5 px-3  sticky left-0 z-10 transition ${
                               isExpanded ? "bg-brand-soft" : "bg-paper group-hover:bg-surface/80"
                             }`}
                           >
@@ -446,7 +446,7 @@ export function JobsPage() {
                                 {job.driverInitials || "UN"}
                               </div>
                               <div className="overflow-hidden">
-                                <span className="font-mono font-bold text-brand text-xs block truncate group-hover:underline">
+                                <span className="font-mono font-bold text-brand text-[13px] block truncate group-hover:underline">
                                   {job.jobId}
                                 </span>
                                 <span className="text-[11px] text-ink-2 truncate block">
@@ -457,53 +457,38 @@ export function JobsPage() {
                           </td>
 
                           {/* Timing */}
-                          <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-ink-2 border-r border-line" title={job.bookedStart || ""}>
+                          <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-ink-2 " title={job.bookedStart || ""}>
                             <span>{formattedTime}</span>
                           </td>
 
                           {/* Customer */}
-                          <td className="py-2.5 px-3 border-r border-line">
-                            <div
-                              className="h-7 px-2.5 py-1 bg-surface border border-line rounded-md flex items-center text-xs font-medium text-ink truncate"
-                              title={`${job.customerName} ${job.customerPhone ? `(${job.customerPhone})` : ""}`}
-                            >
-                              <span className="truncate">{job.customerName}</span>
-                            </div>
+                          <td className="py-2.5 px-3 ">
+                            <span className="text-[13px] text-ink truncate block max-w-[200px]">{job.customerName}</span>
                           </td>
 
                           {/* Pickup Address */}
-                          <td className="py-2.5 px-3 border-r border-line">
-                            <div
-                              className="h-7 px-2.5 py-1 bg-surface border border-line rounded-md flex items-center text-xs text-ink truncate max-w-xs"
-                              title={job.pickup}
-                            >
-                              <span className="truncate">{job.pickup}</span>
-                            </div>
+                          <td className="py-2.5 px-3 ">
+                            <span className="text-[13px] text-ink truncate block max-w-[200px]">{job.pickup}</span>
                           </td>
 
                           {/* Dropoff Address */}
-                          <td className="py-2.5 px-3 border-r border-line">
-                            <div
-                              className="h-7 px-2.5 py-1 bg-surface border border-line rounded-md flex items-center text-xs text-ink truncate max-w-xs"
-                              title={job.dropoff}
-                            >
-                              <span className="truncate">{job.dropoff}</span>
-                            </div>
+                          <td className="py-2.5 px-3 ">
+                            <span className="text-[13px] text-ink truncate block max-w-[200px]">{job.dropoff}</span>
                           </td>
 
                           {/* Status Badge */}
-                          <td className="py-2.5 px-3 whitespace-nowrap border-r border-line">
+                          <td className="py-2.5 px-3 whitespace-nowrap ">
                             <JobStatusBadge status={job.status} />
                           </td>
 
                           {/* Punctuality Badge */}
-                          <td className="py-2.5 px-3 whitespace-nowrap border-r border-line">
+                          <td className="py-2.5 px-3 whitespace-nowrap ">
                             <DelayBandBadge band={job.delayBand} minutes={job.delayMinutes} />
                           </td>
 
                           {/* Photographs Strip */}
                           <td
-                            className="py-2.5 px-3 border-r border-line"
+                            className="py-2.5 px-3 "
                             onClick={e => e.stopPropagation()}
                           >
                             <div className="flex items-center justify-center gap-1">
@@ -538,7 +523,7 @@ export function JobsPage() {
 
                           {/* Signature */}
                           <td
-                            className="py-2.5 px-3 border-r border-line text-center"
+                            className="py-2.5 px-3  text-center"
                             onClick={e => e.stopPropagation()}
                           >
                             {job.signatureUrl ? (
@@ -555,12 +540,12 @@ export function JobsPage() {
                                 />
                               </button>
                             ) : (
-                              <span className="text-xs text-muted">Not captured</span>
+                              <span className="text-[13px] text-muted">Not captured</span>
                             )}
                           </td>
 
                           {/* Total Amount */}
-                          <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono font-bold text-ink border-r border-line">
+                          <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono font-bold text-ink ">
                             £{totalPounds.toFixed(2)}
                           </td>
 
@@ -587,7 +572,7 @@ export function JobsPage() {
 
           {/* Sticky Pagination Bar */}
           {data?.pagination && (
-            <div className="flex items-center justify-between px-5 py-3.5 border-t border-line bg-paper text-xs text-muted sticky bottom-0">
+            <div className="flex items-center justify-between px-5 py-3.5 border-t border-line bg-paper text-[13px] text-muted sticky bottom-0">
               <div>
                 Showing <span className="font-mono text-ink font-bold">1–{data.items.length}</span> of{" "}
                 <span className="font-mono text-ink font-bold">{data.pagination.total}</span> moves
@@ -598,7 +583,7 @@ export function JobsPage() {
                   <select
                     value={pageSize}
                     onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                    className="h-7 px-2 bg-surface border border-line rounded text-xs text-ink font-mono font-medium"
+                    className="h-7 px-2 bg-surface border border-line rounded text-[13px] text-ink font-mono font-medium"
                   >
                     <option value={25}>25</option>
                     <option value={50}>50</option>
@@ -648,17 +633,17 @@ export function JobsPage() {
                       <div className="w-6 h-6 rounded-full bg-brand-soft text-brand font-mono font-bold text-[10px] flex items-center justify-center">
                         {job.driverInitials || "UN"}
                       </div>
-                      <span className="font-mono font-bold text-brand text-xs">{job.jobId}</span>
+                      <span className="font-mono font-bold text-brand text-[13px]">{job.jobId}</span>
                     </div>
                     <JobStatusBadge status={job.status} />
                   </div>
 
-                  <div className="text-xs space-y-1">
+                  <div className="text-[13px] space-y-1">
                     <div className="font-semibold text-ink">{job.customerName}</div>
                     <div className="text-muted text-[11px] truncate">{job.pickup} &rarr; {job.dropoff}</div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-line text-xs font-mono">
+                  <div className="flex items-center justify-between pt-2 border-t border-line text-[13px] font-mono">
                     <span className="text-muted">{formatLondonDateTime(job.bookedStart)}</span>
                     <span className="font-bold text-ink">£{totalPounds.toFixed(2)}</span>
                   </div>

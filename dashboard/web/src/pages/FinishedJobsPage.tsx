@@ -38,10 +38,10 @@ export function FinishedJobsPage() {
       {/* Toolbar Row */}
       <div className="bg-paper p-3 rounded border border-line flex flex-wrap items-center justify-between gap-3 shadow-card">
         <div className="flex items-center gap-3">
-          <div className="flex items-center p-0.5 bg-surface rounded border border-line text-xs">
+          <div className="flex items-center p-0.5 bg-surface rounded border border-line text-[13px]">
             <button
               onClick={() => setViewMode("table")}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded text-[13px] font-medium transition ${
                 viewMode === "table" ? "bg-paper text-ink shadow-card font-semibold" : "text-muted hover:text-ink"
               }`}
             >
@@ -49,7 +49,7 @@ export function FinishedJobsPage() {
             </button>
             <button
               onClick={() => setViewMode("cards")}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded text-[13px] font-medium transition ${
                 viewMode === "cards" ? "bg-paper text-ink shadow-card font-semibold" : "text-muted hover:text-ink"
               }`}
             >
@@ -58,7 +58,7 @@ export function FinishedJobsPage() {
           </div>
 
           <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
-          <span className="text-xs text-muted font-mono">
+          <span className="text-[13px] text-muted font-mono">
             {isLoading ? "Loading..." : `${data?.pagination?.total || 0} finished jobs`}
           </span>
         </div>
@@ -76,42 +76,42 @@ export function FinishedJobsPage() {
       {viewMode === "table" && (
         <div className="bg-paper rounded border border-line-strong shadow-card overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-surface border-b border-line-strong text-muted text-xs font-medium sticky top-0 z-20">
+            <table className="w-full text-left text-[13px] border-collapse">
+              <thead className="bg-surface border-b border-line-strong text-muted text-[13px] font-medium sticky top-0 z-20">
                 <tr className="h-10">
-                  <th className="py-2 px-3 w-8 text-center border-r border-line">
+                  <th className="py-2 px-3 w-8 text-center ">
                     <input type="checkbox" className="rounded text-brand" />
                   </th>
-                  <th className="py-2 px-2 w-8 text-center font-mono text-[11px] text-muted border-r border-line">
+                  <th className="py-2 px-2 w-8 text-center font-mono text-[11px] text-muted ">
                     #
                   </th>
 
                   {/* Frozen Identity Column Header */}
-                  <th className="py-2 px-3 w-56 font-medium sticky left-0 bg-surface z-30 border-r border-line-strong shadow-sm">
+                  <th className="py-2 px-3 w-56 font-medium sticky left-0 bg-surface z-30  shadow-sm">
                     Job & Driver
                   </th>
 
-                  <th className="py-2 px-3 w-40 font-medium border-r border-line">
+                  <th className="py-2 px-3 w-40 font-medium ">
                     Completed (London)
                   </th>
 
-                  <th className="py-2 px-3 w-48 font-medium border-r border-line">
+                  <th className="py-2 px-3 w-48 font-medium ">
                     Customer
                   </th>
 
-                  <th className="py-2 px-3 min-w-[200px] font-medium border-r border-line">
+                  <th className="py-2 px-3 min-w-[200px] font-medium ">
                     Route
                   </th>
 
-                  <th className="py-2 px-3 w-36 font-medium border-r border-line text-center">
+                  <th className="py-2 px-3 w-36 font-medium  text-center">
                     Evidence Photos
                   </th>
 
-                  <th className="py-2 px-3 w-28 font-medium border-r border-line text-center">
+                  <th className="py-2 px-3 w-28 font-medium  text-center">
                     Signature
                   </th>
 
-                  <th className="py-2 px-3 w-28 font-medium border-r border-line text-right font-mono">
+                  <th className="py-2 px-3 w-28 font-medium  text-right font-mono">
                     Total Billed
                   </th>
 
@@ -123,16 +123,16 @@ export function FinishedJobsPage() {
                 {isLoading && (
                   <>
                     {[...Array(6)].map((_, i) => (
-                      <tr key={i} className="h-[52px] animate-pulse">
-                        <td className="py-3 px-3 text-center border-r border-line"><div className="w-3.5 h-3.5 bg-surface rounded mx-auto" /></td>
-                        <td className="py-3 px-2 text-center border-r border-line"><div className="w-3 h-3 bg-surface rounded mx-auto" /></td>
-                        <td className="py-3 px-3 border-r border-line-strong sticky left-0 bg-paper"><div className="w-24 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-24 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-28 h-6 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-36 h-6 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-20 h-7 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-16 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 border-r border-line"><div className="w-14 h-4 bg-surface rounded ml-auto" /></td>
+                      <tr key={i} className="h-14 animate-pulse">
+                        <td className="py-3 px-3 text-center "><div className="w-3.5 h-3.5 bg-surface rounded mx-auto" /></td>
+                        <td className="py-3 px-2 text-center "><div className="w-3 h-3 bg-surface rounded mx-auto" /></td>
+                        <td className="py-3 px-3  sticky left-0 bg-paper"><div className="w-24 h-4 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-24 h-4 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-28 h-6 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-36 h-6 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-20 h-7 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-16 h-4 bg-surface rounded" /></td>
+                        <td className="py-3 px-3 "><div className="w-14 h-4 bg-surface rounded ml-auto" /></td>
                         <td className="py-3 px-3"></td>
                       </tr>
                     ))}
@@ -154,7 +154,7 @@ export function FinishedJobsPage() {
                         <FileText className="w-5 h-5 opacity-60" />
                       </div>
                       <p className="text-btn text-ink">No finished jobs</p>
-                      <p className="text-xs text-muted">No delivered jobs match the timeframe.</p>
+                      <p className="text-[13px] text-muted">No delivered jobs match the timeframe.</p>
                     </td>
                   </tr>
                 )}
@@ -170,21 +170,21 @@ export function FinishedJobsPage() {
                       <React.Fragment key={job.jobId}>
                         <tr
                           onClick={() => setExpandedJobId(isExpanded ? null : job.jobId)}
-                          className={`h-[52px] cursor-pointer transition select-none ${
+                          className={`h-14 cursor-pointer transition select-none ${
                             isExpanded ? "bg-brand-soft" : "hover:bg-surface"
                           }`}
                         >
-                          <td className="py-2.5 px-3 text-center border-r border-line" onClick={e => e.stopPropagation()}>
+                          <td className="py-2.5 px-3 text-center " onClick={e => e.stopPropagation()}>
                             <input type="checkbox" className="rounded text-brand" />
                           </td>
 
-                          <td className="py-2.5 px-2 text-center font-mono text-[11px] text-muted border-r border-line">
+                          <td className="py-2.5 px-2 text-center font-mono text-[11px] text-muted ">
                             {rowNumber}
                           </td>
 
                           {/* Frozen Identity Column */}
                           <td
-                            className={`py-2.5 px-3 border-r border-line-strong sticky left-0 z-10 transition ${
+                            className={`py-2.5 px-3  sticky left-0 z-10 transition ${
                               isExpanded ? "bg-brand-soft" : "bg-paper hover:bg-surface"
                             }`}
                           >
@@ -193,7 +193,7 @@ export function FinishedJobsPage() {
                                 {job.driverInitials || "UN"}
                               </div>
                               <div className="overflow-hidden">
-                                <span className="font-mono font-semibold text-brand text-xs block truncate hover:underline">
+                                <span className="font-mono font-semibold text-brand text-[13px] block truncate hover:underline">
                                   {job.jobId}
                                 </span>
                                 <span className="text-[11px] text-ink-2 truncate block">{job.driverName}</span>
@@ -201,24 +201,24 @@ export function FinishedJobsPage() {
                             </div>
                           </td>
 
-                          <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-ink-2 border-r border-line" title={job.actualFinish || ""}>
+                          <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-ink-2 " title={job.actualFinish || ""}>
                             {formattedTime}
                           </td>
 
-                          <td className="py-2.5 px-3 border-r border-line">
+                          <td className="py-2.5 px-3 ">
                             <div className="h-7 px-2.5 py-1 bg-surface border border-line rounded flex items-center text-[13px] text-ink truncate" title={job.customerName}>
                               <span className="truncate">{job.customerName}</span>
                             </div>
                           </td>
 
-                          <td className="py-2.5 px-3 border-r border-line">
+                          <td className="py-2.5 px-3 ">
                             <div className="h-7 px-2.5 py-1 bg-surface border border-line rounded flex items-center text-[13px] text-ink truncate max-w-xs" title={`${job.pickup} -> ${job.dropoff}`}>
                               <span className="truncate">{job.pickup} &rarr; {job.dropoff}</span>
                             </div>
                           </td>
 
                           {/* Evidence Strip */}
-                          <td className="py-2.5 px-3 border-r border-line" onClick={e => e.stopPropagation()}>
+                          <td className="py-2.5 px-3 " onClick={e => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1">
                               {job.evidenceItems.slice(0, 3).map((ev, i) => (
                                 <ThumbnailPreview
@@ -247,7 +247,7 @@ export function FinishedJobsPage() {
                           </td>
 
                           {/* Signature */}
-                          <td className="py-2.5 px-3 border-r border-line text-center" onClick={e => e.stopPropagation()}>
+                          <td className="py-2.5 px-3  text-center" onClick={e => e.stopPropagation()}>
                             {job.signatureUrl ? (
                               <button
                                 onClick={() => setActivePhoto({ title: `${job.jobId} - Signature`, url: job.signatureUrl! })}
@@ -265,7 +265,7 @@ export function FinishedJobsPage() {
                             )}
                           </td>
 
-                          <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono font-semibold text-ink border-r border-line">
+                          <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono font-semibold text-ink ">
                             £{totalPounds.toFixed(2)}
                           </td>
 
@@ -290,7 +290,7 @@ export function FinishedJobsPage() {
 
           {/* Sticky Pagination Bar */}
           {data?.pagination && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-line bg-paper text-xs text-muted sticky bottom-0">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-line bg-paper text-[13px] text-muted sticky bottom-0">
               <div>
                 Showing <span className="font-mono text-ink font-semibold">1–{data.items.length}</span> of{" "}
                 <span className="font-mono text-ink font-semibold">{data.pagination.total}</span> finished jobs

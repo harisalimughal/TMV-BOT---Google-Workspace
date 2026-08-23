@@ -76,7 +76,7 @@ export function OverviewPage({ onSelectSection }: Props) {
   return (
     <div className="space-y-6 max-w-full">
       {/* 1. EXECUTIVE HERO HEADER */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-paper p-5 rounded-lg border border-line shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-paper p-6 rounded-xl border border-line shadow-sm">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded-full bg-brand-soft text-brand text-[10px] font-mono font-bold uppercase tracking-wider">
@@ -97,9 +97,9 @@ export function OverviewPage({ onSelectSection }: Props) {
       </div>
 
       {/* 2. WORLD-CLASS KPI METRIC CARDS (Ribbon) */}
-      <div className="bg-paper border border-line rounded-lg shadow-primary grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-line">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Gross Invoiced */}
-        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
+        <div className="bg-paper p-6 rounded-xl border border-line shadow-sm hover:shadow-md transition flex flex-col justify-between group cursor-pointer">
           <div>
             <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Gross Invoiced</span>
@@ -121,7 +121,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Total Bookings */}
-        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
+        <div className="bg-paper p-6 rounded-xl border border-line shadow-sm hover:shadow-md transition flex flex-col justify-between group cursor-pointer">
           <div>
             <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Total Move Volume</span>
@@ -143,7 +143,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Completion Rate */}
-        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
+        <div className="bg-paper p-6 rounded-xl border border-line shadow-sm hover:shadow-md transition flex flex-col justify-between group cursor-pointer">
           <div>
             <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Completion Rate</span>
@@ -165,7 +165,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Punctuality / Delay */}
-        <div className="p-6 hover:bg-surface transition flex flex-col justify-between group cursor-pointer hover:shadow-elevated hover:z-10 relative">
+        <div className="bg-paper p-6 rounded-xl border border-line shadow-sm hover:shadow-md transition flex flex-col justify-between group cursor-pointer">
           <div>
             <div className="flex items-center justify-between text-label text-muted mb-1">
               <span>Average Arrival Delay</span>
