@@ -178,7 +178,16 @@ export function exceptionsRoute(): Router {
         }
       }
 
+      const isBadge = req.query.badge === "true";
+      const isRecentOnly = req.query.recent === "true" || isBadge;
+
       let filtered = items;
+      if (isRecentOnly && !from) {
+        // Default to active moves + moves in the past 14 days for the active badge
+        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+        filtered = filtered.filter(it => it.timestamp >= fourteenDaysAgo);
+      }
+
       if (typeFilter && typeFilter !== "ALL") {
         filtered = filtered.filter(it => it.type === typeFilter);
       }
@@ -198,6 +207,7 @@ export function exceptionsRoute(): Router {
       return res.status(200).json({
         total: filtered.length,
         unfilteredTotal: items.length,
+        activeBadgeCount: isRecentOnly ? filtered.length : items.length,
         items: filtered.sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
         types: [...countByType.entries()].map(([type, count]) => ({ type, count })),
         meta: {

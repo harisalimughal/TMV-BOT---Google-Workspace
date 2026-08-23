@@ -67,9 +67,10 @@ export async function fetchFinance(from?: string, to?: string, groupBy = "day"):
   return res.json();
 }
 
-export async function fetchExceptions(type?: string, from?: string, to?: string): Promise<{
+export async function fetchExceptions(type?: string, from?: string, to?: string, badge?: boolean): Promise<{
   total: number;
   unfilteredTotal: number;
+  activeBadgeCount?: number;
   items: ExceptionItem[];
   types: Array<{ type: string; count: number }>;
 }> {
@@ -77,6 +78,7 @@ export async function fetchExceptions(type?: string, from?: string, to?: string)
   if (type) params.set("type", type);
   if (from) params.set("from", from);
   if (to) params.set("to", to);
+  if (badge) params.set("badge", "true");
   const res = await fetch(`/ops/api/exceptions?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load exceptions");
   return res.json();

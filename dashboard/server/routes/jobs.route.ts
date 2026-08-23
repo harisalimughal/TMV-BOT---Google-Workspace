@@ -3,6 +3,7 @@ import { formatGBP, toPounds } from "../../../src/utils/money";
 import { normalizeDataset } from "../normalize/normalize";
 import { formatLondonDate } from "../normalize/timezone";
 import { NormalizedJob } from "../normalize/types";
+import { generateJobPdf } from "../pdf/pdf-generator";
 import { readDataset } from "../read/sheet-reader";
 
 function escapeCsvField(val: unknown): string {
@@ -133,7 +134,6 @@ export function jobsRoute(): Router {
         });
       }
 
-      const { generateJobPdf } = await import("../pdf/pdf-generator");
       const pdfBuffer = generateJobPdf(job);
 
       const dateStr = new Date().toISOString().slice(0, 10);

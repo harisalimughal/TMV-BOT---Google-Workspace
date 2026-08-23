@@ -205,3 +205,11 @@ export interface ScenarioItem {
   photos: Array<{ fileId: string; thumbUrl: string }>;
   signature: { fileId: string; thumbUrl: string } | null;
 }
+
+export function toPounds(pence: number): number {
+  return (pence || 0) / 100;
+}
+
+export function formatGBP(pence: number): string {
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(toPounds(pence));
+}

@@ -28,34 +28,62 @@ export function scenariosRoute(): Router {
       }
 
       const dataset = await readDataset();
-      const rawRows = (dataset as any)[datasetKey] as Record<string, string>[] || [];
+      const rawRows = ((dataset as any)[datasetKey] as Record<string, string>[]) || [];
 
-      // Format rows with thumbnail proxies
-      const rows = rawRows.map((r, index) => {
-        const jobId = r["Job ID"] || "";
+      // Calculate occurrence count per Job ID to distinguish multiple events
+      const jobCounts = new Map<string, number>();
+      for (const r of rawRows) {
+        const jId = (r["Job ID"] || "").trim().toUpperCase();
+        if (jId) jobCounts.set(jId, (jobCounts.get(jId) || 0) + 1);
+      }
+
+      // Track running event index per job ID
+      const jobRunningIndex = new Map<string, number>();
+
+      // Format rows with thumbnail proxies and event labeling
+      const formattedRows = rawRows.map((r, index) => {
+        const jobId = (r["Job ID"] || "").trim();
+        const jIdKey = jobId.toUpperCase();
+        const totalEventsForJob = jobCounts.get(jIdKey) || 1;
+        const currentEventIdx = (jobRunningIndex.get(jIdKey) || 0) + 1;
+        jobRunningIndex.set(jIdKey, currentEventIdx);
+
         const photoIds = extractDriveIds(r["Photo URLs"]);
         const sigId = extractDriveIds(r["Signature URL"])[0];
 
         return {
           id: `${kind}-${index}`,
-          ...r,
+          jobId: jobId || "UNASSIGNED",
+          eventLabel: totalEventsForJob > 1 ? `Event ${currentEventIdx} of ${totalEventsForJob}` : undefined,
+          totalEventsForJob,
+          eventIndex: currentEventIdx,
+          timestamp: r["Timestamp"] || r["Date"] || "",
+          driver: r["Driver"] || "—",
+          clientName: r["Client Name"] || r["Client Full Name"] || "—",
+          clientPhone: r["Client Phone"] || "",
+          clientEmail: r["Client Email"] || "",
+          containerNumber: r["Container Number"] || "—",
+          address: r["Address"] || "",
+          damageCategories: r["Damage Categories"] || "",
+          clientPresent: r["Client Present"] || r["Client Present At Dropoff"] || "—",
+          rawRecord: r,
           photos: photoIds.map(fid => ({
             fileId: fid,
-            thumbUrl: `/ops/api/jobs/${encodeURIComponent(jobId)}/photos/${encodeURIComponent(fid)}`
+            thumbUrl: `/ops/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(fid)}`
           })),
           signature: sigId ? {
             fileId: sigId,
-            thumbUrl: `/ops/api/jobs/${encodeURIComponent(jobId)}/photos/${encodeURIComponent(sigId)}`
+            thumbUrl: `/ops/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(sigId)}`
           } : null
         };
-      }).reverse(); // Latest first
+      }).reverse(); // Latest events first
 
       // Pagination
       const page = Math.max(1, Number(req.query.page) || 1);
       const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
-      const total = rows.length;
+      const total = formattedRows.length;
       const totalPages = Math.ceil(total / pageSize);
-      const items = rows.slice((page - 1) * pageSize, page * pageSize);
+      const items = formattedRows.slice((page - 1) * pageSize, page * pageSize);
 
       return res.status(200).json({
         kind,

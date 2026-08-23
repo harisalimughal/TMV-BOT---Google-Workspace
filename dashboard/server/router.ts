@@ -1,7 +1,8 @@
 import express, { Request, Response, Router } from "express";
 import path from "node:path";
 import fs from "node:fs";
-import { dashboardRateLimit, requireDashboardAuth } from "./auth";
+import { checkAdminPassword } from "../../src/admin/admin.auth";
+import { clearOpsCookie, dashboardRateLimit, hasValidOpsSession, issueOpsCookie, requireDashboardAuth } from "./auth";
 import { sheetCache } from "./read/cache";
 import { readDataset } from "./read/sheet-reader";
 import { activityRoute } from "./routes/activity.route";
@@ -22,6 +23,26 @@ export function dashboardRouter(): Router {
 
   // Mount API endpoints under /api
   const api = Router();
+
+  // Auth endpoints for the modern SPA
+  api.post("/auth/login", (req: Request, res: Response) => {
+    const password = String(req.body?.password || "").trim();
+    if (checkAdminPassword(password)) {
+      issueOpsCookie(res);
+      return res.status(200).json({ ok: true, message: "Authenticated successfully" });
+    }
+    return res.status(401).json({ error: { code: "INVALID_CREDENTIALS", message: "Incorrect admin password" } });
+  });
+
+  api.get("/auth/status", (req: Request, res: Response) => {
+    const authenticated = hasValidOpsSession(req);
+    return res.status(200).json({ authenticated });
+  });
+
+  api.post("/auth/logout", (_req: Request, res: Response) => {
+    clearOpsCookie(res);
+    return res.status(200).json({ ok: true });
+  });
 
   api.use("/summary", summaryRoute());
   api.use("/jobs", jobsRoute());
@@ -69,7 +90,6 @@ export function dashboardRouter(): Router {
       }
     });
   } else {
-    // If frontend hasn't been built to dist yet, serve shell
     router.get("*", (_req, res) => {
       res.status(200).send(defaultOpsShell());
     });

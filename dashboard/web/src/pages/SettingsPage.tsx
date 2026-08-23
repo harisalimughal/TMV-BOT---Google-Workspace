@@ -3,17 +3,17 @@ import { Settings, ShieldCheck, Database, Zap, Clock, DollarSign } from "lucide-
 
 export function SettingsPage() {
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h2 className="text-lg font-bold text-ink">System Configuration & Operational Rates</h2>
-        <p className="text-xs text-muted">
+    <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="bg-paper p-5 rounded-2xl border border-line">
+        <h2 className="text-xl font-bold text-ink tracking-tight">Settings</h2>
+        <p className="text-xs text-muted mt-0.5">
           Read-only system rules, rates, caching invariants and database mapping
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Operational Rates (from env) */}
-        <div className="p-6 bg-paper rounded-xl border border-line shadow-paper">
+        {/* Operational Rates */}
+        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
             <DollarSign className="w-5 h-5 text-tmv-blue" />
             <h3 className="text-sm font-bold text-ink">Operational Charge Rates</h3>
@@ -38,7 +38,7 @@ export function SettingsPage() {
         </div>
 
         {/* Timezone & Localization */}
-        <div className="p-6 bg-paper rounded-xl border border-line shadow-paper">
+        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-5 h-5 text-tmv-blue" />
             <h3 className="text-sm font-bold text-ink">Timezone & Localization</h3>
@@ -62,52 +62,52 @@ export function SettingsPage() {
           </div>
         </div>
 
-        {/* Caching & Concurrency */}
-        <div className="p-6 bg-paper rounded-xl border border-line shadow-paper">
+        {/* Caching Architecture */}
+        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
             <Zap className="w-5 h-5 text-tmv-blue" />
-            <h3 className="text-sm font-bold text-ink">Cloud Run & SWR Caching</h3>
+            <h3 className="text-sm font-bold text-ink">SWR In-Memory Caching</h3>
           </div>
           <div className="space-y-3 text-xs">
             <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Cloud Run Concurrency</span>
-              <span className="font-mono font-bold text-ink">Pinned to 1</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Cache Architecture</span>
-              <span className="font-mono font-bold text-ink">Stale-While-Revalidate (SWR)</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Default Cache TTL</span>
+              <span className="text-muted">Cache Duration (TTL)</span>
               <span className="font-mono font-bold text-ink">30,000 ms (30 seconds)</span>
             </div>
+            <div className="flex justify-between py-2 border-b border-line">
+              <span className="text-muted">Revalidation Policy</span>
+              <span className="font-mono font-bold text-ink">Stale-While-Revalidate</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-line">
+              <span className="text-muted">Read Latency</span>
+              <span className="font-mono font-bold text-ink">&lt; 5 ms (in-memory)</span>
+            </div>
             <p className="text-[11px] text-muted pt-1">
-              Dashboard queries return instantly from memory (&lt;5ms) so background requests never block Google Chat driver webhooks.
+              Zero additional Google Sheets API quota consumed during rapid tab browsing.
             </p>
           </div>
         </div>
 
-        {/* Isolation Guarantee */}
-        <div className="p-6 bg-paper rounded-xl border border-line shadow-paper">
+        {/* Database Mapping Invariants */}
+        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
-            <ShieldCheck className="w-5 h-5 text-status-green" />
-            <h3 className="text-sm font-bold text-ink">Architecture Isolation</h3>
+            <Database className="w-5 h-5 text-tmv-blue" />
+            <h3 className="text-sm font-bold text-ink">Spreadsheet Schema Mapping</h3>
           </div>
           <div className="space-y-3 text-xs">
             <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Read-Only Guarantee</span>
-              <span className="font-mono font-bold text-status-green">STRICT (Zero Sheets Writes)</span>
+              <span className="text-muted">Live Read Tabs</span>
+              <span className="font-mono font-bold text-emerald-700">18 tabs mapped</span>
             </div>
             <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Mount Point</span>
-              <span className="font-mono font-bold text-ink">/ops</span>
+              <span className="text-muted">Dead Tabs (Skipped)</span>
+              <span className="font-mono text-muted">Dashboard, Customers, Reports, Analytics</span>
             </div>
             <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Legacy Admin</span>
-              <span className="font-mono font-bold text-ink">/admin (Untouched & Active)</span>
+              <span className="text-muted">Read-Only Enforced</span>
+              <span className="font-mono font-bold text-emerald-700">Strictly enforced (0 writes)</span>
             </div>
             <p className="text-[11px] text-muted pt-1">
-              The dashboard runs 100% inside <code>dashboard/</code> without modifying any existing production bot workflows.
+              Live Google Sheets operations remain untouched.
             </p>
           </div>
         </div>

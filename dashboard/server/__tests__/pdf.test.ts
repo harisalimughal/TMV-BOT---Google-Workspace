@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateJobPdf } from "../pdf/pdf-generator";
 import { fromPounds } from "../../../src/utils/money";
+import { JobStatus } from "../../../src/jobs/job.types";
 import { NormalizedJob } from "../normalize/types";
 
 describe("PDF Report Generator", () => {
@@ -25,7 +26,7 @@ describe("PDF Report Generator", () => {
     driverInitials: "WD",
     driverName: "William Davies",
     driverEmail: "william@tmv.co.uk",
-    status: "COMPLETED",
+    status: JobStatus.COMPLETED,
     currentState: "COMPLETED",
     workflowCompletionPct: 100,
     basePrice: fromPounds(150),

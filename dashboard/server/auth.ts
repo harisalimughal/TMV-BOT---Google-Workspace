@@ -1,5 +1,11 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextFunction, Request, Response } from "express";
-import { requireAdminSession } from "../../src/admin/admin.auth";
+import { env } from "../../src/config/env";
+import { checkAdminPassword } from "../../src/admin/admin.auth";
+
+const COOKIE_NAME = "tmv_admin";
+const OPS_COOKIE_NAME = "tmv_ops_session";
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface RateLimitRecord {
   count: number;
@@ -9,6 +15,61 @@ interface RateLimitRecord {
 const rateLimitMap = new Map<string, RateLimitRecord>();
 const WINDOW_MS = Number(process.env.TMV_DASHBOARD_RATE_LIMIT_WINDOW_MS) || 60_000;
 const MAX_REQUESTS = Number(process.env.TMV_DASHBOARD_RATE_LIMIT_MAX) || 120;
+
+function sign(exp: number): string {
+  return createHmac("sha256", env.signatureLinkSecret || "default-dev-secret-key").update(`admin-session.${exp}`).digest("hex");
+}
+
+function parseCookies(header: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!header) return out;
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    out[part.slice(0, eq).trim()] = decodeURIComponent(part.slice(eq + 1).trim());
+  }
+  return out;
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
+
+export function hasValidOpsSession(req: Request): boolean {
+  const cookies = parseCookies(req.headers.cookie);
+  const raw = cookies[OPS_COOKIE_NAME] || cookies[COOKIE_NAME];
+  if (!raw) return false;
+  const dot = raw.indexOf(".");
+  if (dot === -1) return false;
+  const exp = Number(raw.slice(0, dot));
+  const sig = raw.slice(dot + 1);
+  if (!Number.isFinite(exp) || Date.now() > exp) return false;
+  return safeEqual(sig, sign(exp));
+}
+
+export function issueOpsCookie(res: Response): void {
+  const exp = Date.now() + SESSION_TTL_MS;
+  const value = `${exp}.${sign(exp)}`;
+  // Path=/ ensures session works across both /ops and /admin
+  res.setHeader(
+    "Set-Cookie",
+    [
+      `${OPS_COOKIE_NAME}=${encodeURIComponent(value)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}` +
+        (env.nodeEnv === "production" ? "; Secure" : ""),
+      `${COOKIE_NAME}=${encodeURIComponent(value)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}` +
+        (env.nodeEnv === "production" ? "; Secure" : "")
+    ]
+  );
+}
+
+export function clearOpsCookie(res: Response): void {
+  res.setHeader("Set-Cookie", [
+    `${OPS_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0`,
+    `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0`
+  ]);
+}
 
 /**
  * In-memory sliding-window rate limiter for /ops routes.
@@ -39,8 +100,32 @@ export function dashboardRateLimit(req: Request, res: Response, next: NextFuncti
 
 /**
  * Enforces session authentication for /ops endpoints.
- * Returns structured JSON error for API requests, redirects browser to /admin/login for HTML requests.
  */
 export function requireDashboardAuth(req: Request, res: Response, next: NextFunction): void {
-  requireAdminSession(req, res, next);
+  if (hasValidOpsSession(req)) {
+    return next();
+  }
+
+  // Allow static assets, favicon, and login API
+  if (
+    req.path.startsWith("/assets/") ||
+    req.path === "/api/auth/login" ||
+    req.path === "/api/auth/status" ||
+    req.path === "/login"
+  ) {
+    return next();
+  }
+
+  if (req.path.startsWith("/api/")) {
+    res.status(401).json({
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Admin authentication required."
+      }
+    });
+    return;
+  }
+
+  // For HTML requests, serve the modern SPA (which will display the login screen)
+  return next();
 }
