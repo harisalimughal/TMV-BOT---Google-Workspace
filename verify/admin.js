@@ -22,7 +22,8 @@ const HEADERS = {
   Drivers: ["Initials","Full Name","Email","Chat User Name","Active","Role"],
   Evidence: ["Evidence ID","Job ID","Driver","Evidence Type","Attachment Ref","Content Type","File Name","Status","Received","Processing Started","Processing Completed","Drive File ID","Drive URL","Retry Count","Last Error"],
   Signatures: ["Timestamp","Job ID","Driver","Customer Name","Mode","Confirmation Text"],
-  Settings: ["Key","Value","Notes"]
+  Settings: ["Key","Value","Notes"],
+  ActivityLog: ["Timestamp","Job ID","Driver","Action","From State","To State","Detail"]
 };
 const tabs = {};
 for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
@@ -57,6 +58,48 @@ addRow("Evidence", { "Evidence ID": "e3", "Job ID": "TMV-ADMIN0001", "Evidence T
 // 4-step photos, even though it's COMPLETED.
 addRow("Evidence", { "Evidence ID": "e4", "Job ID": "TMV-ADMIN0001", "Evidence Type": "CheckIn", "Status": "COMPLETED", "Drive File ID": "fileCheckIn123456", "Drive URL": "https://drive.test/fileCheckIn123456" });
 addRow("Signatures", { "Job ID": "TMV-ADMIN0001", "Customer Name": "Barry Thompson", "Confirmation Text": "https://drive.google.com/file/d/fileSignature12345/view?usp=drivesdk" });
+
+// Notification-delivery-status fixtures -- one job per distinct outcome, plus one
+// never-started job to confirm it's excluded entirely.
+addRow("Bookings", {
+  "Job ID": "TMV-NOTIFY-SENT", "Driver Initials": "WD", "Customer": "Carla Sent",
+  "Customer Email": "carla@example.test", "Phone": "07111111111", "Actual Start": "2026-08-16T09:00:00.000Z",
+  "Status": "IN_PROGRESS", "Current State": "IN_PROGRESS"
+});
+addRow("Bookings", {
+  "Job ID": "TMV-NOTIFY-FAILED", "Driver Initials": "WD", "Customer": "Fred Failed",
+  "Customer Email": "fred@example.test", "Phone": "07222222222", "Actual Start": "2026-08-16T09:05:00.000Z",
+  "Status": "IN_PROGRESS", "Current State": "IN_PROGRESS"
+});
+addRow("Bookings", {
+  "Job ID": "TMV-NOTIFY-PENDING", "Driver Initials": "WD", "Customer": "Pat Pending",
+  "Customer Email": "pat@example.test", "Phone": "07333333333", "Actual Start": "2026-08-16T09:10:00.000Z",
+  "Status": "IN_PROGRESS", "Current State": "IN_PROGRESS"
+});
+addRow("Bookings", {
+  "Job ID": "TMV-NOTIFY-SKIPPED", "Driver Initials": "WD", "Customer": "Sam Skipped",
+  "Actual Start": "2026-08-16T09:15:00.000Z", "Status": "IN_PROGRESS", "Current State": "IN_PROGRESS"
+  // No Customer Email, no Phone -- both channels have nothing to send to.
+});
+addRow("Bookings", {
+  "Job ID": "TMV-NOTIFY-RETRY", "Driver Initials": "WD", "Customer": "Rita Retry",
+  "Customer Email": "rita@example.test", "Actual Start": "2026-08-16T09:20:00.000Z",
+  "Status": "IN_PROGRESS", "Current State": "IN_PROGRESS"
+});
+addRow("Bookings", {
+  "Job ID": "TMV-NOTIFY-NOTSTARTED", "Driver Initials": "WD", "Customer": "Never Started",
+  "Customer Email": "never@example.test", "Status": "READY", "Current State": "READY"
+  // No Actual Start -- Start Job was never tapped, so this must not appear at all.
+});
+
+addRow("ActivityLog", { "Job ID": "TMV-NOTIFY-SENT", "Action": "CLIENT_START_EMAIL_SENT", "Timestamp": "2026-08-16T09:00:05.000Z", "Detail": "carla@example.test" });
+addRow("ActivityLog", { "Job ID": "TMV-NOTIFY-SENT", "Action": "CLIENT_START_SMS_SENT", "Timestamp": "2026-08-16T09:00:06.000Z", "Detail": "447111111111" });
+addRow("ActivityLog", { "Job ID": "TMV-NOTIFY-FAILED", "Action": "CLIENT_START_EMAIL_FAILED", "Timestamp": "2026-08-16T09:05:05.000Z", "Detail": "Invalid recipient address" });
+addRow("ActivityLog", { "Job ID": "TMV-NOTIFY-FAILED", "Action": "CLIENT_START_SMS_FAILED", "Timestamp": "2026-08-16T09:05:06.000Z", "Detail": "Firetext send failed: 2:0 Invalid destination number" });
+// TMV-NOTIFY-PENDING gets no ActivityLog rows at all -- the task hasn't run/completed yet.
+// A failure followed by a successful retry -- SENT must win even though FAILED happened first.
+addRow("ActivityLog", { "Job ID": "TMV-NOTIFY-RETRY", "Action": "CLIENT_START_EMAIL_FAILED", "Timestamp": "2026-08-16T09:20:05.000Z", "Detail": "Timeout" });
+addRow("ActivityLog", { "Job ID": "TMV-NOTIFY-RETRY", "Action": "CLIENT_START_EMAIL_SENT", "Timestamp": "2026-08-16T09:25:00.000Z", "Detail": "rita@example.test" });
 
 const idToTab = {}; Object.keys(HEADERS).forEach((n, i) => { idToTab[i + 1] = n; });
 function colIndex(l) { let n = 0; for (const c of l) n = n * 26 + (c.charCodeAt(0) - 64); return n - 1; }
@@ -201,6 +244,41 @@ function check(label, actual, expected) {
 
   const proxyNoAuthRes = await fetch(`${base}${job.photos[0].thumbUrl}`);
   check("Drive-file proxy is also gated behind the admin session", proxyNoAuthRes.status, 401);
+
+  console.log("\n" + "=".repeat(70));
+  console.log("Notifications: was the job-started email/SMS actually delivered?");
+  console.log("=".repeat(70));
+
+  const notifyRes = await fetch(`${base}/admin/api/notifications`, authed);
+  check("notifications status", notifyRes.status, 200);
+  const { rows: notifyRows } = await notifyRes.json();
+  const byId = Object.fromEntries(notifyRows.map(r => [r.jobId, r]));
+
+  check("a never-started job (no Actual Start) is excluded entirely",
+    Boolean(byId["TMV-NOTIFY-NOTSTARTED"]), false);
+
+  check("both channels show sent, with the recorded detail", [byId["TMV-NOTIFY-SENT"].email, byId["TMV-NOTIFY-SENT"].sms],
+    [{ state: "sent", detail: "carla@example.test", at: "2026-08-16T09:00:05.000Z" },
+      { state: "sent", detail: "447111111111", at: "2026-08-16T09:00:06.000Z" }]);
+
+  check("both channels show failed, with the failure reason as the detail",
+    [byId["TMV-NOTIFY-FAILED"].email.state, byId["TMV-NOTIFY-FAILED"].email.detail],
+    ["failed", "Invalid recipient address"]);
+  check("SMS failure detail carried through too", byId["TMV-NOTIFY-FAILED"].sms.detail,
+    "Firetext send failed: 2:0 Invalid destination number");
+
+  check("no activity row yet -> pending, not mistaken for skipped",
+    [byId["TMV-NOTIFY-PENDING"].email.state, byId["TMV-NOTIFY-PENDING"].sms.state], ["pending", "pending"]);
+
+  check("no email/phone on the booking -> skipped, distinct from pending",
+    [byId["TMV-NOTIFY-SKIPPED"].email.state, byId["TMV-NOTIFY-SKIPPED"].sms.state], ["skipped", "skipped"]);
+  check("skipped SMS on a job with no phone at all (not just no activity row)",
+    byId["TMV-NOTIFY-SKIPPED"].sms.state, "skipped");
+
+  check("a later successful retry wins over an earlier failure for the same channel",
+    byId["TMV-NOTIFY-RETRY"].email, { state: "sent", detail: "rita@example.test", at: "2026-08-16T09:25:00.000Z" });
+  check("a channel with no booking phone at all still reads skipped even mid-retry job",
+    byId["TMV-NOTIFY-RETRY"].sms.state, "skipped");
 
   await new Promise((resolve, reject) => server.close(err => (err ? reject(err) : resolve())));
   server.closeAllConnections?.();
