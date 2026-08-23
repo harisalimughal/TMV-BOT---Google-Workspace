@@ -149,20 +149,12 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
           {/* Brand Header */}
           <div className="pt-6 pb-4 px-6 flex items-center justify-between bg-transparent">
             {!collapsed && (
-              <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="flex items-center overflow-hidden">
                 <img
-                  src="/tmv-mascot.png"
-                  alt="The Man Van Mascot"
-                  className="w-8 h-8 rounded-lg object-contain bg-surface border border-line p-0.5 shadow-2xs flex-shrink-0"
+                  src="/tmv-wide-logo.png"
+                  alt="The Man Van"
+                  className="h-8 w-auto object-contain flex-shrink-0"
                 />
-                <div className="overflow-hidden">
-                  <span className="font-bold text-xs tracking-tight text-brand block leading-tight truncate">
-                    The Man Van
-                  </span>
-                  <span className="text-[10px] font-medium text-muted block leading-none truncate">
-                    London Operations
-                  </span>
-                </div>
               </div>
             )}
             {collapsed && (
