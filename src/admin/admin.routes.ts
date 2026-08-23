@@ -7,6 +7,7 @@ import { createCalendarEvent } from "../google/calendar";
 import { getDriveFileMedia } from "../google/drive";
 import { parseCalendarEvent, syncBookingsForDate } from "../jobs/booking.service";
 import { CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
+import { SMS_JOB_STARTED_TEMPLATE } from "../integrations/firetext";
 import { env } from "../config/env";
 import { log } from "../utils/logger";
 
@@ -22,6 +23,14 @@ const EDITABLE_SETTINGS: Record<string, { settingsKey: string; label: string; de
     label: "Customer Confirmation Text",
     description: "Shown on the Start Job workflow's signature step, and on the customer's signature-pad page.",
     fallback: CUSTOMER_CONFIRMATION_TEXT
+  },
+  smsJobStartedText: {
+    settingsKey: "SMS_JOB_STARTED_TEXT",
+    label: "Customer SMS — Job Started",
+    description:
+      "Sent via Firetext when a driver taps Start Job (only if FIRETEXT_API_KEY/FIRETEXT_SENDER_ID are set — " +
+      "otherwise SMS sending is skipped entirely). Placeholders: {customerName}, {companyName}, {pickup}, {dropoff}.",
+    fallback: SMS_JOB_STARTED_TEMPLATE
   }
 };
 

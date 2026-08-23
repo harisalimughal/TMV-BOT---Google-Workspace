@@ -1,5 +1,5 @@
-import { sendJobStartedSms } from "../../integrations/firetext";
-import { activityWrite, commitWrites, exceptionWrite, getJob, listObjects, SHEETS } from "../../google/sheets";
+import { sendJobStartedSms, SMS_JOB_STARTED_TEMPLATE } from "../../integrations/firetext";
+import { activityWrite, commitWrites, exceptionWrite, getJob, getSetting, listObjects, SHEETS } from "../../google/sheets";
 import { log, setContext } from "../../utils/logger";
 import { PermanentTaskError, SendJobStartedSmsTask } from "../queue.types";
 
@@ -24,7 +24,8 @@ export async function handleSendJobStartedSms(task: SendJobStartedSmsTask): Prom
   }
 
   try {
-    await sendJobStartedSms(job);
+    const template = await getSetting("SMS_JOB_STARTED_TEXT", SMS_JOB_STARTED_TEMPLATE);
+    await sendJobStartedSms(job, template);
     await commitWrites([
       activityWrite({
         jobId: job.jobId,

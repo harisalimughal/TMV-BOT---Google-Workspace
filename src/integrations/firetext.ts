@@ -52,13 +52,25 @@ async function sendSms(to: string, message: string): Promise<void> {
   }
 }
 
-export async function sendJobStartedSms(job: Job): Promise<void> {
+/** Admin-editable via /admin's Settings tab (see admin/admin.routes.ts) -- this is only
+ *  the fallback shown until an admin overrides it. */
+export const SMS_JOB_STARTED_TEMPLATE =
+  "Hi {customerName}, your {companyName} team has started your move. Pickup: {pickup}.";
+
+/** Flat placeholder substitution, same spirit as the admin-editable signature-step
+ *  confirmation text (workflow.engine.ts's CUSTOMER_CONFIRMATION_TEXT) -- a plain block
+ *  of text an admin edits as a whole, not a templating engine with conditionals. */
+export function renderSmsTemplate(template: string, job: Job): string {
+  return template
+    .replace(/\{customerName\}/g, job.customerName || "there")
+    .replace(/\{companyName\}/g, env.notificationFromName)
+    .replace(/\{pickup\}/g, job.pickup || "")
+    .replace(/\{dropoff\}/g, job.dropoff || "");
+}
+
+export async function sendJobStartedSms(job: Job, template: string): Promise<void> {
   if (!env.firetextApiKey || !env.firetextSenderId) return;
   if (!job.customerPhone) return;
 
-  const message =
-    `Hi ${job.customerName || "there"}, your ${env.notificationFromName} team has started your move.` +
-    (job.pickup ? ` Pickup: ${job.pickup}.` : "");
-
-  await sendSms(job.customerPhone, message);
+  await sendSms(job.customerPhone, renderSmsTemplate(template, job));
 }
