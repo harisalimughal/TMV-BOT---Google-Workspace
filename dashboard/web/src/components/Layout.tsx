@@ -61,7 +61,6 @@ const NAV_CONFIG: NavSectionItem[] = [
   { id: "liability", label: "Liability Report", icon: ShieldAlert, desc: "Vehicle or item damage categories with evidence photographs" },
   { type: "header", label: "Management" },
   { id: "drivers", label: "Drivers", icon: Users, desc: "Driver scorecards, revenue handled and punctuality metrics" },
-  { id: "finance", label: "Finance", icon: Banknote, desc: "Reconciliation of Base Price, Extra Charges, Overtime and Payment Methods" },
   { id: "exceptions", label: "Exceptions", icon: AlertTriangle, hasBadge: true, desc: "Operational exceptions and quality control alerts" },
   { id: "activity", label: "Activity Log", icon: History, desc: "Chronological audit records directly from ActivityLog tab" },
   { id: "reports", label: "Reports", icon: FileSpreadsheet, desc: "Downloadable operational datasets and certified export files" },
@@ -118,8 +117,6 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
         onSelectSection("jobs");
       } else if (e.key === "d" || e.key === "D") {
         onSelectSection("drivers");
-      } else if (e.key === "f" || e.key === "F") {
-        onSelectSection("finance");
       } else if (e.key === "e" || e.key === "E") {
         onSelectSection("exceptions");
       }

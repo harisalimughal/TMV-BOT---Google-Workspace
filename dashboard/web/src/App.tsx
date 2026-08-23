@@ -5,7 +5,6 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { JobsPage } from "./pages/JobsPage";
 import { FinishedJobsPage } from "./pages/FinishedJobsPage";
 import { DriversPage } from "./pages/DriversPage";
-import { FinancePage } from "./pages/FinancePage";
 import { ExceptionsPage } from "./pages/ExceptionsPage";
 import { ScenariosPage } from "./pages/ScenariosPage";
 import { ActivityPage } from "./pages/ActivityPage";
@@ -81,7 +80,6 @@ export function App() {
       {activeSection === "parking" && <ScenariosPage kind="parking" />}
       {activeSection === "liability" && <ScenariosPage kind="liability" />}
       {activeSection === "drivers" && <DriversPage />}
-      {activeSection === "finance" && <FinancePage />}
       {activeSection === "exceptions" && <ExceptionsPage onOpenJob={handleOpenJob} />}
       {activeSection === "activity" && <ActivityPage />}
       {activeSection === "reports" && <ReportsPage />}

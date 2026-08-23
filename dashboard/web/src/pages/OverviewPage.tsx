@@ -184,45 +184,6 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
       </div>
 
-      {/* 3. REVENUE BREAKDOWN RIBBON */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-paper rounded-lg border border-line shadow-card flex items-center justify-between">
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-medium text-muted block">Direct Cash Collected</span>
-            <span className="text-lg font-bold font-mono text-ink">
-              £{(kpis.cashCollectedPounds || 0).toLocaleString("en-GB", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-          <span className="px-2 py-0.5 rounded-full bg-status-green-bg text-status-green text-xs font-mono font-semibold">
-            In Hand
-          </span>
-        </div>
-
-        <div className="p-4 bg-paper rounded-lg border border-line shadow-card flex items-center justify-between">
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-medium text-muted block">Digital / Card / Bank Transfer</span>
-            <span className="text-lg font-bold font-mono text-ink">
-              £{(kpis.cardBankPounds || 0).toLocaleString("en-GB", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-          <span className="px-2 py-0.5 rounded-full bg-brand-soft text-brand text-xs font-mono font-semibold">
-            Settled
-          </span>
-        </div>
-
-        <div className="p-4 bg-paper rounded-lg border border-line shadow-card flex items-center justify-between">
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-medium text-muted block">Overtime Billing Volume</span>
-            <span className="text-lg font-bold font-mono text-ink">
-              £{(kpis.overtimePounds || 0).toLocaleString("en-GB", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-          <span className="px-2 py-0.5 rounded-full bg-status-amber-bg text-status-amber text-xs font-mono font-semibold">
-            £55/30m
-          </span>
-        </div>
-      </div>
-
       {/* 4. REAL-TIME LONDON FLEET RADAR MAP */}
 
       {/* 5. CHARTS: REVENUE VELOCITY & DRIVER WORKLOAD */}

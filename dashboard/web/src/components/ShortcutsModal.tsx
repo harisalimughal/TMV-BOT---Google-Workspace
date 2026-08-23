@@ -13,7 +13,6 @@ const SHORTCUTS = [
   { key: "O", desc: "Go to Overview" },
   { key: "J", desc: "Go to Jobs" },
   { key: "D", desc: "Go to Drivers" },
-  { key: "F", desc: "Go to Finance" },
   { key: "E", desc: "Go to Exceptions" },
   { key: "Esc", desc: "Close modal or lightbox" }
 ];
