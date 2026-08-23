@@ -19,6 +19,7 @@ import { ScenarioItem } from "../types";
 import { ThumbnailPreview } from "../components/ThumbnailPreview";
 import { PhotoModal } from "../components/PhotoModal";
 import { PaperScenarioReport } from "../components/PaperScenarioReport";
+import { FormPreviewModal } from "../components/FormPreviewModal";
 import { formatLondonDateTime } from "../utils/date";
 
 interface Props {
@@ -65,6 +66,17 @@ export function ScenariosPage({ kind }: Props) {
   });
 
   const config = KIND_CONFIG[kind] || KIND_CONFIG.checkin;
+  const mapDriver = (nameStr: string) => {
+    if (!nameStr) return { name: "Unknown", initials: "UN" };
+    const n = nameStr.toLowerCase();
+    if (n.includes("caio")) return { name: "Caio Gabriel", initials: "KA" };
+    if (n.includes("henrique")) return { name: "Henrique Driver", initials: "HE" };
+    if (n.includes("maico") || n.includes("lima")) return { name: "Maico Lima", initials: "MK" };
+    if (n.includes("rafael") || n.includes("cruz")) return { name: "Rafael Cruz", initials: "RF" };
+    if (n.includes("tiago")) return { name: "Tiago Menagassi", initials: "TI" };
+    if (n.includes("wander") || n.includes("mendes")) return { name: "Wander Mendes", initials: "WD" };
+    return { name: nameStr, initials: nameStr.substring(0, 2).toUpperCase() };
+  };
 
   return (
     <div className="space-y-4 max-w-full">
@@ -177,7 +189,8 @@ export function ScenariosPage({ kind }: Props) {
                   const raw = item.rawRecord || item;
                   const clientName = item.clientName || raw["Client Name"] || raw["Client Full Name"] || "—";
                   const containerNum = item.containerNumber || raw["Container Number"] || "—";
-                  const driverInitials = item.driver || raw["Driver"] || "—";
+                  const rawDriverStr = item.driver || raw["Driver"] || "N/A";
+                  const { name: driverName, initials: driverInitials } = mapDriver(rawDriverStr);
                   const timestampStr = item.timestamp || raw["Timestamp"] || raw["Date"] || "";
                   const formattedTime = formatLondonDateTime(timestampStr);
                   const rowNumber = (page - 1) * 25 + index + 1;
@@ -200,7 +213,7 @@ export function ScenariosPage({ kind }: Props) {
       <div className="w-7 h-7 rounded-full bg-brand-dark text-white font-mono font-bold text-[10px] flex items-center justify-center shadow-sm">
         {driverInitials}
       </div>
-      <span className="font-medium text-[13px] text-ink">{clientName === "N/A" ? driverInitials + " Driver" : clientName}</span>
+      <span className="font-medium text-[13px] text-ink">{driverName}</span>
     </div>
   </td>
 
@@ -265,20 +278,7 @@ export function ScenariosPage({ kind }: Props) {
 
   <td className="py-2 px-3 text-center"></td>
 </tr>
-{isExpanded && (
-  <tr>
-    <td colSpan={10} className="p-0 bg-bg border-b border-line relative">
-      <div className="absolute top-4 right-8 z-10 print:hidden flex gap-2">
-        <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-paper border border-line rounded-md text-btn hover:bg-surface text-ink shadow-sm transition">
-          Print PDF
-        </button>
-      </div>
-      <div className="print:block p-4">
-        <PaperScenarioReport item={item} kind={kind} />
-      </div>
-    </td>
-  </tr>
-)}
+
                     </React.Fragment>
                   );
                 })}
