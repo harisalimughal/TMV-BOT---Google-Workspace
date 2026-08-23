@@ -35,7 +35,7 @@ export function SearchFilterBar({
   hasActiveFilters
 }: Props) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-paper rounded-2xl border border-line mb-6 shadow-paper">
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-paper rounded-lg border border-line mb-6 shadow-paper">
       <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
         {/* Search Input */}
         <div className="relative flex-1 max-w-sm">

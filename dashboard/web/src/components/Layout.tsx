@@ -138,10 +138,10 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
   const currentNav = NAV_CONFIG.find(n => n.id === activeSection) || NAV_CONFIG[1];
 
   return (
-    <div className="flex min-h-screen bg-bg text-ink selection:bg-brand-soft selection:text-brand font-sans antialiased p-4 gap-4">
+    <div className="flex min-h-screen bg-bg text-ink selection:bg-brand-soft selection:text-brand font-sans antialiased">
       {/* 1. HIGH-TICKET SIDEBAR */}
       <aside
-        className={`bg-paper text-ink flex flex-col justify-between rounded-2xl shadow-card transition-all duration-300 z-30 sticky top-4 h-[calc(100vh-2rem)] ${
+        className={`bg-paper text-ink flex flex-col justify-between border-r border-line transition-all duration-300 z-30 sticky top-0 h-screen ${
           collapsed ? "w-16" : "w-[260px]"
         }`}
       >
@@ -196,7 +196,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                 <button
                   key={item.id}
                   onClick={() => onSelectSection(item.id!)}
-                  className={`w-full h-11 flex items-center gap-3 px-3 rounded-2xl font-medium transition group relative ${
+                  className={`w-full h-11 flex items-center gap-3 px-3 rounded-lg font-medium transition group relative ${
                     isActive
                       ? "text-brand font-bold bg-brand-soft/50"
                       : "text-muted hover:bg-surface hover:text-ink"
@@ -282,8 +282,8 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* 2. HIGH-TICKET FLOATING HEADER */}
-        <header className="h-[76px] flex items-center justify-between sticky top-4 z-20 px-4">
+        {/* 2. HEADER */}
+        <header className="h-[64px] bg-paper border-b border-line px-8 flex items-center justify-between sticky top-0 z-20">
           {/* Left: Page Title & Breadcrumb */}
           <div className="flex flex-col justify-center gap-1">
             <span className="text-sm font-medium text-muted">Pages / {currentNav.label}</span>
@@ -292,17 +292,17 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
             </h1>
           </div>
 
-          {/* Right: Search & Controls Pill */}
-          <div className="flex items-center gap-4 bg-paper rounded-full shadow-card px-3 py-2 border border-line/50">
+          {/* Right: Search & Controls */}
+          <div className="flex items-center gap-4">
             {/* Search input */}
             <div className="relative hidden md:block w-[240px]">
-              <Search className="w-4 h-4 text-ink absolute left-3 top-2.5 pointer-events-none" />
+              <Search className="w-4 h-4 text-muted absolute left-3 top-2.5 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Search anything"
                 onClick={() => setPaletteOpen(true)}
                 readOnly
-                className="w-full h-9 pl-9 pr-10 bg-surface rounded-full text-sm text-ink placeholder:text-muted focus:bg-paper cursor-pointer transition"
+                className="w-full h-9 pl-9 pr-3 bg-surface border border-line rounded-lg text-sm text-ink placeholder:text-muted focus:bg-paper focus:border-brand cursor-pointer transition"
               />
             </div>
 

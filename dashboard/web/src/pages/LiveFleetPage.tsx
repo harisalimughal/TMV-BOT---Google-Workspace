@@ -43,7 +43,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
   return (
     <div className="space-y-4 max-w-full">
       {/* 1. Header Banner */}
-      <div className="bg-paper p-4 rounded shadow-card border border-transparent flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-paper p-4 rounded border border-line shadow-card flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="relative flex h-3 w-3">
@@ -80,7 +80,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
 
       {/* 3. Live Driver Operational Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 bg-paper rounded shadow-card border border-transparent space-y-2">
+        <div className="p-4 bg-paper rounded border border-line shadow-card space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded bg-brand-soft text-brand font-mono font-bold text-xs flex items-center justify-center">
@@ -105,7 +105,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
           </div>
         </div>
 
-        <div className="p-4 bg-paper rounded shadow-card border border-transparent space-y-2">
+        <div className="p-4 bg-paper rounded border border-line shadow-card space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded bg-brand-soft text-brand font-mono font-bold text-xs flex items-center justify-center">
@@ -130,7 +130,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
           </div>
         </div>
 
-        <div className="p-4 bg-paper rounded shadow-card border border-transparent space-y-2">
+        <div className="p-4 bg-paper rounded border border-line shadow-card space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded bg-brand-soft text-brand font-mono font-bold text-xs flex items-center justify-center">
@@ -155,7 +155,7 @@ export function LiveFleetPage({ onSelectSection }: Props) {
           </div>
         </div>
 
-        <div className="p-4 bg-paper rounded shadow-card border border-transparent space-y-2">
+        <div className="p-4 bg-paper rounded border border-line shadow-card space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded bg-brand-soft text-brand font-mono font-bold text-xs flex items-center justify-center">

@@ -112,7 +112,7 @@ export function JobsPage() {
   return (
     <div className="space-y-4 max-w-full">
       {/* 1. ENTERPRISE TOOLBAR ROW */}
-      <div className="bg-paper p-3.5 rounded-2xl border border-line flex flex-wrap items-center justify-between gap-3 shadow-card">
+      <div className="bg-paper p-3.5 rounded-lg border border-line flex flex-wrap items-center justify-between gap-3 shadow-card">
         <div className="flex flex-wrap items-center gap-3">
           {/* View Toggle Segmented Control */}
           <div className="flex items-center p-0.5 bg-surface rounded-lg border border-line text-xs">
@@ -216,7 +216,7 @@ export function JobsPage() {
 
       {/* Expanded Filter Panel */}
       {filterDrawerOpen && (
-        <div className="p-4 bg-paper rounded-2xl border border-line flex flex-wrap items-center gap-4 text-xs shadow-card">
+        <div className="p-4 bg-paper rounded-lg border border-line flex flex-wrap items-center gap-4 text-xs shadow-card">
           <div className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-muted">Status Filter</span>
             <select
@@ -274,7 +274,7 @@ export function JobsPage() {
 
       {/* 2. MASTER HIGH-TICKET DATA TABLE */}
       {viewMode === "table" && (
-        <div className="bg-paper rounded-2xl shadow-card border border-transparent overflow-hidden">
+        <div className="bg-paper rounded-lg border border-line shadow-card overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-surface/80 backdrop-blur-xs border-b border-line text-muted text-xs font-semibold sticky top-0 z-20">
@@ -641,7 +641,7 @@ export function JobsPage() {
                 <div
                   key={job.jobId}
                   onClick={() => setDrawerJob(job)}
-                  className="p-4 bg-paper rounded-2xl shadow-card border border-transparent hover:border-line-strong cursor-pointer transition space-y-3"
+                  className="p-4 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong cursor-pointer transition space-y-3"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

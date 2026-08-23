@@ -4,7 +4,7 @@ import { Settings, ShieldCheck, Database, Zap, Clock, DollarSign } from "lucide-
 export function SettingsPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="bg-paper p-5 rounded-2xl border border-line">
+      <div className="bg-paper p-5 rounded-lg border border-line">
         <h2 className="text-xl font-bold text-ink tracking-tight">Settings</h2>
         <p className="text-xs text-muted mt-0.5">
           Read-only system rules, rates, caching invariants and database mapping
@@ -13,7 +13,7 @@ export function SettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Operational Rates */}
-        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
+        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
             <DollarSign className="w-5 h-5 text-tmv-blue" />
             <h3 className="text-sm font-bold text-ink">Operational Charge Rates</h3>
@@ -38,7 +38,7 @@ export function SettingsPage() {
         </div>
 
         {/* Timezone & Localization */}
-        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
+        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-5 h-5 text-tmv-blue" />
             <h3 className="text-sm font-bold text-ink">Timezone & Localization</h3>
@@ -63,7 +63,7 @@ export function SettingsPage() {
         </div>
 
         {/* Caching Architecture */}
-        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
+        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
             <Zap className="w-5 h-5 text-tmv-blue" />
             <h3 className="text-sm font-bold text-ink">SWR In-Memory Caching</h3>
@@ -88,7 +88,7 @@ export function SettingsPage() {
         </div>
 
         {/* Database Mapping Invariants */}
-        <div className="p-6 bg-paper rounded-2xl border border-line shadow-2xs">
+        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
           <div className="flex items-center gap-2 mb-4">
             <Database className="w-5 h-5 text-tmv-blue" />
             <h3 className="text-sm font-bold text-ink">Spreadsheet Schema Mapping</h3>

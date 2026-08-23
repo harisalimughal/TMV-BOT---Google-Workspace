@@ -46,7 +46,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
 
   if (error || !data) {
     return (
-      <div className="p-8 text-center text-status-red bg-paper rounded-2xl shadow-card border border-transparent">
+      <div className="p-8 text-center text-status-red bg-paper rounded-lg border border-line shadow-card">
         <AlertCircle className="w-6 h-6 mx-auto mb-2 text-status-red" />
         <h3 className="text-sm font-semibold text-ink">Failed to load exceptions</h3>
         <button
@@ -84,7 +84,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
         {/* Critical Card */}
         <div
           onClick={() => setSelectedSeverity(selectedSeverity === "CRITICAL" ? "ALL" : "CRITICAL")}
-          className={`p-4 rounded-2xl border transition cursor-pointer shadow-card flex items-center justify-between ${
+          className={`p-4 rounded-lg border transition cursor-pointer shadow-card flex items-center justify-between ${
             selectedSeverity === "CRITICAL"
               ? "bg-status-red-bg border-status-red/40 ring-2 ring-status-red/20"
               : "bg-paper border-line hover:border-status-red/30"
@@ -106,7 +106,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
         {/* Warning Card */}
         <div
           onClick={() => setSelectedSeverity(selectedSeverity === "WARNING" ? "ALL" : "WARNING")}
-          className={`p-4 rounded-2xl border transition cursor-pointer shadow-card flex items-center justify-between ${
+          className={`p-4 rounded-lg border transition cursor-pointer shadow-card flex items-center justify-between ${
             selectedSeverity === "WARNING"
               ? "bg-status-amber-bg border-status-amber/40 ring-2 ring-status-amber/20"
               : "bg-paper border-line hover:border-status-amber/30"
@@ -128,7 +128,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
         {/* Informational Card */}
         <div
           onClick={() => setSelectedSeverity(selectedSeverity === "INFO" ? "ALL" : "INFO")}
-          className={`p-4 rounded-2xl border transition cursor-pointer shadow-card flex items-center justify-between ${
+          className={`p-4 rounded-lg border transition cursor-pointer shadow-card flex items-center justify-between ${
             selectedSeverity === "INFO"
               ? "bg-brand-soft border-brand/40 ring-2 ring-brand/20"
               : "bg-paper border-line hover:border-brand/30"
@@ -149,7 +149,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
       </div>
 
       {/* 2. FILTER TOOLBAR */}
-      <div className="bg-paper p-3.5 rounded-2xl border border-line flex flex-wrap items-center justify-between gap-3 shadow-card">
+      <div className="bg-paper p-3.5 rounded-lg border border-line flex flex-wrap items-center justify-between gap-3 shadow-card">
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative w-64">
@@ -199,7 +199,7 @@ export function ExceptionsPage({ onOpenJob }: Props) {
       </div>
 
       {/* 3. EXCEPTIONS DATA TABLE */}
-      <div className="bg-paper rounded-2xl shadow-card border border-transparent overflow-hidden">
+      <div className="bg-paper rounded-lg border border-line shadow-card overflow-hidden">
         <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-surface/80 backdrop-blur-xs border-b border-line text-muted text-xs font-semibold sticky top-0 z-20">

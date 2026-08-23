@@ -328,7 +328,7 @@ export function ScenariosPage({ kind }: Props) {
                       {isExpanded && (
                         <tr>
                           <td colSpan={10} className="p-6 bg-bg border-b border-line">
-                            <div className="p-6 bg-paper rounded shadow-card border border-transparent space-y-4 max-w-3xl">
+                            <div className="p-6 bg-paper rounded border border-line shadow-card space-y-4 max-w-3xl">
                               <div className="flex items-center justify-between border-b border-line pb-3">
                                 <div>
                                   <h4 className="text-sm font-semibold text-ink font-mono">{item.jobId} Dossier</h4>

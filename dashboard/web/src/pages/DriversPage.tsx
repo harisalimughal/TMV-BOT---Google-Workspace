@@ -39,7 +39,7 @@ export function DriversPage({ onFilterJobsByDriver }: Props) {
       )}
 
       {error && (
-        <div className="p-8 text-center text-status-red bg-paper rounded shadow-card border border-transparent">
+        <div className="p-8 text-center text-status-red bg-paper rounded border border-line shadow-card">
           Failed to load driver statistics.
         </div>
       )}
@@ -50,7 +50,7 @@ export function DriversPage({ onFilterJobsByDriver }: Props) {
           data?.drivers.map((driver: DriverSummaryItem) => (
             <div
               key={driver.initials}
-              className="p-5 bg-paper rounded shadow-card border border-transparent flex flex-col justify-between hover:border-line-strong transition"
+              className="p-5 bg-paper rounded border border-line shadow-card flex flex-col justify-between hover:border-line-strong transition"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">

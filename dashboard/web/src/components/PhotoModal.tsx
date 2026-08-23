@@ -26,7 +26,7 @@ export function PhotoModal({ isOpen, onClose, title, photoUrl, driveUrl }: Props
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="relative max-w-4xl w-full bg-paper rounded-2xl shadow-2xl border border-line overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative max-w-4xl w-full bg-paper rounded-lg shadow-2xl border border-line overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-line bg-surface">
           <div>

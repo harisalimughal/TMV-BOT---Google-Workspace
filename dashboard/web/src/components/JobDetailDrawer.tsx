@@ -110,7 +110,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
         {/* 2. Scrollable Body Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs text-ink">
           {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-surface border border-line">
+          <div className="grid grid-cols-3 gap-3 p-3.5 rounded-lg bg-surface border border-line">
             <div>
               <span className="text-[11px] text-muted block mb-0.5">Total Billed</span>
               <span className="text-base font-bold font-mono text-ink block">£{totalPounds.toFixed(2)}</span>
@@ -128,7 +128,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
           </div>
 
           {/* Route & Postcodes */}
-          <div className="p-4 rounded-2xl border border-line bg-paper space-y-3 shadow-card">
+          <div className="p-4 rounded-lg border border-line bg-paper space-y-3 shadow-card">
             <h4 className="text-xs font-bold text-ink flex items-center gap-1.5 uppercase tracking-wider text-muted">
               <MapPin className="w-3.5 h-3.5 text-brand" />
               Route Corridors
@@ -146,7 +146,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
           </div>
 
           {/* 10-Stage Lifecycle Timeline */}
-          <div className="p-4 rounded-2xl border border-line bg-paper space-y-3 shadow-card">
+          <div className="p-4 rounded-lg border border-line bg-paper space-y-3 shadow-card">
             <h4 className="text-xs font-bold text-ink flex items-center gap-1.5 uppercase tracking-wider text-muted">
               <Clock className="w-3.5 h-3.5 text-brand" />
               Audit Lifecycle Timeline (10 Stages)
@@ -176,7 +176,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
           </div>
 
           {/* Photographic Evidence Grid */}
-          <div className="p-4 rounded-2xl border border-line bg-paper space-y-3 shadow-card">
+          <div className="p-4 rounded-lg border border-line bg-paper space-y-3 shadow-card">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-ink flex items-center gap-1.5 uppercase tracking-wider text-muted">
                 <Camera className="w-3.5 h-3.5 text-brand" />
@@ -211,7 +211,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
 
           {/* Financial Breakdown & Customer Signature */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl border border-line bg-paper space-y-2 shadow-card">
+            <div className="p-4 rounded-lg border border-line bg-paper space-y-2 shadow-card">
               <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">Financial Audit</span>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between py-1 border-b border-line">
@@ -233,7 +233,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-line bg-paper flex flex-col justify-between shadow-card">
+            <div className="p-4 rounded-lg border border-line bg-paper flex flex-col justify-between shadow-card">
               <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1">Customer Sign-off</span>
               {job.signatureUrl ? (
                 <div

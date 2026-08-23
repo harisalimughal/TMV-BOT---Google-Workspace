@@ -77,7 +77,7 @@ export function OverviewPage({ onSelectSection }: Props) {
   return (
     <div className="space-y-6 max-w-full">
       {/* 1. EXECUTIVE HERO HEADER */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-paper p-5 rounded-2xl shadow-card border border-transparent">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-paper p-5 rounded-lg border border-line shadow-card">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded-full bg-brand-soft text-brand text-[10px] font-mono font-bold uppercase tracking-wider">
@@ -97,7 +97,7 @@ export function OverviewPage({ onSelectSection }: Props) {
           {onSelectSection && (
             <button
               onClick={() => onSelectSection("live_fleet")}
-              className="h-9 px-3.5 rounded-lg bg-gradient-to-r from-brand to-accent text-white text-xs font-semibold hover:opacity-95 transition shadow-sm flex items-center gap-1.5"
+              className="h-9 px-3.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-xs font-semibold hover:opacity-95 transition shadow-sm flex items-center gap-1.5"
             >
               <Navigation className="w-3.5 h-3.5" />
               <span>Open Live Fleet GPS</span>
@@ -110,7 +110,7 @@ export function OverviewPage({ onSelectSection }: Props) {
       {/* 2. WORLD-CLASS KPI METRIC CARDS (4-Up Grid) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Invoiced */}
-        <div className="p-5 bg-paper rounded-2xl shadow-card border border-transparent hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
           <div>
             <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
               <span>Gross Invoiced</span>
@@ -132,7 +132,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Total Bookings */}
-        <div className="p-5 bg-paper rounded-2xl shadow-card border border-transparent hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
           <div>
             <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
               <span>Total Move Volume</span>
@@ -154,7 +154,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Completion Rate */}
-        <div className="p-5 bg-paper rounded-2xl shadow-card border border-transparent hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
           <div>
             <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
               <span>Completion Rate</span>
@@ -176,7 +176,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Punctuality / Delay */}
-        <div className="p-5 bg-paper rounded-2xl shadow-card border border-transparent hover:border-line-strong transition flex flex-col justify-between group">
+        <div className="p-5 bg-paper rounded-lg border border-line shadow-card hover:border-line-strong transition flex flex-col justify-between group">
           <div>
             <div className="flex items-center justify-between text-muted text-xs font-medium mb-1">
               <span>Average Arrival Delay</span>
@@ -197,7 +197,7 @@ export function OverviewPage({ onSelectSection }: Props) {
 
       {/* 3. REVENUE BREAKDOWN RIBBON */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-paper rounded-2xl shadow-card border border-transparent flex items-center justify-between">
+        <div className="p-4 bg-paper rounded-lg border border-line shadow-card flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[11px] font-medium text-muted block">Direct Cash Collected</span>
             <span className="text-lg font-bold font-mono text-ink">
@@ -209,7 +209,7 @@ export function OverviewPage({ onSelectSection }: Props) {
           </span>
         </div>
 
-        <div className="p-4 bg-paper rounded-2xl shadow-card border border-transparent flex items-center justify-between">
+        <div className="p-4 bg-paper rounded-lg border border-line shadow-card flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[11px] font-medium text-muted block">Digital / Card / Bank Transfer</span>
             <span className="text-lg font-bold font-mono text-ink">
@@ -221,7 +221,7 @@ export function OverviewPage({ onSelectSection }: Props) {
           </span>
         </div>
 
-        <div className="p-4 bg-paper rounded-2xl shadow-card border border-transparent flex items-center justify-between">
+        <div className="p-4 bg-paper rounded-lg border border-line shadow-card flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[11px] font-medium text-muted block">Overtime Billing Volume</span>
             <span className="text-lg font-bold font-mono text-ink">
@@ -245,7 +245,7 @@ export function OverviewPage({ onSelectSection }: Props) {
       {/* 5. CHARTS: REVENUE VELOCITY & DRIVER WORKLOAD */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Velocity Area Chart */}
-        <div className="p-6 bg-paper rounded-2xl shadow-card border border-transparent">
+        <div className="p-6 bg-paper rounded-lg border border-line shadow-card">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-ink tracking-tight">Revenue Velocity</h3>
@@ -277,7 +277,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
         {/* Driver Workload Matrix */}
-        <div className="p-6 bg-paper rounded-2xl shadow-card border border-transparent">
+        <div className="p-6 bg-paper rounded-lg border border-line shadow-card">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-ink tracking-tight">Driver Fleet Workload</h3>

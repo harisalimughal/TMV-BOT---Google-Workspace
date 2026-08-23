@@ -58,7 +58,7 @@ export function App() {
     return (
       <div className="min-h-screen bg-navy-900 flex items-center justify-center text-white">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-2xl bg-navy-800 border border-tmv-cyan/40 flex items-center justify-center mx-auto mb-3 animate-pulse font-mono font-bold text-tmv-cyan">
+          <div className="w-12 h-12 rounded-lg bg-navy-800 border border-tmv-cyan/40 flex items-center justify-center mx-auto mb-3 animate-pulse font-mono font-bold text-tmv-cyan">
             TMV
           </div>
           <span className="text-xs text-muted font-mono tracking-wider uppercase">Initializing Operations HUD...</span>
