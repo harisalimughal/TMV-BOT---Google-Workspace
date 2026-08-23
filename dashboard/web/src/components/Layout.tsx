@@ -30,7 +30,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchExceptions, triggerDatasetRefresh } from "../api/client";
 import { CommandPalette } from "./CommandPalette";
 import { ShortcutsModal } from "./ShortcutsModal";
-import { LiveActivityTicker } from "./LiveActivityTicker";
 import { formatLondonTimeOnly } from "../utils/date";
 
 interface Props {
@@ -350,9 +349,6 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
           {/* Page Content */}
           <main className="flex-1 p-8">{children}</main>
         </div>
-
-        {/* Live Real-time Operations Event Ticker */}
-        <LiveActivityTicker />
       </div>
 
       {/* Global Command Palette */}
