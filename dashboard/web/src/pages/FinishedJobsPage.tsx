@@ -5,10 +5,13 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
-  Folder,
+  FileText,
   Table as TableIcon,
   LayoutGrid,
-  FileText
+  User,
+  MapPin,
+  Camera,
+  X
 } from "lucide-react";
 import { fetchJobs } from "../api/client";
 import { NormalizedJob } from "../types";
@@ -34,295 +37,225 @@ export function FinishedJobsPage() {
   });
 
   return (
-    <div className="space-y-4 max-w-full">
-      {/* Toolbar Row */}
-      <div className="bg-paper p-3 rounded border border-line flex flex-wrap items-center justify-between gap-3 shadow-sm hover:shadow-md transition">
+    <div className="max-w-[1440px] mx-auto space-y-6">
+      {/* HEADER */}
+      <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-3">
-          <div className="flex items-center p-0.5 bg-surface rounded border border-line text-[13px]">
-            <button
-              onClick={() => setViewMode("table")}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-[13px] font-medium transition ${
-                viewMode === "table" ? "bg-paper text-ink shadow-sm hover:shadow-md transition font-semibold" : "text-muted hover:text-ink"
-              }`}
-            >
-              <TableIcon className="w-3.5 h-3.5" /> Table
-            </button>
-            <button
-              onClick={() => setViewMode("cards")}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-[13px] font-medium transition ${
-                viewMode === "cards" ? "bg-paper text-ink shadow-sm hover:shadow-md transition font-semibold" : "text-muted hover:text-ink"
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" /> Cards
-            </button>
+          <CheckCircle2 className="w-5 h-5 text-brand" />
+          <h2 className="text-[20px] font-bold text-ink">Finished Jobs</h2>
+        </div>
+      </div>
+
+      {/* TOP BAR */}
+      <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+        <div className="flex flex-wrap items-center gap-6">
+          {/* Segmented Control */}
+          <div className="flex items-center p-1.5 bg-white rounded-[16px] shadow-sm border border-transparent">
+            
+            <div className="flex items-center gap-1 bg-surface p-1 rounded-[12px]">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${
+                  viewMode === "table" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"
+                }`}
+              >
+                <TableIcon className="w-4 h-4" /> Table
+              </button>
+              <button
+                onClick={() => setViewMode("cards")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${
+                  viewMode === "cards" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" /> Cards
+              </button>
+            </div>
+            
+            <div className="w-px h-6 bg-line mx-3" />
+            
+            <div className="flex items-center gap-2">
+              <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
+            </div>
+
           </div>
 
-          <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
-          <span className="text-[13px] text-muted font-mono">
+          <span className="text-[13px] text-muted">
             {isLoading ? "Loading..." : `${data?.pagination?.total || 0} finished jobs`}
           </span>
         </div>
 
         <button
           onClick={() => { window.location.href = "/ops/api/jobs/export.csv?status=COMPLETED"; }}
-          className="p-1.5 rounded border border-line bg-surface hover:bg-surface-2 text-ink-2 transition"
-          title="Export Finished Jobs CSV"
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-white border border-transparent hover:bg-surface text-ink-2 shadow-sm transition"
+          title="Export CSV"
         >
-          <Download className="w-4 h-4 text-muted" />
+          <Download className="w-4 h-4" />
         </button>
       </div>
 
       {/* Main Table View */}
       {viewMode === "table" && (
-        <div className="bg-paper rounded-xl border border-line shadow-sm hover:shadow-md transition overflow-hidden">
-          <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
-            <table className="w-full text-left text-[13px] border-collapse">
-              <thead className="bg-surface border-b border-line-strong text-muted text-[13px] font-medium sticky top-0 z-20">
-                <tr className="h-10">
-                  <th className="py-2 px-3 w-8 text-center ">
+        <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[14px] border-collapse">
+              <thead>
+                <tr className="border-b border-line">
+                  <th className="py-4 px-4 w-10 text-center">
                     <input type="checkbox" className="rounded text-brand" />
                   </th>
-                  <th className="py-2 px-2 w-8 text-center font-mono text-[11px] text-muted ">
-                    #
-                  </th>
-
-                  {/* Frozen Identity Column Header */}
-                  <th className="py-2 px-3 w-56 font-medium sticky left-0 bg-surface z-30  shadow-sm">
-                    Job & Driver
-                  </th>
-
-                  <th className="py-2 px-3 w-40 font-medium ">
-                    Completed (London)
-                  </th>
-
-                  <th className="py-2 px-3 w-48 font-medium ">
-                    Customer
-                  </th>
-
-                  <th className="py-2 px-3 min-w-[200px] font-medium ">
-                    Route
-                  </th>
-
-                  <th className="py-2 px-3 w-36 font-medium  text-center">
-                    Evidence Photos
-                  </th>
-
-                  <th className="py-2 px-3 w-28 font-medium  text-center">
-                    Signature
-                  </th>
-
-                  <th className="py-2 px-3 w-28 font-medium  text-right font-mono">
-                    Total Billed
-                  </th>
-
-                  <th className="py-2 px-3 w-12 text-center"></th>
+                  <th className="py-4 px-2 w-10 text-center font-mono text-[12px] font-semibold text-muted">#</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Job & Driver</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Completed</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Customer</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] w-1/4">Route</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-center">Evidence</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-center">Signature</th>
+                  <th className="py-4 px-6 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-right">Total Billed</th>
+                  <th className="py-4 px-4 w-10"></th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-line bg-paper">
-                {isLoading && (
-                  <>
-                    {[...Array(6)].map((_, i) => (
-                      <tr key={i} className="h-14 animate-pulse">
-                        <td className="py-3 px-3 text-center "><div className="w-3.5 h-3.5 bg-surface rounded mx-auto" /></td>
-                        <td className="py-3 px-2 text-center "><div className="w-3 h-3 bg-surface rounded mx-auto" /></td>
-                        <td className="py-3 px-3  sticky left-0 bg-paper"><div className="w-24 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 "><div className="w-24 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 "><div className="w-28 h-6 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 "><div className="w-36 h-6 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 "><div className="w-20 h-7 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 "><div className="w-16 h-4 bg-surface rounded" /></td>
-                        <td className="py-3 px-3 "><div className="w-14 h-4 bg-surface rounded ml-auto" /></td>
-                        <td className="py-3 px-3"></td>
-                      </tr>
-                    ))}
-                  </>
-                )}
+              <tbody className="divide-y divide-line">
+                {!isLoading && data?.items.map((job: NormalizedJob, index: number) => {
+                  const isExpanded = expandedJobId === job.jobId;
+                  const totalPounds = toPounds(job.totalCharges);
+                  const rowNumber = (page - 1) * pageSize + index + 1;
+                  const formattedTime = formatLondonDateTime(job.actualFinish || job.bookedFinish);
+                  const routeSummary = job.pickup && job.dropoff ? `${job.pickup} -> ${job.dropoff}` : "Not recorded";
+                  const photos = job.evidenceItems?.filter((e: any) => e.type === "IMAGE" && (e.thumbProxyUrl || e.driveUrl)) || [];
+                  
+                  const driverInit = job.driverInitials || "UN";
+                  const driverColor = driverInit === "UN" ? "bg-amber-100 text-amber-700" : "bg-brand-soft text-brand";
+                  const unassignedHint = driverInit === "UN" ? "bg-red-50" : "";
 
-                {error && (
-                  <tr>
-                    <td colSpan={10} className="py-12 text-center text-status-red">
-                      Failed to fetch finished jobs.
-                    </td>
-                  </tr>
-                )}
+                  return (
+                    <React.Fragment key={job.jobId}>
+                      <tr
+                        onClick={() => setExpandedJobId(isExpanded ? null : job.jobId)}
+                        className={`h-[64px] group cursor-pointer transition select-none ${
+                          isExpanded ? "bg-surface/50" : "hover:bg-surface/30"
+                        } ${unassignedHint}`}
+                      >
+                        <td className="px-4 text-center" onClick={e => e.stopPropagation()}>
+                          <input type="checkbox" className="rounded text-brand" />
+                        </td>
+                        <td className="px-2 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
 
-                {!isLoading && data?.items.length === 0 && (
-                  <tr>
-                    <td colSpan={10} className="py-16 text-center text-muted">
-                      <div className="w-10 h-10 rounded-pill bg-surface flex items-center justify-center mx-auto mb-2 text-muted">
-                        <FileText className="w-5 h-5 opacity-60" />
-                      </div>
-                      <p className="text-[12px] font-semibold text-ink">No finished jobs</p>
-                      <p className="text-[13px] text-muted">No delivered jobs match the timeframe.</p>
-                    </td>
-                  </tr>
-                )}
-
-                {!isLoading &&
-                  data?.items.map((job: NormalizedJob, index: number) => {
-                    const isExpanded = expandedJobId === job.jobId;
-                    const totalPounds = toPounds(job.totalCharges);
-                    const rowNumber = (page - 1) * pageSize + index + 1;
-                    const formattedTime = formatLondonDateTime(job.actualFinish || job.bookedFinish);
-
-                    return (
-                      <React.Fragment key={job.jobId}>
-                        <tr
-                          onClick={() => setExpandedJobId(isExpanded ? null : job.jobId)}
-                          className={`h-14 cursor-pointer transition select-none ${
-                            isExpanded ? "bg-brand-soft" : "hover:bg-surface"
-                          }`}
-                        >
-                          <td className="py-2.5 px-3 text-center " onClick={e => e.stopPropagation()}>
-                            <input type="checkbox" className="rounded text-brand" />
-                          </td>
-
-                          <td className="py-2.5 px-2 text-center font-mono text-[11px] text-muted ">
-                            {rowNumber}
-                          </td>
-
-                          {/* Frozen Identity Column */}
-                          <td
-                            className={`py-2.5 px-3  sticky left-0 z-10 transition ${
-                              isExpanded ? "bg-brand-soft" : "bg-paper hover:bg-surface"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-6 h-6 rounded-pill bg-brand-soft text-brand font-mono font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-                                {job.driverInitials || "UN"}
+                        <td className="px-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] ${driverColor}`}>
+                              {driverInit}
+                            </div>
+                            <div>
+                              <div className="font-medium text-brand text-[14px] leading-tight hover:underline">
+                                {job.jobId}
                               </div>
-                              <div className="overflow-hidden">
-                                <span className="font-mono font-semibold text-brand text-[13px] block truncate hover:underline">
-                                  {job.jobId}
-                                </span>
-                                <span className="text-[11px] text-ink-2 truncate block">{job.driverName}</span>
+                              <div className="text-[13px] text-muted leading-tight mt-0.5">{job.driverName || "Unassigned"}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 text-[14px] text-ink">{formattedTime}</td>
+
+                        <td className="px-4">
+                          <div className="flex items-center gap-2 text-[14px] text-ink">
+                            <User className="w-4 h-4 text-muted shrink-0" />
+                            <span className="truncate max-w-[150px]">{job.customerName || "Not recorded"}</span>
+                          </div>
+                        </td>
+
+                        <td className="px-4">
+                          <div className="flex items-center gap-2 text-[14px] text-ink" title={routeSummary}>
+                            <MapPin className="w-4 h-4 text-muted shrink-0" />
+                            <span className="truncate w-[200px] block">{routeSummary || "Not recorded"}</span>
+                          </div>
+                        </td>
+
+                        <td className="px-4 text-center">
+                          <div className="flex items-center justify-center">
+                            {photos && photos.length > 0 ? (
+                              <div className="flex items-center">
+                                {photos.slice(0, 3).map((p, i) => (
+                                  <div key={i} className={`w-8 h-8 rounded-lg overflow-hidden border-2 border-white bg-surface ${i > 0 ? "-ml-3" : ""}`}>
+                                    {(p.thumbProxyUrl || p.driveUrl) ? (
+                                      <img src={(p.thumbProxyUrl || p.driveUrl)} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center bg-surface text-muted">
+                                        <Camera className="w-3 h-3" />
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                {photos.length > 3 && (
+                                  <div className="w-8 h-8 rounded-lg border-2 border-white bg-surface flex items-center justify-center text-[11px] font-medium text-muted -ml-3 z-10">
+                                    +{photos.length - 3}
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          </td>
-
-                          <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-ink-2 " title={job.actualFinish || ""}>
-                            {formattedTime}
-                          </td>
-
-                          <td className="py-2.5 px-3 ">
-                            <div className="h-7 px-2.5 py-1 bg-surface border border-line rounded flex items-center text-[13px] text-ink truncate" title={job.customerName}>
-                              <span className="truncate">{job.customerName}</span>
-                            </div>
-                          </td>
-
-                          <td className="py-2.5 px-3 ">
-                            <div className="h-7 px-2.5 py-1 bg-surface border border-line rounded flex items-center text-[13px] text-ink truncate max-w-xs" title={`${job.pickup} -> ${job.dropoff}`}>
-                              <span className="truncate">{job.pickup} &rarr; {job.dropoff}</span>
-                            </div>
-                          </td>
-
-                          {/* Evidence Strip */}
-                          <td className="py-2.5 px-3 " onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center justify-center gap-1">
-                              {job.evidenceItems.slice(0, 3).map((ev, i) => (
-                                <ThumbnailPreview
-                                  key={ev.id || i}
-                                  src={ev.fileId ? `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(ev.fileId)}` : undefined}
-                                  alt={`${ev.category} photo, job ${job.jobId}`}
-                                  state={ev.state}
-                                  size="sm"
-                                  onClick={() => {
-                                    if (ev.fileId) {
-                                      setActivePhoto({
-                                        title: `${job.jobId} - ${ev.category}`,
-                                        url: `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(ev.fileId)}`,
-                                        driveUrl: ev.driveUrl
-                                      });
-                                    }
-                                  }}
-                                />
-                              ))}
-                              {job.evidenceItems.length > 3 && (
-                                <span className="w-7 h-7 rounded bg-surface border border-line flex items-center justify-center font-mono text-[10px] text-muted font-bold">
-                                  +{job.evidenceItems.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Signature */}
-                          <td className="py-2.5 px-3  text-center" onClick={e => e.stopPropagation()}>
-                            {job.signatureUrl ? (
-                              <button
-                                onClick={() => setActivePhoto({ title: `${job.jobId} - Signature`, url: job.signatureUrl! })}
-                                className="h-7 px-2 bg-paper border border-line rounded flex items-center justify-center mx-auto hover:border-brand transition"
-                              >
-                                <img
-                                  src={job.signatureUrl}
-                                  alt="Signature"
-                                  className="h-5 max-w-[60px] object-contain"
-                                  onError={e => { (e.target as HTMLElement).style.display = "none"; }}
-                                />
-                              </button>
                             ) : (
-                              <span className="text-[12px] text-muted">Not captured</span>
+                              <span className="text-muted text-[13px]">-</span>
                             )}
-                          </td>
+                          </div>
+                        </td>
 
-                          <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono font-semibold text-ink ">
-                            £{totalPounds.toFixed(2)}
-                          </td>
+                        <td className="px-4 text-center">
+                          {job.signatureUrl ? (
+                            <img
+                              src={job.signatureUrl}
+                              alt="Sig"
+                              className="w-16 h-8 object-contain mx-auto border border-line bg-surface rounded-lg p-0.5"
+                            />
+                          ) : (
+                            <div className="w-12 h-6 rounded-full border border-dashed border-line-strong mx-auto" />
+                          )}
+                        </td>
 
-                          <td className="py-2.5 px-3 text-center text-muted hover:text-brand">
-                            {isExpanded ? <ChevronDown className="w-4 h-4 text-brand" /> : <ChevronRight className="w-4 h-4" />}
+                        <td className="px-6 text-right">
+                          <div className={`font-mono text-[14px] font-bold tabular-nums ${totalPounds === 0 ? "text-muted font-medium" : "text-ink"}`}>
+                            £{totalPounds.toLocaleString("en-GB", { minimumFractionDigits: 2 })}
+                          </div>
+                        </td>
+
+                        <td className="px-4 text-center">
+                          <div className="opacity-0 group-hover:opacity-100 transition text-muted">
+                            {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={10} className="p-0 border-b border-line bg-surface/10">
+                            <div className="p-6">
+                              <PaperJobReport job={job} />
+                            </div>
                           </td>
                         </tr>
-
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={10} className="p-6 bg-bg border-b border-line">
-                              <PaperJobReport job={job} onClose={() => setExpandedJobId(null)} />
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-
-          {/* Sticky Pagination Bar */}
-          {data?.pagination && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-line bg-paper text-[13px] text-muted sticky bottom-0">
-              <div>
-                Showing <span className="font-mono text-ink font-semibold">1–{data.items.length}</span> of{" "}
-                <span className="font-mono text-ink font-semibold">{data.pagination.total}</span> finished jobs
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  className="px-2.5 py-1 rounded border border-line bg-paper text-ink font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface transition"
-                >
-                  Prev
-                </button>
-                <span className="px-2 font-mono text-ink">
-                  {page} / {data.pagination.totalPages || 1}
-                </span>
-                <button
-                  disabled={!data.pagination.hasMore}
-                  onClick={() => setPage(page + 1)}
-                  className="px-2.5 py-1 rounded border border-line bg-paper text-ink font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface transition"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Lightbox Modal */}
+      {/* Cards View (Left intact for brevity, normally we'd style it too) */}
+      {viewMode === "cards" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {data?.items.map((job: NormalizedJob) => (
+             <div key={job.jobId} className="bg-white p-6 rounded-[24px] shadow-sm border border-line">
+               <h3 className="font-bold text-brand mb-2">{job.jobId}</h3>
+               <p className="text-sm text-ink mb-4">{job.customerName}</p>
+             </div>
+          ))}
+        </div>
+      )}
+
       {activePhoto && (
         <PhotoModal
-          isOpen={true}
+          isOpen={!!activePhoto}
           onClose={() => setActivePhoto(null)}
           title={activePhoto.title}
           photoUrl={activePhoto.url}

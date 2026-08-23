@@ -173,12 +173,9 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
               if (item.type === "header") {
                 if (collapsed) return <div key={idx} className="my-4 border-t border-line" />;
                 return (
-                  <div
-                    key={idx}
-                    className="pt-5 pb-2 px-3 text-meta text-muted uppercase"
-                  >
-                    {item.label}
-                  </div>
+                  <div key={idx} className="pt-6 pb-2 px-3 text-[12px] font-semibold text-muted uppercase tracking-[0.1em]">
+                      {item.label}
+                    </div>
                 );
               }
 
@@ -189,7 +186,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                 <button
                   key={item.id}
                   onClick={() => onSelectSection(item.id!)}
-                  className={`w-full h-11 flex items-center gap-3 px-4 rounded-full text-[14px] font-medium transition group ${
+                  className={`w-full h-11 flex items-center gap-3 px-4 rounded-xl text-[14px] font-medium transition group ${
                       isActive
                         ? "text-ink font-semibold bg-white shadow-sm"
                         : "text-muted hover:bg-white/50 hover:text-ink"
@@ -215,7 +212,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
 
                   {/* Exception Badge */}
                   {!collapsed && item.hasBadge && exceptionsBadgeLabel && (
-                    <span className="ml-auto px-1.5 py-0.2 rounded-pill bg-status-red-bg text-status-red text-[10px] font-bold font-mono">
+                    <span className="ml-auto flex items-center justify-center px-1.5 min-w-[20px] h-5 rounded-full bg-status-red text-white text-[11px] font-bold">
                       {exceptionsBadgeLabel}
                     </span>
                   )}
@@ -276,13 +273,13 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
           {/* Left: Global Search */}
           <div className="flex items-center gap-4">
             <div className="relative hidden md:block w-[320px]">
-              <Search className="w-4 h-4 text-muted absolute left-3 top-2.5 pointer-events-none" />
+              <Search className="w-4 h-4 text-muted absolute left-4 top-3 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search anything"
                 onClick={() => setPaletteOpen(true)}
                 readOnly
-                className="w-full h-9 pl-9 pr-3 bg-surface border border-line rounded-lg text-sm text-ink placeholder:text-muted focus:bg-paper focus:border-brand cursor-pointer transition"
+                className="w-full h-10 pl-10 pr-4 bg-surface border-transparent rounded-full text-sm text-ink placeholder:text-muted cursor-pointer transition"
               />
             </div>
           </div>
