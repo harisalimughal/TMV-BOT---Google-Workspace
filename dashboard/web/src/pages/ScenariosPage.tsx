@@ -11,6 +11,7 @@ import {
   Table as TableIcon,
   LayoutGrid,
   FileText,
+  MoreHorizontal,
   RefreshCw
 } from "lucide-react";
 import { fetchScenarios } from "../api/client";
@@ -155,47 +156,20 @@ export function ScenariosPage({ kind }: Props) {
         <div className="bg-paper rounded border border-line-strong shadow-card overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-surface border-b border-line-strong text-muted text-xs font-medium sticky top-0 z-20">
-                <tr className="h-10">
-                  <th className="py-2 px-3 w-8 text-center border-r border-line">
-                    <input type="checkbox" className="rounded text-brand" />
-                  </th>
-                  <th className="py-2 px-2 w-8 text-center font-mono text-[11px] text-muted border-r border-line">
-                    #
-                  </th>
-
-                  {/* Frozen Identity Column Header */}
-                  <th className="py-2 px-3 w-56 font-medium sticky left-0 bg-surface z-30 border-r border-line-strong shadow-sm">
-                    Job & Driver
-                  </th>
-
-                  <th className="py-2 px-3 w-40 font-medium border-r border-line">
-                    Recorded (London)
-                  </th>
-
-                  <th className="py-2 px-3 w-48 font-medium border-r border-line">
-                    Client Name
-                  </th>
-
-                  <th className="py-2 px-3 w-36 font-medium border-r border-line">
-                    Container Number
-                  </th>
-
-                  <th className="py-2 px-3 min-w-[180px] font-medium border-r border-line">
-                    {kind === "liability" ? "Damage Categories" : "Location / Note"}
-                  </th>
-
-                  <th className="py-2 px-3 w-36 font-medium border-r border-line text-center">
-                    Photographs
-                  </th>
-
-                  <th className="py-2 px-3 w-28 font-medium border-r border-line text-center">
-                    Signature
-                  </th>
-
-                  <th className="py-2 px-3 w-12 text-center"></th>
-                </tr>
-              </thead>
+              <thead className="bg-surface border-b border-line text-[11px] font-semibold text-muted sticky top-0 z-20">
+  <tr className="h-10">
+    <th className="py-2 px-4 w-10 text-center font-normal"><input type="checkbox" className="rounded border-line-strong text-brand" /></th>
+    <th className="py-2 px-2 w-12 text-left font-normal">#</th>
+    <th className="py-2 px-4 w-64 text-left font-normal border-r border-transparent">User</th>
+    <th className="py-2 px-3 w-10 text-center border-r border-line-strong">...</th>
+    <th className="py-2 px-3 w-12 text-center border-r border-line-strong"><FileText className="w-4 h-4 text-muted mx-auto" /></th>
+    <th className="py-2 px-4 text-left font-normal">Date submitted</th>
+    <th className="py-2 px-4 text-left font-normal truncate">Damage Liability & Ass...</th>
+    <th className="py-2 px-4 text-left font-normal">Pictures</th>
+    <th className="py-2 px-4 text-left font-normal">Sign here.</th>
+    <th className="py-2 px-3 w-10 text-center"></th>
+  </tr>
+</thead>
 
               <tbody className="divide-y divide-line bg-paper">
                 {data.items.map((item: any, index: number) => {
@@ -211,122 +185,87 @@ export function ScenariosPage({ kind }: Props) {
                   return (
                     <React.Fragment key={item.id}>
                       <tr
-                        onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                        className={`h-[52px] cursor-pointer transition select-none ${
-                          isExpanded ? "bg-brand-soft" : "hover:bg-surface"
-                        }`}
-                      >
-                        <td className="py-2.5 px-3 text-center border-r border-line" onClick={e => e.stopPropagation()}>
-                          <input type="checkbox" className="rounded text-brand" />
-                        </td>
+  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+  className={`h-14 cursor-pointer transition select-none ${isExpanded ? "bg-brand-soft" : "hover:bg-surface-hover border-b border-line"}`}
+>
+  <td className="py-2 px-4 text-center" onClick={e => e.stopPropagation()}>
+    <input type="checkbox" className="rounded border-line-strong text-brand" />
+  </td>
+  
+  <td className="py-2 px-2 text-left text-[13px] text-ink">{rowNumber}</td>
 
-                        <td className="py-2.5 px-2 text-center font-mono text-[11px] text-muted border-r border-line">
-                          {rowNumber}
-                        </td>
+  {/* User Column */}
+  <td className="py-2 px-4 text-left border-r border-transparent">
+    <div className="flex items-center gap-2">
+      <div className="w-7 h-7 rounded-full bg-brand-dark text-white font-mono font-bold text-[10px] flex items-center justify-center shadow-sm">
+        {driverInitials}
+      </div>
+      <span className="font-medium text-[13px] text-ink">{clientName === "N/A" ? driverInitials + " Driver" : clientName}</span>
+    </div>
+  </td>
 
-                        {/* Frozen Identity Column: Job ID + Driver Initials */}
-                        <td
-                          className={`py-2.5 px-3 border-r border-line-strong sticky left-0 z-10 transition ${
-                            isExpanded ? "bg-brand-soft" : "bg-paper hover:bg-surface"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-6 h-6 rounded-pill bg-brand-soft text-brand font-mono font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-                              {driverInitials}
-                            </div>
-                            <div className="overflow-hidden">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono font-semibold text-brand text-xs block truncate">
-                                  {item.jobId}
-                                </span>
-                                {item.eventLabel && (
-                                  <span className="px-1.5 py-0.2 rounded-pill bg-status-amber-bg text-status-amber text-[9px] font-mono font-medium">
-                                    {item.eventLabel}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
+  <td className="py-2 px-3 text-center text-muted">
+    <MoreHorizontal className="w-4 h-4 mx-auto" />
+  </td>
 
-                        {/* Timestamp */}
-                        <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-ink-2 border-r border-line" title={timestampStr}>
-                          {formattedTime}
-                        </td>
+  <td className="py-2 px-3 text-center border-r border-line-strong text-muted">
+    <FileText className="w-4 h-4 mx-auto hover:text-ink transition" />
+  </td>
 
-                        {/* Client Name Pill Input */}
-                        <td className="py-2.5 px-3 border-r border-line">
-                          <div className="h-7 px-2.5 py-1 bg-surface border border-line rounded flex items-center text-[13px] text-ink truncate" title={clientName}>
-                            <span className="truncate">{clientName}</span>
-                          </div>
-                        </td>
+  {/* Date submitted */}
+  <td className="py-2 px-4 text-[13px] text-ink">
+    {formattedTime}
+  </td>
 
-                        {/* Container Pill Input */}
-                        <td className="py-2.5 px-3 border-r border-line">
-                          <div className="h-7 px-2.5 py-1 bg-surface border border-line rounded flex items-center text-[13px] font-mono text-ink truncate" title={containerNum}>
-                            <span className="truncate">{containerNum}</span>
-                          </div>
-                        </td>
+  {/* Damage Liability / Pill */}
+  <td className="py-2 px-4">
+    <div className="h-8 px-3 inline-flex items-center gap-2 bg-paper border border-line rounded-lg text-[13px] text-ink shadow-sm truncate max-w-[160px]">
+      <span className="truncate">{item.damageCategories || item.address || containerNum || "No protection..."}</span>
+      <ChevronDown className="w-3 h-3 text-muted flex-shrink-0" />
+    </div>
+  </td>
 
-                        {/* Address or Damage Categories */}
-                        <td className="py-2.5 px-3 border-r border-line">
-                          <div className="h-7 px-2.5 py-1 bg-surface border border-line rounded flex items-center text-[13px] text-ink truncate" title={item.damageCategories || item.address || "—"}>
-                            <span className="truncate">{item.damageCategories || item.address || "—"}</span>
-                          </div>
-                        </td>
+  {/* Pictures */}
+  <td className="py-2 px-4" onClick={e => e.stopPropagation()}>
+    {item.photos && item.photos.length > 0 ? (
+      <div className="flex items-center gap-1.5">
+        {item.photos.slice(0, 3).map((p: any, pIdx: number) => (
+          <ThumbnailPreview
+            key={p.fileId || pIdx}
+            src={p.thumbUrl}
+            alt={`Photograph #${pIdx + 1}`}
+            size="sm"
+            onClick={() => setActivePhoto({ title: `Photo #${pIdx + 1}`, url: p.thumbUrl })}
+          />
+        ))}
+        {item.photos.length > 3 && (
+          <span className="w-7 h-7 rounded-lg bg-surface border border-line flex items-center justify-center text-[10px] text-muted font-bold shadow-sm">
+            +{item.photos.length - 3}
+          </span>
+        )}
+      </div>
+    ) : (
+      <span className="text-[12px] text-muted">None</span>
+    )}
+  </td>
 
-                        {/* Photographs Strip */}
-                        <td className="py-2.5 px-3 border-r border-line text-center" onClick={e => e.stopPropagation()}>
-                          {item.photos && item.photos.length > 0 ? (
-                            <div className="flex items-center justify-center gap-1">
-                              {item.photos.slice(0, 3).map((p: any, pIdx: number) => (
-                                <ThumbnailPreview
-                                  key={p.fileId || pIdx}
-                                  src={p.thumbUrl}
-                                  alt={`Photograph #${pIdx + 1}, job ${item.jobId}`}
-                                  size="sm"
-                                  onClick={() => setActivePhoto({ title: `${item.jobId} - Photo #${pIdx + 1}`, url: p.thumbUrl })}
-                                />
-                              ))}
-                              {item.photos.length > 3 && (
-                                <span className="w-7 h-7 rounded bg-surface border border-line flex items-center justify-center font-mono text-[10px] text-muted font-bold">
-                                  +{item.photos.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-muted italic">None</span>
-                          )}
-                        </td>
+  {/* Signature */}
+  <td className="py-2 px-4" onClick={e => e.stopPropagation()}>
+    {item.signature ? (
+      <button
+        onClick={() => setActivePhoto({ title: `Customer Sign-Off`, url: item.signature.thumbUrl })}
+        className="h-8 px-2 bg-paper border border-line rounded-lg flex items-center justify-center hover:border-brand transition shadow-sm"
+      >
+        <img src={item.signature.thumbUrl} alt="Signature" className="h-5 max-w-[60px] object-contain mix-blend-multiply" />
+      </button>
+    ) : (
+      <span className="text-[12px] text-muted">None</span>
+    )}
+  </td>
 
-                        {/* Signature */}
-                        <td className="py-2.5 px-3 border-r border-line text-center" onClick={e => e.stopPropagation()}>
-                          {item.signature ? (
-                            <button
-                              onClick={() => setActivePhoto({ title: `${item.jobId} - Customer Sign-Off`, url: item.signature.thumbUrl })}
-                              className="h-7 px-2 bg-paper border border-line rounded flex items-center justify-center mx-auto hover:border-brand transition"
-                              title="View Customer Sign-Off"
-                            >
-                              <img
-                                src={item.signature.thumbUrl}
-                                alt="Signature"
-                                className="h-5 max-w-[60px] object-contain"
-                                onError={e => { (e.target as HTMLElement).style.display = "none"; }}
-                              />
-                            </button>
-                          ) : (
-                            <span className="text-[12px] text-muted">Not captured</span>
-                          )}
-                        </td>
-
-                        {/* Chevron */}
-                        <td className="py-2.5 px-3 text-center text-muted hover:text-brand">
-                          {isExpanded ? <ChevronDown className="w-4 h-4 text-brand" /> : <ChevronRight className="w-4 h-4" />}
-                        </td>
-                      </tr>
-
-                      {/* Expanded Report Row */}
-                      {isExpanded && (
+  <td className="py-2 px-3 text-center"></td>
+</tr>
+{isExpanded && (
   <tr>
     <td colSpan={10} className="p-0 bg-bg border-b border-line relative">
       <div className="absolute top-4 right-8 z-10 print:hidden flex gap-2">

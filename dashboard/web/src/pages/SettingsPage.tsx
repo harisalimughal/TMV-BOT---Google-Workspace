@@ -1,116 +1,136 @@
 import React from "react";
-import { Settings, ShieldCheck, Database, Zap, Clock, DollarSign } from "lucide-react";
+import { DollarSign, Clock, Zap, Database } from "lucide-react";
 
 export function SettingsPage() {
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="bg-paper p-5 rounded-lg border border-line">
-        <h2 className="text-xl font-bold text-ink tracking-tight">Settings</h2>
-        <p className="text-xs text-muted mt-0.5">
+    <div className="space-y-6 max-w-[1000px] mx-auto py-2">
+      {/* Header Card */}
+      <div className="bg-paper p-6 rounded-xl border border-line shadow-sm">
+        <h2 className="text-page-title text-ink font-bold tracking-tight mb-1">Settings</h2>
+        <p className="text-nav text-muted">
           Read-only system rules, rates, caching invariants and database mapping
         </p>
       </div>
 
+      {/* Grid of Settings Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Operational Rates */}
-        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign className="w-5 h-5 text-tmv-blue" />
-            <h3 className="text-sm font-bold text-ink">Operational Charge Rates</h3>
+        
+        {/* Card 1: Operational Charge Rates */}
+        <div className="bg-paper rounded-xl border border-line shadow-sm flex flex-col">
+          <div className="p-6 border-b border-transparent">
+            <h3 className="text-section-title font-bold text-ink flex items-center gap-2 mb-6">
+              <DollarSign className="w-5 h-5" /> Operational Charge Rates
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Overtime Rate</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">£55.00 per 30 minutes (rounded up)</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Congestion Charge</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">£18.00 fixed</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Tunnel Charge</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">£13.00 fixed</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Overtime Rate</span>
-              <span className="font-mono font-bold text-ink">£55.00 per 30 minutes (rounded up)</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Congestion Charge</span>
-              <span className="font-mono font-bold text-ink">£18.00 fixed</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Tunnel Charge</span>
-              <span className="font-mono font-bold text-ink">£13.00 fixed</span>
-            </div>
-            <p className="text-[11px] text-muted pt-1">
-              Rates are defined server-side in <code>src/config/env.ts</code> and never hardcoded in the client.
+          <div className="p-6 pt-2 mt-auto">
+            <p className="text-[12px] text-muted font-medium leading-relaxed">
+              Rates are defined server-side in <code className="bg-surface px-1 py-0.5 rounded text-ink">src/config/env.ts</code> and never hardcoded in the client.
             </p>
           </div>
         </div>
 
-        {/* Timezone & Localization */}
-        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-tmv-blue" />
-            <h3 className="text-sm font-bold text-ink">Timezone & Localization</h3>
+        {/* Card 2: Timezone & Localization */}
+        <div className="bg-paper rounded-xl border border-line shadow-sm flex flex-col">
+          <div className="p-6 border-b border-transparent">
+            <h3 className="text-section-title font-bold text-ink flex items-center gap-2 mb-6">
+              <Clock className="w-5 h-5" /> Timezone & Localization
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Operational Timezone</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">Europe/London</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Daylight Saving Rule</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">BST (UTC+1) / GMT (UTC+0)</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Storage Format</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">ISO-8601 UTC (Z)</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Operational Timezone</span>
-              <span className="font-mono font-bold text-ink">Europe/London</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Daylight Saving Rule</span>
-              <span className="font-mono font-bold text-ink">BST (UTC+1) / GMT (UTC+0)</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Storage Format</span>
-              <span className="font-mono font-bold text-ink">ISO-8601 UTC (Z)</span>
-            </div>
-            <p className="text-[11px] text-muted pt-1">
+          <div className="p-6 pt-2 mt-auto">
+            <p className="text-[12px] text-muted font-medium leading-relaxed">
               Timestamps with non-London offsets (+05:00) are flagged as untrustworthy in the QC audit.
             </p>
           </div>
         </div>
 
-        {/* Caching Architecture */}
-        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-5 h-5 text-tmv-blue" />
-            <h3 className="text-sm font-bold text-ink">SWR In-Memory Caching</h3>
+        {/* Card 3: SWR In-Memory Caching */}
+        <div className="bg-paper rounded-xl border border-line shadow-sm flex flex-col">
+          <div className="p-6 border-b border-transparent">
+            <h3 className="text-section-title font-bold text-ink flex items-center gap-2 mb-6">
+              <Zap className="w-5 h-5" /> SWR In-Memory Caching
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Cache Duration (TTL)</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">30,000 ms (30 seconds)</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Revalidation Policy</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">Stale-While-Revalidate</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Read Latency</span>
+                <span className="font-mono text-ink text-[13px] font-semibold">&lt; 5 ms (in-memory)</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Cache Duration (TTL)</span>
-              <span className="font-mono font-bold text-ink">30,000 ms (30 seconds)</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Revalidation Policy</span>
-              <span className="font-mono font-bold text-ink">Stale-While-Revalidate</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Read Latency</span>
-              <span className="font-mono font-bold text-ink">&lt; 5 ms (in-memory)</span>
-            </div>
-            <p className="text-[11px] text-muted pt-1">
+          <div className="p-6 pt-2 mt-auto">
+            <p className="text-[12px] text-muted font-medium leading-relaxed">
               Zero additional Google Sheets API quota consumed during rapid tab browsing.
             </p>
           </div>
         </div>
 
-        {/* Database Mapping Invariants */}
-        <div className="p-6 bg-paper rounded-lg border border-line shadow-2xs">
-          <div className="flex items-center gap-2 mb-4">
-            <Database className="w-5 h-5 text-tmv-blue" />
-            <h3 className="text-sm font-bold text-ink">Spreadsheet Schema Mapping</h3>
+        {/* Card 4: Spreadsheet Schema Mapping */}
+        <div className="bg-paper rounded-xl border border-line shadow-sm flex flex-col">
+          <div className="p-6 border-b border-transparent">
+            <h3 className="text-section-title font-bold text-ink flex items-center gap-2 mb-6">
+              <Database className="w-5 h-5" /> Spreadsheet Schema Mapping
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Live Read Tabs</span>
+                <span className="font-mono text-status-green text-[13px] font-bold">18 tabs mapped</span>
+              </div>
+              <div className="flex justify-between items-start py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium mt-0.5">Dead Tabs<br/><span className="text-[10px]">(Skipped)</span></span>
+                <span className="font-mono text-muted text-[12px] text-right max-w-[200px]">Dashboard, Customers, Reports, Analytics</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-line border-dashed">
+                <span className="text-muted text-[13px] font-medium">Read-Only Enforced</span>
+                <span className="font-mono text-status-green text-[13px] font-bold">Strictly enforced (0 writes)</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Live Read Tabs</span>
-              <span className="font-mono font-bold text-emerald-700">18 tabs mapped</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Dead Tabs (Skipped)</span>
-              <span className="font-mono text-muted">Dashboard, Customers, Reports, Analytics</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-line">
-              <span className="text-muted">Read-Only Enforced</span>
-              <span className="font-mono font-bold text-emerald-700">Strictly enforced (0 writes)</span>
-            </div>
-            <p className="text-[11px] text-muted pt-1">
+          <div className="p-6 pt-2 mt-auto">
+            <p className="text-[12px] text-muted font-medium leading-relaxed">
               Live Google Sheets operations remain untouched.
             </p>
           </div>
         </div>
+
       </div>
     </div>
   );
