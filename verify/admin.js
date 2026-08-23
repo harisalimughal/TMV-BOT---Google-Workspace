@@ -13,6 +13,13 @@ process.env.TMV_ADMIN_PASSWORD = "test-admin-password";
 process.env.LOG_LEVEL = "error";
 process.env.BOOTSTRAP_ON_START = "false";
 process.env.TMV_SHEET_CACHE_TTL_MS = "0";
+// env.ts's "import 'dotenv/config'" auto-loads the real local .env for any var this
+// script doesn't set itself -- without blanking these explicitly, the Notifications
+// tests below would silently depend on whatever Firetext credentials happen to be in
+// the developer's own .env, making "is SMS configured" pass or fail unpredictably
+// depending on who runs it and what's in their local file.
+process.env.FIRETEXT_API_KEY = "";
+process.env.FIRETEXT_SENDER_ID = "";
 
 const path = require("node:path");
 const BOT = path.join(__dirname, "..", "dist");
@@ -257,23 +264,36 @@ function check(label, actual, expected) {
   check("a never-started job (no Actual Start) is excluded entirely",
     Boolean(byId["TMV-NOTIFY-NOTSTARTED"]), false);
 
-  check("both channels show sent, with the recorded detail", [byId["TMV-NOTIFY-SENT"].email, byId["TMV-NOTIFY-SENT"].sms],
-    [{ state: "sent", detail: "carla@example.test", at: "2026-08-16T09:00:05.000Z" },
-      { state: "sent", detail: "447111111111", at: "2026-08-16T09:00:06.000Z" }]);
+  check("phone/email are surfaced directly on the row, not just inside the pill",
+    [byId["TMV-NOTIFY-SENT"].customerEmail, byId["TMV-NOTIFY-SENT"].customerPhone],
+    ["carla@example.test", "07111111111"]);
 
-  check("both channels show failed, with the failure reason as the detail",
+  // This test process never sets FIRETEXT_API_KEY/FIRETEXT_SENDER_ID, so SMS reads as
+  // "disabled" wherever nothing was actually sent -- the exact bug reported live
+  // ("why does it say Sent when nothing was sent?"): sendJobStartedSms() used to no-op
+  // silently when Firetext wasn't configured, and the handler wrote CLIENT_START_SMS_SENT
+  // regardless. Email has no such "globally off" concept (Gmail is core, not optional),
+  // so it still shows the real sent/failed/pending states -- both channels run through
+  // the exact same notifyStatus() function, just with `configured` fixed per channel.
+  check("email shows sent with the recorded address", byId["TMV-NOTIFY-SENT"].email,
+    { state: "sent", detail: "carla@example.test", at: "2026-08-16T09:00:05.000Z" });
+  check("a SENT row still wins for SMS even though Firetext is unconfigured in this test env " +
+    "(e.g. it was sent before being disabled)", byId["TMV-NOTIFY-SENT"].sms,
+    { state: "sent", detail: "447111111111", at: "2026-08-16T09:00:06.000Z" });
+
+  check("email shows failed, with the failure reason as the detail",
     [byId["TMV-NOTIFY-FAILED"].email.state, byId["TMV-NOTIFY-FAILED"].email.detail],
     ["failed", "Invalid recipient address"]);
-  check("SMS failure detail carried through too", byId["TMV-NOTIFY-FAILED"].sms.detail,
-    "Firetext send failed: 2:0 Invalid destination number");
+  check("SMS never actually sent (Firetext unconfigured) reads 'disabled', NOT the old false 'failed'/'sent'",
+    byId["TMV-NOTIFY-FAILED"].sms, { state: "disabled", detail: "", at: "" });
 
-  check("no activity row yet -> pending, not mistaken for skipped",
-    [byId["TMV-NOTIFY-PENDING"].email.state, byId["TMV-NOTIFY-PENDING"].sms.state], ["pending", "pending"]);
+  check("no activity row yet -> email pending, not mistaken for skipped",
+    byId["TMV-NOTIFY-PENDING"].email.state, "pending");
+  check("no activity row + Firetext unconfigured -> SMS disabled, not pending forever",
+    byId["TMV-NOTIFY-PENDING"].sms, { state: "disabled", detail: "", at: "" });
 
-  check("no email/phone on the booking -> skipped, distinct from pending",
+  check("no email/phone on the booking -> skipped, distinct from pending or disabled",
     [byId["TMV-NOTIFY-SKIPPED"].email.state, byId["TMV-NOTIFY-SKIPPED"].sms.state], ["skipped", "skipped"]);
-  check("skipped SMS on a job with no phone at all (not just no activity row)",
-    byId["TMV-NOTIFY-SKIPPED"].sms.state, "skipped");
 
   check("a later successful retry wins over an earlier failure for the same channel",
     byId["TMV-NOTIFY-RETRY"].email, { state: "sent", detail: "rita@example.test", at: "2026-08-16T09:25:00.000Z" });

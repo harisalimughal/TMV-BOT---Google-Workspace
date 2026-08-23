@@ -115,6 +115,7 @@ export function dashboardShell(): string {
   .pill-failed { background: #fee2e2; color: #991b1b; cursor: help; }
   .pill-pending { background: #fef3c7; color: #92400e; }
   .pill-skipped { background: #f1f1f1; color: #888; }
+  .pill-disabled { background: #e5e7eb; color: #4b5563; }
   .loading { padding: 30px; text-align: center; color: #888; font-size: 14px; }
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   .modal-bg.open { display: flex; }
@@ -360,7 +361,7 @@ export function dashboardShell(): string {
     // only visible by digging through the raw Activity Log for CLIENT_START_EMAIL_*/
     // CLIENT_START_SMS_* rows. One row per started job here instead.
     function notifyPillHtml(status) {
-      var label = { sent: 'Sent', failed: 'Failed', pending: 'Pending', skipped: 'No email/phone' }[status.state] || status.state;
+      var label = { sent: 'Sent', failed: 'Failed', pending: 'Pending', skipped: 'No target', disabled: 'SMS off' }[status.state] || status.state;
       var title = status.detail ? ' title="' + escapeHtml(status.detail) + '"' : '';
       return '<span class="pill pill-' + status.state + '"' + title + '>' + label + '</span>';
     }
@@ -381,7 +382,8 @@ export function dashboardShell(): string {
           '<button class="btn-outline" id="exportPdfBtn">Export PDF</button>' +
           '</div></div>' +
           '<div class="table-wrap"><table><thead><tr>' +
-          '<th>Job ID</th><th>Customer</th><th>Driver</th><th>Started</th><th>Email</th><th>SMS</th>' +
+          '<th>Job ID</th><th>Customer</th><th>Driver</th><th>Started</th>' +
+          '<th>Email address</th><th>Email</th><th>Phone number</th><th>SMS</th>' +
           '</tr></thead><tbody>' +
           rows.map(function (r) {
             return '<tr>' +
@@ -389,18 +391,20 @@ export function dashboardShell(): string {
               '<td>' + escapeHtml(r.customerName) + '</td>' +
               '<td>' + escapeHtml(r.driverInitials) + '</td>' +
               '<td>' + formatDate(r.actualStart) + '</td>' +
+              '<td>' + (r.customerEmail ? escapeHtml(r.customerEmail) : '<span class="muted">—</span>') + '</td>' +
               '<td>' + notifyPillHtml(r.email) + '</td>' +
+              '<td>' + (r.customerPhone ? escapeHtml(r.customerPhone) : '<span class="muted">—</span>') + '</td>' +
               '<td>' + notifyPillHtml(r.sms) + '</td>' +
               '</tr>';
           }).join('') +
           '</tbody></table></div>';
 
-        var NOTIFY_COLUMNS = ['Job ID', 'Customer', 'Driver', 'Started', 'Email', 'SMS'];
+        var NOTIFY_COLUMNS = ['Job ID', 'Customer', 'Driver', 'Started', 'Email address', 'Email', 'Phone number', 'SMS'];
         function notifyRow(r) {
           return {
             'Job ID': r.jobId, 'Customer': r.customerName, 'Driver': r.driverInitials, 'Started': formatDate(r.actualStart),
-            'Email': r.email.state + (r.email.detail ? ' (' + r.email.detail + ')' : ''),
-            'SMS': r.sms.state + (r.sms.detail ? ' (' + r.sms.detail + ')' : '')
+            'Email address': r.customerEmail, 'Email': r.email.state + (r.email.detail ? ' (' + r.email.detail + ')' : ''),
+            'Phone number': r.customerPhone, 'SMS': r.sms.state + (r.sms.detail ? ' (' + r.sms.detail + ')' : '')
           };
         }
         document.getElementById('exportCsvBtn').addEventListener('click', function () {

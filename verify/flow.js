@@ -23,6 +23,13 @@ process.env.TMV_SIGNATURE_LINK_SECRET = "test-scenario-link-secret";
 process.env.LOG_LEVEL = "error";
 process.env.BOOTSTRAP_ON_START = "false";
 process.env.TMV_SHEET_CACHE_TTL_MS = "0";   // test mutates the fake sheet directly
+// env.ts's "import 'dotenv/config'" auto-loads the real local .env for any var this
+// script doesn't set itself -- without blanking these explicitly, the SMS no-op check
+// below would depend on whatever Firetext credentials happen to be in the developer's
+// own .env, and could even reach the real Firetext API through this file's global.fetch
+// mock (which only mocks the shape needed for Chat media downloads).
+process.env.FIRETEXT_API_KEY = "";
+process.env.FIRETEXT_SENDER_ID = "";
 
 const path = require("node:path");
 const BOT = path.join(__dirname, "..", "dist");

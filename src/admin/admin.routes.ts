@@ -432,9 +432,15 @@ export function adminRouter(): Router {
    * columns, not just the absence of an activity row.
    */
   function notifyStatus(
-    hasTarget: boolean, sentRow: Record<string, string> | undefined, failedRow: Record<string, string> | undefined
-  ): { state: "sent" | "failed" | "pending" | "skipped"; detail: string; at: string } {
+    hasTarget: boolean, configured: boolean, sentRow: Record<string, string> | undefined, failedRow: Record<string, string> | undefined
+  ): { state: "sent" | "failed" | "pending" | "skipped" | "disabled"; detail: string; at: string } {
     if (!hasTarget) return { state: "skipped", detail: "", at: "" };
+    // Distinct from "pending": SMS sending being off entirely (no Firetext key/sender
+    // configured) means it will NEVER send, not just "hasn't happened yet" -- collapsing
+    // the two looked like a bug report waiting to happen ("why does this say pending
+    // forever?"). A SENT row still wins if one exists (e.g. this got disabled after an
+    // earlier successful send).
+    if (!configured && !sentRow) return { state: "disabled", detail: "", at: "" };
     // A SENT row always wins even if an earlier attempt also failed -- the queue's
     // alreadySent() guard means nothing sends again once one exists, but a transient
     // failure can still be followed by a successful retry, leaving both rows behind.
@@ -459,23 +465,30 @@ export function adminRouter(): Router {
         latestByJobAction.set(`${row["Job ID"]}::${row["Action"]}`, row);
       }
 
+      // Global, not per-job: matches the exact same checks email.handler.ts (always
+      // configured -- Gmail impersonation is core, not optional) and sms.handler.ts
+      // (skips entirely, writes nothing, when Firetext isn't set up) actually run.
+      const smsConfigured = Boolean(env.firetextApiKey && env.firetextSenderId);
+
       const rows = bookings
         .filter(b => b["Actual Start"]) // only jobs Start Job was actually tapped on
         .map(b => {
           const jobId = b["Job ID"];
           const email = notifyStatus(
-            Boolean(b["Customer Email"]),
+            Boolean(b["Customer Email"]), true,
             latestByJobAction.get(`${jobId}::CLIENT_START_EMAIL_SENT`),
             latestByJobAction.get(`${jobId}::CLIENT_START_EMAIL_FAILED`)
           );
           const sms = notifyStatus(
-            Boolean(b["Phone"]),
+            Boolean(b["Phone"]), smsConfigured,
             latestByJobAction.get(`${jobId}::CLIENT_START_SMS_SENT`),
             latestByJobAction.get(`${jobId}::CLIENT_START_SMS_FAILED`)
           );
           return {
             jobId,
             customerName: b["Customer"] || "",
+            customerEmail: b["Customer Email"] || "",
+            customerPhone: b["Phone"] || "",
             driverInitials: b["Driver Initials"] || "",
             actualStart: b["Actual Start"] || "",
             email,

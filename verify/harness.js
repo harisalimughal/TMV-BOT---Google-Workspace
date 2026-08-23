@@ -11,6 +11,11 @@ process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\\n
 process.env.TMV_SIGNATURE_LINK_SECRET = "test-scenario-link-secret";
 process.env.LOG_LEVEL = "error";
 process.env.BOOTSTRAP_ON_START = "false";
+// env.ts's "import 'dotenv/config'" auto-loads the real local .env for any var this
+// script doesn't set itself -- blanked so this run's behavior never depends on whatever
+// Firetext credentials happen to be in the developer's own .env.
+process.env.FIRETEXT_API_KEY = "";
+process.env.FIRETEXT_SENDER_ID = "";
 
 const path = require("node:path");
 const BOT = path.join(__dirname, "..", "dist");
