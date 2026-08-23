@@ -1,6 +1,7 @@
 import { google, gmail_v1 } from "googleapis";
 import { createGoogleAuth, env, SCOPES } from "../config/env";
 import { Job } from "../jobs/job.types";
+import { renderJobStartedMessage } from "../notifications/message";
 import { withRetry, withTimeout } from "../utils/retry";
 
 let clientPromise: Promise<gmail_v1.Gmail> | null = null;
@@ -26,22 +27,14 @@ function encodeMessage(lines: string[]): string {
     .replace(/=+$/, "");
 }
 
-export async function sendJobStartedEmail(job: Job): Promise<void> {
+export async function sendJobStartedEmail(job: Job, template: string): Promise<void> {
   if (!job.customerEmail) return;
   const gmail = await client();
+  // Subject is email-only (SMS has no equivalent concept), so it stays fixed rather
+  // than living in the shared admin-editable template. The body is exactly the same
+  // rendered text sent as the SMS -- one wording, both channels, no drift.
   const subject = `Your ${env.notificationFromName} team has started your job`;
-  const body = [
-    `Hello ${job.customerName || "there"},`,
-    "",
-    `Your ${env.notificationFromName} team has started your move.`,
-    job.pickup ? `Pickup: ${job.pickup}` : "",
-    job.dropoff ? `Drop-off: ${job.dropoff}` : "",
-    job.actualStart ? `Started: ${new Date(job.actualStart).toLocaleString("en-GB", { timeZone: env.timezone })}` : "",
-    "",
-    "Thank you."
-  ]
-    .filter(Boolean)
-    .join("\r\n");
+  const body = renderJobStartedMessage(template, job);
 
   const raw = encodeMessage([
     `To: ${job.customerEmail}`,

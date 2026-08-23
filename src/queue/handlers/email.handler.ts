@@ -1,5 +1,6 @@
 import { sendJobStartedEmail } from "../../google/gmail";
-import { activityWrite, commitWrites, exceptionWrite, getJob, listObjects, SHEETS } from "../../google/sheets";
+import { JOB_STARTED_MESSAGE_TEMPLATE } from "../../notifications/message";
+import { activityWrite, commitWrites, exceptionWrite, getJob, getSetting, listObjects, SHEETS } from "../../google/sheets";
 import { log, setContext } from "../../utils/logger";
 import { PermanentTaskError, SendJobStartedEmailTask } from "../queue.types";
 
@@ -27,7 +28,8 @@ export async function handleSendJobStartedEmail(task: SendJobStartedEmailTask): 
   }
 
   try {
-    await sendJobStartedEmail(job);
+    const template = await getSetting("JOB_STARTED_MESSAGE_TEXT", JOB_STARTED_MESSAGE_TEMPLATE);
+    await sendJobStartedEmail(job, template);
     await commitWrites([
       activityWrite({
         jobId: job.jobId,
