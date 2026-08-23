@@ -30,7 +30,6 @@ import {
 } from "recharts";
 import { fetchJobs, fetchSummary } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
-import { LiveFleetMap } from "../components/LiveFleetMap";
 import { formatLondonDate } from "../utils/date";
 
 interface Props {
@@ -94,16 +93,6 @@ export function OverviewPage({ onSelectSection }: Props) {
 
         <div className="flex items-center gap-3">
           <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
-          {onSelectSection && (
-            <button
-              onClick={() => onSelectSection("live_fleet")}
-              className="h-9 px-3.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-btn hover:opacity-95 transition shadow-sm flex items-center gap-1.5"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              <span>Open Live Fleet GPS</span>
-              <ArrowRight className="w-3 h-3 ml-0.5" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -235,12 +224,6 @@ export function OverviewPage({ onSelectSection }: Props) {
       </div>
 
       {/* 4. REAL-TIME LONDON FLEET RADAR MAP */}
-      <LiveFleetMap
-        jobs={jobsData?.items || []}
-        onSelectJob={_id => {
-          if (onSelectSection) onSelectSection("jobs");
-        }}
-      />
 
       {/* 5. CHARTS: REVENUE VELOCITY & DRIVER WORKLOAD */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

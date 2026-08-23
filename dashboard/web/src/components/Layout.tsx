@@ -53,7 +53,6 @@ interface NavSectionItem {
 const NAV_CONFIG: NavSectionItem[] = [
   { type: "header", label: "Operations" },
   { id: "overview", label: "Overview", icon: LayoutDashboard, desc: "Executive KPI telemetry, revenue velocity and operational health" },
-  { id: "live_fleet", label: "Live Fleet", icon: Navigation, isLive: true, desc: "Real-time London GPS vehicle tracking, route corridors and driver cockpit telemetry" },
   { id: "jobs", label: "Jobs", icon: Truck, desc: "Operational moves joined across Bookings, Drivers, Workflow and Evidence" },
   { id: "finished", label: "Finished Jobs", icon: CheckSquare, desc: "Completed moves audit with verified evidence and sign-off records" },
   { type: "header", label: "Scenarios" },
@@ -116,8 +115,6 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
         refreshMutation.mutate();
       } else if (e.key === "o" || e.key === "O") {
         onSelectSection("overview");
-      } else if (e.key === "l" || e.key === "L") {
-        onSelectSection("live_fleet");
       } else if (e.key === "j" || e.key === "J") {
         onSelectSection("jobs");
       } else if (e.key === "d" || e.key === "D") {
@@ -245,10 +242,10 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
             <>
               <div className="flex items-center gap-2 overflow-hidden">
                 <div className="w-6 h-6 rounded-full bg-surface border border-line flex items-center justify-center font-mono font-bold text-[10px] text-ink">
-                  AD
+                  WC
                 </div>
                 <div className="overflow-hidden">
-                  <span className="font-medium text-ink truncate block text-xs">Admin Console</span>
+                  <span className="font-medium text-ink truncate block text-xs">Washington Carrato</span>
                   <span className="text-[10px] text-muted block font-mono">London &bull; {londonClock}</span>
                 </div>
               </div>
@@ -326,8 +323,8 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
               </button>
 
               <div className="w-9 h-9 ml-2 rounded-full bg-brand-soft text-brand font-bold text-xs flex items-center justify-center border-2 border-paper shadow-2xs">
-                AD
-              </div>
+                  WC
+                </div>
             </div>
           </div>
         </header>
@@ -347,14 +344,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
             </div>
             
             {/* Contextual actions could go here (e.g. Settings, Permissions) */}
-            <div className="flex items-center gap-3">
-              {currentNav.isLive && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-status-green-bg border border-status-green/20 rounded-lg text-status-green font-medium text-sm">
-                  <span className="w-2 h-2 rounded-full bg-status-green animate-pulse" />
-                  Live System Active
-                </div>
-              )}
-            </div>
+            <div className="flex items-center gap-3"></div>
           </div>
           
           {/* Page Content */}
