@@ -151,7 +151,7 @@ export function ScenariosPage({ kind }: Props) {
         <div className="w-[1px] h-6 bg-line mx-2" />
         
         <span className="text-[13px] text-muted font-medium pr-2">
-          {isLoading ? "..." : `${filteredItems.length} submissions`}
+          {isLoading ? "..." : `${filteredItems.length} submission${filteredItems.length === 1 ? "" : "s"}`}
         </span>
 
         <button 
@@ -316,7 +316,7 @@ export function ScenariosPage({ kind }: Props) {
           {data?.pagination && (
             <div className="px-6 py-4 border-t border-line bg-white flex items-center justify-between">
               <span className="text-[13px] text-muted">
-                Showing {(page - 1) * 25 + 1}-{Math.min(page * 25, data.pagination.total)} of {data.pagination.total} records
+                Showing {(page - 1) * 25 + 1}-{Math.min(page * 25, data.pagination.total)} of {data.pagination.total} {data.pagination.total === 1 ? "record" : "records"}
               </span>
               <div className="flex items-center gap-2">
                 <button 
