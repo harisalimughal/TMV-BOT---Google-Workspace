@@ -23,13 +23,6 @@ process.env.TMV_SIGNATURE_LINK_SECRET = "test-scenario-link-secret";
 process.env.LOG_LEVEL = "error";
 process.env.BOOTSTRAP_ON_START = "false";
 process.env.TMV_SHEET_CACHE_TTL_MS = "0";   // test mutates the fake sheet directly
-// env.ts's "import 'dotenv/config'" auto-loads the real local .env for any var this
-// script doesn't set itself -- without blanking these explicitly, the SMS no-op check
-// below would depend on whatever Firetext credentials happen to be in the developer's
-// own .env, and could even reach the real Firetext API through this file's global.fetch
-// mock (which only mocks the shape needed for Chat media downloads).
-process.env.FIRETEXT_API_KEY = "";
-process.env.FIRETEXT_SENDER_ID = "";
 
 const path = require("node:path");
 const BOT = path.join(__dirname, "..", "dist");
@@ -421,22 +414,14 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("photo step asks for evidence, not the next field yet", hasText(checkInPhotosEmpty, "Evidence that the items have been loaded."), true);
   check("no CONTINUE button until the minimum photo count is met", hasText(checkInPhotosEmpty, "CONTINUE"), false);
 
-  // Check In's photoMin === photoMax === 1, so there's nothing left to offer once the
-  // one required photo is in -- the driver is auto-advanced straight to the next field
-  // rather than being made to tap CONTINUE on a card with no other option.
-  const checkInField1 = await photo();
-  check("the single required photo auto-advances -- no manual CONTINUE needed", subtitle(checkInField1), "Step 2 of 6");
-  check("resumed field is Client Name", hasText(checkInField1, "Client Name"), true);
+  const checkInAfterPhoto = await photo();
+  check("sending a photo advances the received count immediately (no drain needed)",
+    hasText(checkInAfterPhoto, "<b>1</b> of up to 1 photo(s) received."), true);
+  check("CONTINUE appears once the minimum is met", hasText(checkInAfterPhoto, "CONTINUE"), true);
 
-  // Reported live: a stray extra photo arriving after the scenario already moved past
-  // its photo step (a habit resend, or Chat redelivering the same message) used to hit
-  // a dead-end "already sent the maximum" error card with no button anywhere. It must
-  // never block -- there's always a legitimate current card to fall back to.
-  const checkInStrayPhoto = await photo();
-  check("a stray extra photo never blocks -- it just shows wherever the scenario actually is now",
-    subtitle(checkInStrayPhoto), "Step 2 of 6");
-  check("stray photo's card is the same real current step, not a dead-end error",
-    title(checkInStrayPhoto) !== "TMV — Action blocked", true);
+  const checkInField1 = await continuePhotos(JOB_STANDALONE, "checkin");
+  check("continuing from photos resumes the REMAINING fields, not signature", subtitle(checkInField1), "Step 2 of 6");
+  check("resumed field is Client Name", hasText(checkInField1, "Client Name"), true);
 
   const checkInField2 = await submitField(JOB_STANDALONE, "checkin", 1, "client_name", "Barry Thompson");
   check("step 3 of 6 (Client phone)", subtitle(checkInField2), "Step 3 of 6");
@@ -444,19 +429,6 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("step 4 of 6 (Client Email)", subtitle(checkInField3), "Step 4 of 6");
   const checkInField4 = await submitField(JOB_STANDALONE, "checkin", 3, "client_email", "barry@example.test");
   check("step 5 of 6 (Is the client present ?)", subtitle(checkInField4), "Step 5 of 6");
-
-  // Reported live: tapping CONTINUE on a yesno field without picking Yes/No got
-  // rejected onto a generic "Action blocked" card whose only button (RETRY) jumped to
-  // the classic flow's job/menu card, losing the scenario entirely -- the driver had to
-  // start Check In over from scratch instead of just picking an option and continuing.
-  const checkInFieldRejected = await submitField(JOB_STANDALONE, "checkin", 4, "client_present");
-  check("submitting a required field with no value re-shows the SAME step, not a generic error card",
-    subtitle(checkInFieldRejected), "Step 5 of 6");
-  check("the same step's error shows the field is required",
-    hasText(checkInFieldRejected, "Is the client present ?"), true);
-  check("the rejected submit did not advance anything -- still Check In, not a dead-end card",
-    title(checkInFieldRejected), "Check In");
-
   const checkInField5 = await submitField(JOB_STANDALONE, "checkin", 4, "client_present", "Yes");
   check("step 6 of 6 (date)", subtitle(checkInField5), "Step 6 of 6");
 
@@ -529,8 +501,9 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const checkOutField0 = await menuTap("MENU_CHECK_OUT", JOB_STANDALONE, "checkout");
   check("Check Out step 1 of 5", subtitle(checkOutField0), "Step 1 of 5");
   await submitField(JOB_STANDALONE, "checkout", 0, "container_number", "C-999");
-  const checkOutField1 = await photo();
-  check("Check Out's single required photo also auto-advances", subtitle(checkOutField1), "Step 2 of 5");
+  await photo();
+  const checkOutField1 = await continuePhotos(JOB_STANDALONE, "checkout");
+  check("Check Out resumes remaining fields after its photo step", subtitle(checkOutField1), "Step 2 of 5");
   await submitField(JOB_STANDALONE, "checkout", 1, "client_name", "Barry Thompson");
   await submitField(JOB_STANDALONE, "checkout", 2, "client_email", "barry@example.test");
   await submitField(JOB_STANDALONE, "checkout", 3, "client_present", "No");

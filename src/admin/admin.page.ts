@@ -7,7 +7,6 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "jobs", label: "Jobs" },
   { key: "finished", label: "Finished Jobs" },
-  { key: "notifications", label: "Notifications" },
   { key: "checkin", label: "Check In" },
   { key: "checkout", label: "Check Out" },
   { key: "parking", label: "Parking Liability" },
@@ -63,7 +62,7 @@ export function dashboardShell(): string {
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f0f2f5; color: #1a1a1a; }
   .app { display: flex; min-height: 100vh; }
-  .sidebar { width: 220px; flex-shrink: 0; background: #1a2233; color: #cfd6e4; padding: 16px 0; transition: margin-left .2s; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .sidebar { width: 220px; flex-shrink: 0; background: #1a2233; color: #cfd6e4; padding: 16px 0; transition: margin-left .2s; }
   .sidebar h2 { color: #fff; font-size: 16px; margin: 0 18px 18px; }
   .nav-item { display: block; width: 100%; text-align: left; padding: 11px 18px; background: none; border: none; color: inherit; font-size: 14px; cursor: pointer; }
   .nav-item:hover { background: #232d43; }
@@ -110,13 +109,6 @@ export function dashboardShell(): string {
   .thumb-row { display: flex; flex-wrap: wrap; gap: 4px; }
   .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e2e2; cursor: pointer; background: #f4f4f4; }
   .muted { color: #aaa; }
-  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-  .pill-sent { background: #dcfce7; color: #166534; }
-  .pill-failed { background: #fee2e2; color: #991b1b; cursor: help; }
-  .pill-pending { background: #fef3c7; color: #92400e; }
-  .pill-skipped { background: #f1f1f1; color: #888; }
-  .pill-disabled { background: #e5e7eb; color: #4b5563; }
-  .tick-badge { display: inline-block; color: #16a34a; font-weight: 700; cursor: help; }
   .loading { padding: 30px; text-align: center; color: #888; font-size: 14px; }
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   .modal-bg.open { display: flex; }
@@ -209,7 +201,6 @@ export function dashboardShell(): string {
       if (tab === 'dashboard') loadDashboard();
       else if (tab === 'settings') loadSettings();
       else if (tab === 'finished') loadFinishedJobs();
-      else if (tab === 'notifications') loadNotifications();
       else loadTable(tab);
     }
 
@@ -354,65 +345,6 @@ export function dashboardShell(): string {
             if (c === 'Folder') return j.driveFolderUrl ? '<a href="' + escapeHtml(j.driveFolderUrl) + '">Open</a>' : '<span class="muted">—</span>';
             return '';
           });
-        });
-      }).catch(showError);
-    }
-
-    // Whether the "job started" email/SMS actually reached the customer -- previously
-    // only visible by digging through the raw Activity Log for CLIENT_START_EMAIL_*/
-    // CLIENT_START_SMS_* rows. One row per started job here instead.
-    function notifyPillHtml(status) {
-      var label = { sent: 'Sent', failed: 'Failed', pending: 'Pending', skipped: 'No target', disabled: 'SMS off' }[status.state] || status.state;
-      var title = status.detail ? ' title="' + escapeHtml(status.detail) + '"' : '';
-      return '<span class="pill pill-' + status.state + '"' + title + '>' + label + '</span>';
-    }
-
-    function loadNotifications() {
-      fetch('/admin/api/notifications').then(function (r) {
-        if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || 'Failed to load.'); });
-        return r.json();
-      }).then(function (data) {
-        var rows = data.rows || [];
-        if (!rows.length) {
-          content.innerHTML = '<div class="table-wrap"><div class="empty">No jobs have been started yet.</div></div>';
-          return;
-        }
-        content.innerHTML =
-          '<div class="toolbar"><span></span><div class="toolbar-right">' +
-          '<button class="btn-outline" id="exportCsvBtn">Export CSV</button>' +
-          '<button class="btn-outline" id="exportPdfBtn">Export PDF</button>' +
-          '</div></div>' +
-          '<div class="table-wrap"><table><thead><tr>' +
-          '<th>Job ID</th><th>Customer</th><th>Driver</th><th>Started</th>' +
-          '<th>Email address</th><th>Email</th><th>Phone number</th><th>SMS</th>' +
-          '</tr></thead><tbody>' +
-          rows.map(function (r) {
-            return '<tr>' +
-              '<td>' + escapeHtml(r.jobId) + '</td>' +
-              '<td>' + escapeHtml(r.customerName) + '</td>' +
-              '<td>' + escapeHtml(r.driverInitials) + '</td>' +
-              '<td>' + formatDate(r.actualStart) + '</td>' +
-              '<td>' + (r.customerEmail ? escapeHtml(r.customerEmail) : '<span class="muted">—</span>') + '</td>' +
-              '<td>' + notifyPillHtml(r.email) + '</td>' +
-              '<td>' + (r.customerPhone ? escapeHtml(r.customerPhone) : '<span class="muted">—</span>') + '</td>' +
-              '<td>' + notifyPillHtml(r.sms) + '</td>' +
-              '</tr>';
-          }).join('') +
-          '</tbody></table></div>';
-
-        var NOTIFY_COLUMNS = ['Job ID', 'Customer', 'Driver', 'Started', 'Email address', 'Email', 'Phone number', 'SMS'];
-        function notifyRow(r) {
-          return {
-            'Job ID': r.jobId, 'Customer': r.customerName, 'Driver': r.driverInitials, 'Started': formatDate(r.actualStart),
-            'Email address': r.customerEmail, 'Email': r.email.state + (r.email.detail ? ' (' + r.email.detail + ')' : ''),
-            'Phone number': r.customerPhone, 'SMS': r.sms.state + (r.sms.detail ? ' (' + r.sms.detail + ')' : '')
-          };
-        }
-        document.getElementById('exportCsvBtn').addEventListener('click', function () {
-          downloadCsv('notifications.csv', NOTIFY_COLUMNS, rows.map(notifyRow));
-        });
-        document.getElementById('exportPdfBtn').addEventListener('click', function () {
-          exportPdf('Notifications', NOTIFY_COLUMNS, rows.map(notifyRow));
         });
       }).catch(showError);
     }
@@ -579,13 +511,13 @@ export function dashboardShell(): string {
             '<div class="table-wrap"><table><thead><tr>' +
             columns.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') +
             '</tr></thead><tbody id="tbody"></tbody></table></div>';
-          renderRows(columns, currentRows, tab);
+          renderRows(columns, currentRows);
           document.getElementById('searchBox').addEventListener('input', function (e) {
             var q = e.target.value.trim().toLowerCase();
             var filtered = !q ? currentRows : currentRows.filter(function (row) {
               return columns.some(function (c) { return String(row[c] || '').toLowerCase().indexOf(q) !== -1; });
             });
-            renderRows(columns, filtered, tab);
+            renderRows(columns, filtered);
           });
           document.getElementById('exportCsvBtn').addEventListener('click', function () {
             downloadCsv(tab + '.csv', columns, currentRows);
@@ -690,16 +622,13 @@ export function dashboardShell(): string {
       });
     }
 
-    function renderRows(columns, rows, tab) {
+    function renderRows(columns, rows) {
       var tbody = document.getElementById('tbody');
       if (!tbody) return;
       tbody.innerHTML = rows.map(function (row, i) {
         return '<tr class="clickable" data-i="' + i + '">' +
           columns.map(function (c) {
             if (DRIVE_LINK_COLUMNS.indexOf(c) !== -1) return '<td>' + driveThumbsHtml(row[c]) + '</td>';
-            if (tab === 'jobs' && c === 'Job ID' && row['Status'] === 'COMPLETED') {
-              return '<td><span class="tick-badge" title="This job is finished">&#10003;</span> ' + escapeHtml(String(row[c] || '')) + '</td>';
-            }
             return '<td>' + escapeHtml(String(row[c] || '')) + '</td>';
           }).join('') +
           '</tr>';

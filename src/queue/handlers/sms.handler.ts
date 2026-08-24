@@ -1,7 +1,5 @@
 import { sendJobStartedSms } from "../../integrations/firetext";
-import { JOB_STARTED_MESSAGE_TEMPLATE } from "../../notifications/message";
-import { activityWrite, commitWrites, exceptionWrite, getJob, getSetting, listObjects, SHEETS } from "../../google/sheets";
-import { env } from "../../config/env";
+import { activityWrite, commitWrites, exceptionWrite, getJob, listObjects, SHEETS } from "../../google/sheets";
 import { log, setContext } from "../../utils/logger";
 import { PermanentTaskError, SendJobStartedSmsTask } from "../queue.types";
 
@@ -19,16 +17,6 @@ export async function handleSendJobStartedSms(task: SendJobStartedSmsTask): Prom
     log.info("no customer phone on job; nothing to text", { job_id: task.jobId });
     return;
   }
-  // sendJobStartedSms() itself also no-ops when Firetext isn't configured, but doing
-  // that check ONLY there meant this handler couldn't tell "silently skipped" apart
-  // from "actually sent" -- it happily wrote CLIENT_START_SMS_SENT either way, so the
-  // admin Notifications tab showed "Sent" for texts that never left the building.
-  // Checked here too, before anything is recorded, so an unconfigured deployment
-  // writes nothing at all -- same as the no-phone-on-file case above.
-  if (!env.firetextApiKey || !env.firetextSenderId) {
-    log.info("Firetext is not configured; SMS sending is disabled", { job_id: task.jobId });
-    return;
-  }
 
   if (await alreadySent(task.jobId)) {
     log.info("start SMS already sent; task is a no-op", { job_id: task.jobId });
@@ -36,8 +24,7 @@ export async function handleSendJobStartedSms(task: SendJobStartedSmsTask): Prom
   }
 
   try {
-    const template = await getSetting("JOB_STARTED_MESSAGE_TEXT", JOB_STARTED_MESSAGE_TEMPLATE);
-    await sendJobStartedSms(job, template);
+    await sendJobStartedSms(job);
     await commitWrites([
       activityWrite({
         jobId: job.jobId,

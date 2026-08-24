@@ -463,19 +463,11 @@ function scenarioFieldWidget(field: ScenarioFieldSpec): any {
   return { textInput: { name: field.name, label: field.label, hintText: field.placeholder ?? "Type here", type: "SINGLE_LINE" } };
 }
 
-/** A rejected submit (e.g. a required field left blank) never advances anything, so the
- *  driver needs to see the SAME step again to fix it — not a generic dead-end error
- *  card. Every scenario card that can be the target of a validation error accepts this
- *  and renders it as a leading warning line, right above the same interactive widget. */
-function scenarioErrorWidget(errorText?: string): any[] {
-  return errorText ? [{ textParagraph: { text: `<b><font color="#b3261e">${escapeHtml(errorText)}</font></b>` } }] : [];
-}
-
 export function scenarioFieldCard(
-  spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, fieldIndex: number, errorText?: string
+  spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, fieldIndex: number
 ): ChatResponse {
   const field = spec.fields[fieldIndex];
-  const widgets: any[] = [...scenarioErrorWidget(errorText)];
+  const widgets: any[] = [];
   if (fieldIndex === 0 && spec.noticeHtml) {
     widgets.push({ textParagraph: { text: `<b>${escapeHtml(spec.noticeTitle ?? spec.title)}</b>` } });
     widgets.push({ textParagraph: { text: escapeHtml(spec.noticeHtml) } });
@@ -489,21 +481,17 @@ export function scenarioFieldCard(
   return card(`scenario-${jobId}-${scenario}-${fieldIndex}`, spec.title, `Step ${fieldIndex + 1} of ${spec.fields.length}`, widgets);
 }
 
-export function scenarioNoticeCard(spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, errorText?: string): ChatResponse {
+export function scenarioNoticeCard(spec: ScenarioSpec, scenario: ScenarioKey, jobId: string): ChatResponse {
   const notice = spec.conditionalNotice!;
   return card(`scenario-${jobId}-${scenario}-notice`, notice.title, spec.title, [
-    ...scenarioErrorWidget(errorText),
     { textParagraph: { text: escapeHtml(notice.text) } },
     { buttonList: { buttons: [scenarioButton("CONTINUE", "SCENARIO_NOTICE_ACK", jobId, scenario)] } }
   ]);
 }
 
-export function scenarioPhotoCard(
-  spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, received: number, errorText?: string
-): ChatResponse {
+export function scenarioPhotoCard(spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, received: number): ChatResponse {
   const remaining = Math.max(0, spec.photoMin - received);
   const widgets: any[] = [
-    ...scenarioErrorWidget(errorText),
     { textParagraph: { text: escapeHtml(spec.photoLabel) } },
     {
       textParagraph: {
@@ -541,20 +529,17 @@ export function scenarioSubmittedCard(spec: ScenarioSpec, jobId: string): ChatRe
   ]);
 }
 
-/** Dispatches to the right card for wherever a scenario's state machine currently is.
- *  `errorText`, when given, is shown as a leading warning line on the field/notice/
- *  photos cards — used to re-render the exact step a validation error was raised on,
- *  instead of losing scenario context on a generic error card. */
+/** Dispatches to the right card for wherever a scenario's state machine currently is. */
 export function renderScenarioStep(
-  spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, step: ScenarioStepView, errorText?: string
+  spec: ScenarioSpec, scenario: ScenarioKey, jobId: string, step: ScenarioStepView
 ): ChatResponse {
   switch (step.kind) {
     case "field":
-      return scenarioFieldCard(spec, scenario, jobId, step.fieldIndex, errorText);
+      return scenarioFieldCard(spec, scenario, jobId, step.fieldIndex);
     case "notice":
-      return scenarioNoticeCard(spec, scenario, jobId, errorText);
+      return scenarioNoticeCard(spec, scenario, jobId);
     case "photos":
-      return scenarioPhotoCard(spec, scenario, jobId, step.received, errorText);
+      return scenarioPhotoCard(spec, scenario, jobId, step.received);
     case "signature":
       return scenarioSignatureCard(spec, scenario, jobId, scenarioLinkFor(scenario, jobId));
     case "done":

@@ -10,7 +10,7 @@ import {
   reopenPhotoStep, retryFailedEvidence
 } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
-import { PHOTO_STATES, WorkflowState } from "../workflow/workflow.states";
+import { WorkflowState } from "../workflow/workflow.states";
 import { PermanentTaskError } from "../queue/queue.types";
 import { ChatAttachment, EvidenceType } from "../jobs/job.types";
 import { setContext, log } from "../utils/logger";
@@ -167,42 +167,24 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
           // scenario is normally "waiting on a photo" at a time; if more than one
           // somehow is, the most recently touched one wins.
           const { job: activeJob, driver } = await getActiveJobForDriver(identifier(event));
-          const scenarioProgressList = activeJob ? await listScenarioProgressForJob(activeJob.jobId, 0) : [];
-          const scenarioWaiting = scenarioProgressList.find(p => isPhotosStep(p.step));
-          const classicWaiting = Boolean(activeJob && PHOTO_STATES.has(activeJob.currentState as WorkflowState));
-          // Neither actually wants this photo (it moved past its own photo step already,
-          // e.g. via the auto-advance above, or a redelivery arriving after the fact) --
-          // rather than falling through to the classic flow's "not expecting a photo"
-          // error, which has nothing to do with a stray send here, just show wherever
-          // this scenario actually is now. receiveScenarioPhoto() already renders that
-          // gracefully for a non-photos-step progress record, with no write attempted.
-          const scenarioTarget = scenarioWaiting ??
-            (!classicWaiting ? scenarioProgressList.find(p => p.step !== "done") : undefined);
+          const scenarioWaiting = activeJob
+            ? (await listScenarioProgressForJob(activeJob.jobId, 0)).find(p => isPhotosStep(p.step))
+            : undefined;
 
-          if (activeJob && scenarioTarget) {
-            const scenario = scenarioTarget.scenario as ScenarioKey;
+          if (activeJob && scenarioWaiting) {
+            const scenario = scenarioWaiting.scenario as ScenarioKey;
             const spec = SCENARIOS[scenario];
             return await runOnce(
               eventKey,
               { jobId: activeJob.jobId },
               async () => {
-                // receiveScenarioPhoto never blocks: a stray/duplicate photo (redelivery,
-                // or one sent out of habit) always resolves to a legitimate current card
-                // rather than a dead-end error, and auto-advances once the max is reached
-                // -- for Check In/Check Out (photoMin === photoMax === 1) that's every
-                // time, so there's never a manual CONTINUE to tap there. Parking
-                // Liability/Liability Report still show it, since a driver there can
-                // genuinely choose to send more before continuing.
-                const messageName = event.message?.name ?? scenarioTarget.messageName;
-                const progress = await receiveScenarioPhoto(
-                  scenario, activeJob, driver.email || driver.chatUserName, files, messageName
-                );
+                const { received } = await receiveScenarioPhoto(scenario, activeJob, driver.email || driver.chatUserName, files);
                 timer.mark("photo_accept");
-                log.info("scenario photo accepted", { job_id: activeJob.jobId, scenario, step: progress.step, ...timer.fields() });
-                const step = await describeStep(spec, progress);
+                log.info("scenario photo accepted", { job_id: activeJob.jobId, scenario, received, ...timer.fields() });
+                const step = await describeStep(spec, scenarioWaiting);
                 return {
                   result: createResponse(renderScenarioStep(spec, scenario, activeJob.jobId, step)),
-                  outcomeState: progress.step,
+                  outcomeState: scenarioWaiting.step,
                   jobId: activeJob.jobId
                 };
               },
@@ -353,7 +335,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         return createResponse(helpCard());
     }
   } catch (error) {
-    return { message: await errorCard(error, event, timer), update: isClick };
+    return { message: errorCard(error, event, timer), update: isClick };
   }
 }
 
@@ -364,7 +346,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
  * schema problem, a Google 500 — is logged in full and replaced with a generic message,
  * because internal detail is neither useful nor safe on a driver's phone.
  */
-async function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTimer): Promise<ChatResponse> {
+function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTimer): ChatResponse {
   const jobId = actionParam(event, "jobId");
 
   if (error instanceof EvidencePendingError) {
@@ -377,24 +359,6 @@ async function errorCard(error: unknown, event: GoogleChatEvent, timer: PhaseTim
   }
   if (error instanceof ValidationError || error instanceof PermanentTaskError) {
     log.info("action rejected", { job_id: jobId, event_type: event.type, reason: error.message, ...timer.fields() });
-
-    // A rejected scenario field/notice/photos submit never wrote anything — the
-    // ScenarioProgress row is exactly where it was. Re-show that same step with the
-    // error on it, rather than a generic "Action blocked" card whose only button
-    // (RETRY -> RESUME_JOB) jumped to the classic flow's job/menu card and lost the
-    // scenario entirely, forcing the driver to start the whole thing over.
-    const fn = actionName(event);
-    const isScenarioAction = fn === "SCENARIO_FIELD_SUBMIT" || fn === "SCENARIO_NOTICE_ACK" || fn === "SCENARIO_PHOTOS_CONTINUE";
-    if (isScenarioAction && jobId) {
-      const scenario = actionParam(event, "scenario") as ScenarioKey;
-      const spec = SCENARIOS[scenario];
-      const progress = spec ? await getScenarioProgress(jobId, scenario, 0) : null;
-      if (spec && progress) {
-        const step = await describeStep(spec, progress);
-        return renderScenarioStep(spec, scenario, jobId, step, error.message);
-      }
-    }
-
     return errorResponse(error.message, jobId);
   }
 

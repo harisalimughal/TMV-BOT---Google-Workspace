@@ -7,7 +7,6 @@ import { createCalendarEvent } from "../google/calendar";
 import { getDriveFileMedia } from "../google/drive";
 import { parseCalendarEvent, syncBookingsForDate } from "../jobs/booking.service";
 import { CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
-import { JOB_STARTED_MESSAGE_TEMPLATE } from "../notifications/message";
 import { env } from "../config/env";
 import { log } from "../utils/logger";
 
@@ -23,12 +22,6 @@ const EDITABLE_SETTINGS: Record<string, { settingsKey: string; label: string; de
     label: "Customer Confirmation Text",
     description: "Shown on the Start Job workflow's signature step, and on the customer's signature-pad page.",
     fallback: CUSTOMER_CONFIRMATION_TEXT
-  },
-  jobStartedMessage: {
-    settingsKey: "JOB_STARTED_MESSAGE_TEXT",
-    label: "Customer Message — Job Started (Email & SMS)",
-    description: "Sent to the customer by both email and SMS when a driver taps Start Job. Placeholders: {customerName}, {companyName}, {pickup}, {dropoff}.",
-    fallback: JOB_STARTED_MESSAGE_TEMPLATE
   }
 };
 
@@ -416,91 +409,6 @@ export function adminRouter(): Router {
     } catch (error) {
       log.error("admin finished jobs load failed", error);
       res.status(500).json({ error: "Failed to load finished jobs." });
-    }
-  });
-
-  const NOTIFY_ACTIONS = new Set([
-    "CLIENT_START_EMAIL_SENT", "CLIENT_START_EMAIL_FAILED", "CLIENT_START_SMS_SENT", "CLIENT_START_SMS_FAILED"
-  ]);
-
-  /**
-   * Whether the "job started" email/SMS actually reached the customer for a given job --
-   * previously only visible by digging through the raw Activity Log. email.handler.ts /
-   * sms.handler.ts write CLIENT_START_{EMAIL,SMS}_{SENT,FAILED} rows; a job that never
-   * had an email/phone on file never gets a row at all (the handler skips silently), so
-   * that's told apart from "still queued" using the booking's own Customer Email/Phone
-   * columns, not just the absence of an activity row.
-   */
-  function notifyStatus(
-    hasTarget: boolean, configured: boolean, sentRow: Record<string, string> | undefined, failedRow: Record<string, string> | undefined
-  ): { state: "sent" | "failed" | "pending" | "skipped" | "disabled"; detail: string; at: string } {
-    if (!hasTarget) return { state: "skipped", detail: "", at: "" };
-    // Distinct from "pending": SMS sending being off entirely (no Firetext key/sender
-    // configured) means it will NEVER send, not just "hasn't happened yet" -- collapsing
-    // the two looked like a bug report waiting to happen ("why does this say pending
-    // forever?"). A SENT row still wins if one exists (e.g. this got disabled after an
-    // earlier successful send).
-    if (!configured && !sentRow) return { state: "disabled", detail: "", at: "" };
-    // A SENT row always wins even if an earlier attempt also failed -- the queue's
-    // alreadySent() guard means nothing sends again once one exists, but a transient
-    // failure can still be followed by a successful retry, leaving both rows behind.
-    if (sentRow) return { state: "sent", detail: sentRow["Detail"] || "", at: sentRow["Timestamp"] || "" };
-    if (failedRow) return { state: "failed", detail: failedRow["Detail"] || "", at: failedRow["Timestamp"] || "" };
-    return { state: "pending", detail: "", at: "" };
-  }
-
-  router.get("/api/notifications", async (_req, res) => {
-    try {
-      const [bookings, activity] = await Promise.all([
-        listObjects(SHEETS.BOOKINGS, 0),
-        listObjects(SHEETS.ACTIVITY, 0)
-      ]);
-
-      // listObjects returns sheet order (oldest first, append-only) -- later rows
-      // overwrite earlier ones here, so this always ends up holding the latest of each
-      // (job, action) pair without needing a separate timestamp comparison pass.
-      const latestByJobAction = new Map<string, Record<string, string>>();
-      for (const row of activity) {
-        if (!NOTIFY_ACTIONS.has(row["Action"])) continue;
-        latestByJobAction.set(`${row["Job ID"]}::${row["Action"]}`, row);
-      }
-
-      // Global, not per-job: matches the exact same checks email.handler.ts (always
-      // configured -- Gmail impersonation is core, not optional) and sms.handler.ts
-      // (skips entirely, writes nothing, when Firetext isn't set up) actually run.
-      const smsConfigured = Boolean(env.firetextApiKey && env.firetextSenderId);
-
-      const rows = bookings
-        .filter(b => b["Actual Start"]) // only jobs Start Job was actually tapped on
-        .map(b => {
-          const jobId = b["Job ID"];
-          const email = notifyStatus(
-            Boolean(b["Customer Email"]), true,
-            latestByJobAction.get(`${jobId}::CLIENT_START_EMAIL_SENT`),
-            latestByJobAction.get(`${jobId}::CLIENT_START_EMAIL_FAILED`)
-          );
-          const sms = notifyStatus(
-            Boolean(b["Phone"]), smsConfigured,
-            latestByJobAction.get(`${jobId}::CLIENT_START_SMS_SENT`),
-            latestByJobAction.get(`${jobId}::CLIENT_START_SMS_FAILED`)
-          );
-          return {
-            jobId,
-            customerName: b["Customer"] || "",
-            customerEmail: b["Customer Email"] || "",
-            customerPhone: b["Phone"] || "",
-            driverInitials: b["Driver Initials"] || "",
-            actualStart: b["Actual Start"] || "",
-            email,
-            sms
-          };
-        })
-        .sort((a, b) => (b.actualStart || "").localeCompare(a.actualStart || ""));
-
-      res.status(200).json({ rows });
-    } catch (error) {
-      log.error("admin notifications load failed", error);
-      res.status(500).json({ error: "Failed to load notification status." });
     }
   });
 

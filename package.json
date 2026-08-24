@@ -14,6 +14,8 @@
     "sweep": "curl -s -X POST -H 'Content-Type: application/json' -H \"x-tmv-worker-secret: $TMV_WORKER_SHARED_SECRET\" -d '{\"type\":\"SWEEP_STALE_EVIDENCE\"}' http://localhost:8080/internal/tasks/sweep-evidence",
     "test": "vitest run",
     "test:watch": "vitest",
+    "dashboard:build": "npm run build --prefix dashboard/web",
+    "dashboard:test": "vitest run --config dashboard/vitest.config.ts",
     "ci": "npm run typecheck && npm run test && npm run verify"
   },
   "engines": {

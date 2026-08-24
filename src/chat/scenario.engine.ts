@@ -163,46 +163,35 @@ export async function acknowledgeScenarioNotice(
  * one for. Mirrors workflow.engine.ts's handlePhotoStep: synchronous and
  * network-free — the RECEIVED evidence record and the background upload task are all
  * that happen here, the actual Drive upload is the queue's job.
- *
- * Never throws for a stray or duplicate photo — a Chat redelivery of the same message,
- * or a driver sending one more out of habit after the scenario already moved past its
- * photo step. There is always a legitimate current card to show (whatever step the
- * scenario actually is on), so this always returns that instead of a dead-end error the
- * driver has no button to act on. Once the count reaches photoMax it auto-advances past
- * the photo step immediately, same as tapping CONTINUE.
  */
 export async function receiveScenarioPhoto(
-  scenario: ScenarioKey, job: Job, driverEmail: string, attachments: ChatAttachment[], messageName: string
-): Promise<ScenarioProgressRecord> {
+  scenario: ScenarioKey, job: Job, driverEmail: string, attachments: ChatAttachment[]
+): Promise<{ received: number }> {
   const spec = SCENARIOS[scenario];
   const progress = await getScenarioProgress(job.jobId, scenario, 0);
-  if (!progress) {
-    throw new ValidationError("This scenario isn't in progress. Tap Main Menu and start it again.");
-  }
-  if (!isPhotosStep(progress.step)) {
-    return progress;
+  if (!progress || !isPhotosStep(progress.step)) {
+    throw new ValidationError("This scenario isn't waiting on a photo right now. Tap Main Menu to check its current step.");
   }
 
   const existing = await countScenarioPhotos(job.jobId, spec.folderKey, progress.startedAt);
   const room = spec.photoMax - existing;
-  if (room > 0) {
-    const { records, writes } = buildReceivedEvidence(job.jobId, driverEmail, spec.folderKey, attachments.slice(0, room));
-    await commitWrites([
-      ...writes,
-      driverFlowWrite({
-        jobId: job.jobId, driver: driverEmail, field: `${spec.title} photo`,
-        value: `${records.length} image(s) received; processing`, state: progress.step
-      })
-    ]);
-    await enqueueAll(
-      records.map(r => ({ type: "PROCESS_JOB_IMAGE", evidenceId: r.evidenceId, jobId: job.jobId }) satisfies ProcessJobImageTask)
-    );
+  if (room <= 0) {
+    throw new ValidationError(`You've already sent the maximum of ${spec.photoMax} photo(s) — tap CONTINUE on the card above.`);
   }
 
-  const received = await countScenarioPhotos(job.jobId, spec.folderKey, progress.startedAt);
-  return received >= spec.photoMax
-    ? await continueFromScenarioPhotos(scenario, job.jobId, messageName)
-    : progress;
+  const { records, writes } = buildReceivedEvidence(job.jobId, driverEmail, spec.folderKey, attachments.slice(0, room));
+  await commitWrites([
+    ...writes,
+    driverFlowWrite({
+      jobId: job.jobId, driver: driverEmail, field: `${spec.title} photo`,
+      value: `${records.length} image(s) received; processing`, state: progress.step
+    })
+  ]);
+  await enqueueAll(
+    records.map(r => ({ type: "PROCESS_JOB_IMAGE", evidenceId: r.evidenceId, jobId: job.jobId }) satisfies ProcessJobImageTask)
+  );
+
+  return { received: existing + records.length };
 }
 
 export async function continueFromScenarioPhotos(

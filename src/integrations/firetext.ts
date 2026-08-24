@@ -1,6 +1,5 @@
 import { env } from "../config/env";
 import { Job } from "../jobs/job.types";
-import { renderJobStartedMessage } from "../notifications/message";
 import { withRetry, withTimeout } from "../utils/retry";
 
 /**
@@ -53,9 +52,13 @@ async function sendSms(to: string, message: string): Promise<void> {
   }
 }
 
-export async function sendJobStartedSms(job: Job, template: string): Promise<void> {
+export async function sendJobStartedSms(job: Job): Promise<void> {
   if (!env.firetextApiKey || !env.firetextSenderId) return;
   if (!job.customerPhone) return;
 
-  await sendSms(job.customerPhone, renderJobStartedMessage(template, job));
+  const message =
+    `Hi ${job.customerName || "there"}, your ${env.notificationFromName} team has started your move.` +
+    (job.pickup ? ` Pickup: ${job.pickup}.` : "");
+
+  await sendSms(job.customerPhone, message);
 }
