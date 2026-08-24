@@ -24,6 +24,7 @@ import {
 import { fetchJobs, fetchSummary, fetchExceptions } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { formatLondonDate, formatLondonDateTime } from "../utils/date";
+import { GenerateReportModal } from "../components/GenerateReportModal";
 
 interface Props {
   onSelectSection?: (id: string) => void;
@@ -32,6 +33,7 @@ interface Props {
 export function OverviewPage({ onSelectSection }: Props) {
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["summary", from, to],
@@ -77,7 +79,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
         <div className="flex items-center gap-3">
           <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
-          <button className="px-6 py-2 bg-ink text-white rounded-full text-[14px] font-semibold hover:bg-black transition shadow-md">
+          <button onClick={() => setIsReportModalOpen(true)} className="px-6 py-2 bg-ink text-white rounded-full text-[14px] font-semibold hover:bg-black transition shadow-md">
             Generate Report
           </button>
         </div>
@@ -242,6 +244,7 @@ export function OverviewPage({ onSelectSection }: Props) {
         </div>
 
       </div>
+      <GenerateReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} initialFrom={from} initialTo={to} />
     </div>
   );
 }
