@@ -239,10 +239,14 @@ export function ScenariosPage({ kind }: Props) {
                           {formattedTime}
                         </td>
 
-                        <td className="px-4 text-[14px] text-ink">
-                          <div className="inline-flex items-center gap-2 h-8 px-3 bg-surface border border-transparent rounded-[8px] font-mono tabular-nums">
-                            <span className="truncate max-w-[150px]">{refText}</span>
-                          </div>
+                        <td className="px-4 text-[14px]">
+                          {refText === "—" ? (
+                            <span className="text-muted italic text-[13px]">Not recorded</span>
+                          ) : (
+                            <div className="inline-flex items-center gap-2 h-8 px-3 bg-surface border border-transparent rounded-[8px] font-mono tabular-nums text-ink">
+                              <span className="truncate max-w-[150px]" title={refText}>{refText}</span>
+                            </div>
+                          )}
                         </td>
 
                         <td className="px-4">
