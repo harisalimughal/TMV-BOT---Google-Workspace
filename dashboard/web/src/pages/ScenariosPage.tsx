@@ -78,7 +78,7 @@ export function ScenariosPage({ kind }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [previewJob, setPreviewJob] = useState<NormalizedJob | null>(null);
+  const [previewJob, setPreviewJob] = useState<any | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -431,6 +431,21 @@ export function ScenariosPage({ kind }: Props) {
 
           {kind === "liability" && <LiabilityConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />}
       {kind === "liability" && <LiabilityMobileForm isOpen={isMobileOpen} onClose={() => setIsMobileOpen(false)} />}
+      {previewJob && (
+        <SubmissionDetailDrawer
+          job={previewJob}
+          isOpen={!!previewJob}
+          onClose={() => setPreviewJob(null)}
+          onNavigate={(dir) => {
+            if (!data?.items) return;
+            const idx = data.items.findIndex((j: any) => (j.id || j.jobId) === (previewJob.id || previewJob.jobId));
+            if (dir === 'next' && idx < data.items.length - 1) setPreviewJob(data.items[idx + 1]);
+            if (dir === 'prev' && idx > 0) setPreviewJob(data.items[idx - 1]);
+          }}
+          hasNext={data?.items ? data.items.findIndex((j: any) => (j.id || j.jobId) === (previewJob.id || previewJob.jobId)) < data.items.length - 1 : false}
+          hasPrev={data?.items ? data.items.findIndex((j: any) => (j.id || j.jobId) === (previewJob.id || previewJob.jobId)) > 0 : false}
+        />
+      )}
     </div>
   );
 }

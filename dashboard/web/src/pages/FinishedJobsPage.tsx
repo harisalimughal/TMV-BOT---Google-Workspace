@@ -253,10 +253,19 @@ export function FinishedJobsPage() {
          </div>
       )}
           {previewJob && (
-        <>
-          <PaperDossierReport job={previewJob} />
-          
-        </>
+        <SubmissionDetailDrawer
+          job={previewJob}
+          isOpen={!!previewJob}
+          onClose={() => setPreviewJob(null)}
+          onNavigate={(dir) => {
+            if (!data?.items) return;
+            const idx = data.items.findIndex((j: any) => j.jobId === previewJob.jobId);
+            if (dir === 'next' && idx < data.items.length - 1) setPreviewJob(data.items[idx + 1]);
+            if (dir === 'prev' && idx > 0) setPreviewJob(data.items[idx - 1]);
+          }}
+          hasNext={data?.items ? data.items.findIndex((j: any) => j.jobId === previewJob.jobId) < data.items.length - 1 : false}
+          hasPrev={data?.items ? data.items.findIndex((j: any) => j.jobId === previewJob.jobId) > 0 : false}
+        />
       )}
     </div>
   );
