@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
-import { ACTIVE_DRIVERS } from "../utils/drivers";
+import { getDrivers, addDriver } from "../utils/drivers";
 
 interface Props {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export function AddDriverModal({ isOpen, onClose }: Props) {
     }
   };
 
-  const isCodeTaken = ACTIVE_DRIVERS.some(d => d.code === code.toUpperCase());
+  const isCodeTaken = getDrivers().some(d => d.code === code.toUpperCase());
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -113,7 +113,27 @@ export function AddDriverModal({ isOpen, onClose }: Props) {
           <button onClick={onClose} className="px-4 py-2 rounded-[12px] text-[13px] font-semibold text-muted hover:text-ink transition">
             Cancel
           </button>
-          <button onClick={onClose} disabled={isCodeTaken || !name || !code} className="px-6 py-2 rounded-[12px] bg-[#2563EB] disabled:bg-[#93C5FD] disabled:cursor-not-allowed hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition">
+          <button 
+            onClick={() => {
+              addDriver({ 
+                name, 
+                code, 
+                vehicleReg, 
+                email, 
+                phone, 
+                active, 
+                color: "bg-blue-100 text-blue-700" 
+              });
+              onClose();
+              setName("");
+              setCode("");
+              setVehicleReg("");
+              setEmail("");
+              setPhone("");
+            }} 
+            disabled={isCodeTaken || !name || !code} 
+            className="px-6 py-2 rounded-[12px] bg-[#2563EB] disabled:bg-[#93C5FD] disabled:cursor-not-allowed hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition"
+          >
             Add Driver
           </button>
         </div>

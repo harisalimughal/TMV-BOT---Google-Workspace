@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   ClipboardList
 } from "lucide-react";
-import { ACTIVE_DRIVERS } from "../utils/drivers";
+import { getDrivers } from "../utils/drivers";
 
 interface Props {
   isOpen: boolean;
@@ -37,6 +37,13 @@ export function AddJobModal({ isOpen, onClose }: Props) {
 
   const [driverSearchOpen, setDriverSearchOpen] = useState(false);
   const [driverSearchQuery, setDriverSearchQuery] = useState("");
+  const [roster, setRoster] = useState(getDrivers());
+
+  useEffect(() => {
+    const handler = () => setRoster(getDrivers());
+    window.addEventListener('roster_updated', handler);
+    return () => window.removeEventListener('roster_updated', handler);
+  }, []);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -90,8 +97,8 @@ export function AddJobModal({ isOpen, onClose }: Props) {
     return `${hrs > 0 ? `${hrs}h ` : ""}${mins}m`;
   };
 
-  const selectedDriver = ACTIVE_DRIVERS.find(d => d.code === form.driverId);
-  const filteredRoster = ACTIVE_DRIVERS.filter(d => 
+  const selectedDriver = roster.find(d => d.code === form.driverId);
+  const filteredRoster = roster.filter(d => 
     d.name.toLowerCase().includes(driverSearchQuery.toLowerCase()) || 
     d.code.toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
     d.vehicleReg.toLowerCase().includes(driverSearchQuery.toLowerCase())
