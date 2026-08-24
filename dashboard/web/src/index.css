@@ -244,9 +244,7 @@ body {
   aside, header, .no-print, button {
     display: none !important;
   }
-  body * {
-    visibility: hidden;
-  }
+  body * { display: none; } .print-content, .print-content * { display: block; visibility: visible; }
   .paper-sheet, .paper-sheet * {
     visibility: visible;
   }

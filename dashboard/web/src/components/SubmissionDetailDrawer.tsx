@@ -165,6 +165,7 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
 
   return (
     <div className="fixed inset-0 z-[100] flex bg-ink/30 backdrop-blur-[2px] animate-in fade-in duration-200">
+      <div className="flex w-full h-full print:hidden">
       
       {toast && (
         <div className="fixed top-6 right-6 z-[200] bg-ink text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
@@ -250,12 +251,11 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
         </div>
       </div>
       
+         </div>
       {/* Hidden PDF renderer just for printing */}
-      {!isPreviewing && (
-        <div className="hidden">
-           <PaperDossierReport job={job} isPreview={false} />
-        </div>
-      )}
+      <div className="hidden print:block print-content fixed inset-0 z-[99999] bg-white overflow-visible">
+         <PaperDossierReport job={job} isPreview={false} />
+      </div>
     </div>
   );
 }

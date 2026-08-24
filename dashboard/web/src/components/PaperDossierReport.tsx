@@ -95,7 +95,7 @@ export function PaperDossierReport({ job, isPreview = false }: Props) {
   const totalPages = Math.max(photos.length, 1);
 
   return (
-    <div className={`font-sans ${isPreview ? 'w-full' : 'hidden print:block absolute inset-0 z-[9999] bg-white'}`}>
+    <div className={`font-sans ${isPreview ? 'w-full' : 'hidden print:block'}`}>
       <style>{!isPreview ? `
         @media print {
           @page { size: A4 portrait; margin: 0; }
