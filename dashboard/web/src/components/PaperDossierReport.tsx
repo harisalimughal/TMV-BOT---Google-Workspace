@@ -1,218 +1,181 @@
 import React from "react";
-import { NormalizedJob, toPounds } from "../types";
+import { NormalizedJob } from "../types";
 import { formatLondonDateTime } from "../utils/date";
-import { CheckCircle2, ShieldCheck, MapPin } from "lucide-react";
-import { JobStatusBadge, DelayBandBadge } from "./StatusBadge";
 
 interface Props {
   job: NormalizedJob;
+  isPreview?: boolean;
 }
 
-export function PaperDossierReport({ job }: Props) {
-  const totalPounds = toPounds(job.totalCharges);
+export function PaperDossierReport({ job, isPreview = false }: Props) {
   const now = new Date().toISOString();
   
-  // 10-Stage Lifecycle Audit Timeline
-  const rawStages = [
-    { name: "Booking Created", time: job.bookedStart, actor: "System", state: "COMPLETED" },
-    { name: "Driver Assigned", time: job.bookedStart, actor: "Dispatcher", state: "COMPLETED", detail: `${job.driverName} (${job.driverInitials})` },
-    { name: "En Route to Pickup", time: job.actualStart || job.bookedStart, actor: job.driverName, state: job.status !== "READY" ? "COMPLETED" : "PENDING" },
-    { name: "Arrived at Pickup", time: job.actualStart, actor: job.driverName, state: job.actualStart ? "COMPLETED" : "PENDING" },
-    { name: "Loading Van & Evidence", time: job.actualStart, actor: job.driverName, state: job.evidenceCompleteness.vanLoaded === "COMPLETED" ? "COMPLETED" : "PENDING" },
-    { name: "In Transit to Dropoff", time: job.actualStart, actor: job.driverName, state: job.status === "IN_PROGRESS" || job.status === "COMPLETED" ? "COMPLETED" : "PENDING" },
-    { name: "Unloading & Empty Van", time: job.actualFinish, actor: job.driverName, state: job.evidenceCompleteness.emptyVan === "COMPLETED" ? "COMPLETED" : "PENDING" },
-    { name: "Payment Received", time: job.actualFinish, actor: "Customer / Driver", state: job.reconciled ? "COMPLETED" : "PENDING", detail: job.paymentMethod },
-    { name: "Customer Sign-off", time: job.actualFinish, actor: job.clientConfirmedName || job.customerName, state: job.signatureUrl ? "COMPLETED" : "PENDING" },
-    { name: "Job Completed", time: job.actualFinish, actor: "System Bot", state: job.status === "COMPLETED" ? "COMPLETED" : "PENDING" }
-  ];
+  // Helpers
+  const formatPounds = (cents: number | undefined) => `£${((cents || 0) / 100).toFixed(2)}`;
 
-  let firstPendingIndex = rawStages.findIndex(s => s.state === "PENDING");
-  if (firstPendingIndex === -1) firstPendingIndex = 999;
-  
-  const stages = rawStages.map((stg, i) => {
-    let finalState = stg.state;
-    // Sequential enforce: if a stage has no time, or is past the first pending, it's not completed in a certified way
-    let isCertifiedComplete = stg.state === "COMPLETED" && i <= firstPendingIndex && !!stg.time;
-    // Special case for Booking Created / Driver assigned which use bookedStart
-    if (i < 2 && stg.state === "COMPLETED") isCertifiedComplete = true;
+  // Get Photos by Category
+  const getPhoto = (category: string) => {
+    const item = job.evidenceItems?.find(e => e.category === category);
+    if (!item?.fileId) return null;
+    return `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(item.fileId)}`;
+  };
 
-    return { ...stg, isCertifiedComplete };
-  });
+  const arrivalPhoto = getPhoto("Arrival") || "/mock-arrival.jpg"; 
+  const loadedPhoto = getPhoto("VanLoaded") || "/mock-loaded.jpg";
+  const unloadedPhoto = getPhoto("EmptyVan") || "/mock-unloaded.jpg";
+  const organizedPhoto = getPhoto("Organized") || "/mock-organized.jpg";
 
-  const isCancelled = job.status === "CANCELLED";
+  // Data blocks
+  const submitterName = job.driverName || "Unknown Driver";
+  const submitterInitials = job.driverInitials || "UN";
+  const formattedTime = formatLondonDateTime(job.actualFinish || job.bookedStart || now);
 
-  return (
-    <div className="paper-document bg-white font-sans text-[#1A1A1A] hidden print:block absolute inset-0 z-[9999]">
-      <style>{`
-        @media print {
-          .print-dossier-page {
-            page-break-after: always;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            padding: 40px;
-            box-sizing: border-box;
-            background: white;
-          }
-          .print-dossier-page:last-child {
-            page-break-after: auto;
-          }
-          body { background: white; margin: 0; padding: 0; }
-        }
-      `}</style>
+  const Header = () => (
+    <div className="flex items-start justify-between mb-8 shrink-0">
+      <h1 className="text-[24px] font-bold text-ink">Job Completed</h1>
+      <div className="flex flex-col items-end">
+        <div className="text-[20px] font-black text-brand tracking-tighter mb-1">THE MAN VAN</div>
+        <span className="text-[12px] font-bold text-ink tracking-wider">020 3773 9113</span>
+      </div>
+    </div>
+  );
 
-      <div className="print-dossier-page">
-        {/* HEADER */}
-        <div className="flex items-start justify-between pb-6 border-b border-line mb-8">
-          <div className="flex flex-col gap-3">
-            <h1 className="text-[24px] font-bold text-ink leading-tight">Certified Operations Dossier</h1>
-            <div className="flex items-center gap-3">
-              <span className="text-[16px] font-mono font-bold">{job.jobId}</span>
-              <div className="px-2 py-0.5 rounded-full border border-line bg-surface text-[11px] font-bold uppercase tracking-wider">
-                {job.status}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              <ShieldCheck className="w-4 h-4 text-brand" />
-              <span className="text-[12px] font-medium text-brand uppercase tracking-wider">Verified Record</span>
-              <span className="text-[12px] text-muted ml-2">Generated: {formatLondonDateTime(now)}</span>
-            </div>
-          </div>
-          <div className="flex flex-col items-end">
-            <img src="/tmv-new-logo.png" alt="The Man Van" className="w-[120px] object-contain" />
-            <span className="text-[11px] font-bold text-ink tracking-wider mt-1">020 3773 9113</span>
-          </div>
+  const SubmitterCard = () => (
+    <div className="flex items-center justify-between p-4 mb-8 bg-[#F8F9FA] rounded-[12px] border border-[#E5E7EB] shrink-0">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-brand-soft text-brand font-bold text-[14px] flex items-center justify-center border border-brand/20">
+          {submitterInitials}
         </div>
-
-        {/* KEY METRICS SUMMARY TABLE */}
-        <div className="mb-8">
-          <h2 className="text-[11px] font-bold text-muted uppercase tracking-wider mb-3">Key Metrics</h2>
-          <div className="grid grid-cols-4 gap-4 p-5 bg-[#F7F7F7] rounded-[12px] border border-line">
-            <div className="flex flex-col gap-1.5 border-r border-line/60 pr-4">
-              <span className="text-[12px] text-muted">Total Billed</span>
-              <span className="text-[16px] font-mono font-bold text-ink">£{totalPounds.toFixed(2)}</span>
-            </div>
-            <div className="flex flex-col gap-1.5 border-r border-line/60 px-4">
-              <span className="text-[12px] text-muted">Payment Status</span>
-              <div>
-                {job.reconciled ? (
-                   <span className="px-2 py-1 rounded-md bg-status-green-bg text-status-green text-[11px] font-bold uppercase tracking-wider inline-block">Paid</span>
-                ) : (
-                   <span className="px-2 py-1 rounded-md bg-surface border border-line text-muted text-[11px] font-bold uppercase tracking-wider inline-block">Unpaid</span>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5 border-r border-line/60 px-4">
-              <span className="text-[12px] text-muted">Driver & Crew</span>
-              <span className="text-[14px] font-bold text-ink">{job.driverName || "Unassigned"}</span>
-              <span className="text-[11px] text-muted">{job.crewSize} Crew</span>
-            </div>
-            <div className="flex flex-col gap-1.5 pl-4">
-              <span className="text-[12px] text-muted">Punctuality</span>
-              <div>
-                {isCancelled ? (
-                  <span className="text-muted font-mono">—</span>
-                ) : (
-                  <DelayBandBadge band={job.delayBand} minutes={job.delayMinutes} />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ROUTE CORRIDORS */}
-        <div className="mb-8">
-          <h2 className="text-[11px] font-bold text-muted uppercase tracking-wider mb-3">Route Corridors</h2>
-          <div className="flex flex-col gap-3">
-            <div className="p-4 bg-white border border-line rounded-[12px] border-l-4 border-l-status-green flex gap-4">
-              <div className="w-[100px] shrink-0">
-                <span className="text-[10px] font-bold text-status-green uppercase tracking-wider block">Pickup</span>
-              </div>
-              <div className="flex-1">
-                <span className="text-[13px] text-ink font-medium leading-relaxed whitespace-pre-wrap">{job.pickup || "Address not recorded"}</span>
-              </div>
-            </div>
-            <div className="p-4 bg-white border border-line rounded-[12px] border-l-4 border-l-[#2563EB] flex gap-4">
-              <div className="w-[100px] shrink-0">
-                <span className="text-[10px] font-bold text-[#2563EB] uppercase tracking-wider block">Dropoff</span>
-              </div>
-              <div className="flex-1">
-                <span className="text-[13px] text-ink font-medium leading-relaxed whitespace-pre-wrap">{job.dropoff || "Address not recorded"}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* AUDIT LIFECYCLE TIMELINE (TABLE FORMAT) */}
-        <div className="mb-8 flex-1">
-          <h2 className="text-[11px] font-bold text-muted uppercase tracking-wider mb-3">Audit Lifecycle Timeline</h2>
-          <div className="border border-line rounded-[12px] overflow-hidden">
-            <table className="w-full text-left text-[12px]">
-              <thead className="bg-[#F7F7F7] border-b border-line">
-                <tr>
-                  <th className="py-3 px-4 font-semibold text-muted w-12 text-center">#</th>
-                  <th className="py-3 px-4 font-semibold text-muted">Stage</th>
-                  <th className="py-3 px-4 font-semibold text-muted">Actor</th>
-                  <th className="py-3 px-4 font-semibold text-muted text-right">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {stages.map((stg, i) => (
-                  <tr key={i} className={stg.isCertifiedComplete ? "bg-white" : "bg-surface/30"}>
-                    <td className="py-3 px-4 text-center">
-                      {stg.isCertifiedComplete ? (
-                        <CheckCircle2 className="w-4 h-4 text-status-green mx-auto" />
-                      ) : (
-                        <div className="w-2 h-2 rounded-full bg-line mx-auto" />
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`block ${stg.isCertifiedComplete ? "font-bold text-ink" : "text-muted"}`}>
-                        {stg.name}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`block ${stg.isCertifiedComplete ? "text-ink" : "text-muted"}`}>
-                        {stg.actor} {stg.detail ? `• ${stg.detail}` : ""}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono">
-                      <span className={stg.isCertifiedComplete ? "text-ink" : "text-muted"}>
-                        {stg.isCertifiedComplete && stg.time ? formatLondonDateTime(stg.time) : "—"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* SIGNATURE SECTION */}
-        {job.signatureUrl && (
-          <div className="mt-4 mb-4 page-break-inside-avoid">
-            <h2 className="text-[11px] font-bold text-muted uppercase tracking-wider mb-3">Customer Sign-off</h2>
-            <div className="flex items-start gap-8 p-6 bg-[#F7F7F7] border border-line rounded-[12px]">
-              <div className="w-[200px] h-[100px] bg-white border border-line rounded-lg p-2 flex items-center justify-center">
-                <img src={job.signatureUrl} alt="Signature" className="max-w-full max-h-full object-contain mix-blend-multiply" />
-              </div>
-              <div className="flex flex-col gap-2 pt-2">
-                <span className="text-[13px] text-muted">Confirmed by:</span>
-                <span className="text-[14px] font-bold text-ink">{job.clientConfirmedName || job.customerName || "Customer"}</span>
-                <span className="text-[12px] font-mono text-muted mt-1">Signed: {formatLondonDateTime(job.actualFinish || now)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* FOOTER */}
-        <div className="mt-auto pt-4 border-t border-line flex items-center justify-between">
-          <span className="text-[10px] text-muted italic">
-            This document was generated by The Man Van Operations System and reflects the recorded state at time of export.
-          </span>
-          <span className="text-[11px] text-muted">Page 1/1</span>
+        <div>
+          <div className="text-[14px] font-bold text-ink leading-tight">{submitterName}</div>
+          <div className="text-[12px] font-medium text-muted mt-0.5">{formattedTime}</div>
         </div>
       </div>
+      <div className="px-3 py-1.5 bg-white border border-[#E5E7EB] rounded-full text-[12px] font-bold text-muted uppercase tracking-widest shadow-sm">
+        #{job.jobId.slice(0, 8)}
+      </div>
+    </div>
+  );
+
+  const PhotoSection = ({ title, src }: { title: string, src: string }) => (
+    <div className="flex-1 flex flex-col mb-8 min-h-0">
+      <h2 className="text-[14px] font-semibold text-[#1F2937] mb-3">{title}</h2>
+      <div className="flex-1 w-full bg-[#F3F4F6] rounded-[12px] border border-[#E5E7EB] shadow-sm overflow-hidden flex items-center justify-center p-2">
+         {/* Using object-contain so we don't letterbox improperly, but it fills the area */}
+         <img 
+           src={src} 
+           alt={title}
+           className="max-w-full max-h-[100%] rounded-[8px] object-contain shadow-[0_2px_8px_rgba(0,0,0,0.08)] bg-white"
+           onError={(e) => { e.currentTarget.style.display = 'none'; }}
+         />
+      </div>
+    </div>
+  );
+
+  const Footer = ({ page }: { page: number }) => (
+    <div className="pt-4 mt-auto border-t border-[#E5E7EB] flex justify-end shrink-0">
+      <span className="text-[12px] font-semibold text-muted">{page}/4</span>
+    </div>
+  );
+
+  // Common wrapper for each page
+  const Page = ({ page, children }: { page: number, children: React.ReactNode }) => (
+    <div 
+      className={`bg-white text-ink flex flex-col mx-auto ${isPreview ? 'w-full shadow-lg border border-line mb-8 overflow-hidden rounded-md' : 'print-page'}`}
+      style={{
+        width: isPreview ? '100%' : '210mm',
+        height: isPreview ? 'auto' : '297mm',
+        minHeight: isPreview ? '297mm' : 'auto',
+        padding: '20mm',
+        pageBreakAfter: 'always',
+        boxSizing: 'border-box'
+      }}
+    >
+      <Header />
+      {page === 1 && <SubmitterCard />}
+      {children}
+      <Footer page={page} />
+    </div>
+  );
+
+  return (
+    <div className={`font-sans ${isPreview ? 'w-full' : 'hidden print:block absolute inset-0 z-[9999] bg-white'}`}>
+      <style>{!isPreview ? `
+        @media print {
+          @page { size: A4 portrait; margin: 0; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
+          .print-page { 
+            width: 210mm !important; 
+            height: 297mm !important; 
+            padding: 20mm !important; 
+            margin: 0 !important; 
+            page-break-after: always;
+            page-break-inside: avoid;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+          }
+        }
+      ` : ''}</style>
+
+      {/* PAGE 1 */}
+      <Page page={1}>
+        <PhotoSection title="Arrival and Start the Job!" src={arrivalPhoto} />
+      </Page>
+
+      {/* PAGE 2 */}
+      <Page page={2}>
+        <PhotoSection title="Proof Of Van Loaded" src={loadedPhoto} />
+        <div className="mb-4 border border-[#E5E7EB] rounded-[12px] overflow-hidden shrink-0">
+          <div className="flex items-center justify-between p-4 border-b border-[#E5E7EB] bg-white">
+            <span className="text-[13px] font-medium text-muted">Any Extra Charges</span>
+            <span className="text-[13px] font-bold text-ink">{formatPounds(job.totalCharges ? job.totalCharges - (job.totalCharges * 0.8) : 0)}</span>
+          </div>
+          <div className="flex items-center justify-between p-4 border-b border-[#E5E7EB] bg-white">
+            <span className="text-[13px] font-medium text-muted">Total Charges</span>
+            <span className="text-[13px] font-bold text-ink">{formatPounds(job.totalCharges)}</span>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-white">
+            <span className="text-[13px] font-medium text-muted">Type of Payment</span>
+            <span className="text-[13px] font-bold text-ink">{job.paymentMethod || "Card"}</span>
+          </div>
+        </div>
+      </Page>
+
+      {/* PAGE 3 */}
+      <Page page={3}>
+        <PhotoSection title="Empty Van / Unloaded?" src={unloadedPhoto} />
+        
+        <div className="mb-6 border border-[#E5E7EB] rounded-[12px] overflow-hidden shrink-0">
+          <div className="flex items-center justify-between p-4 border-b border-[#E5E7EB] bg-white">
+            <span className="text-[13px] font-medium text-muted">Client Name</span>
+            <span className="text-[13px] font-bold text-ink">{job.clientConfirmedName || job.customerName || "N/A"}</span>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-white">
+            <span className="text-[13px] font-medium text-muted">Postcode</span>
+            <span className="text-[13px] font-bold text-ink uppercase">{(job.dropoff || "").split(",").pop()?.trim() || "N/A"}</span>
+          </div>
+        </div>
+
+        <div className="mb-4 shrink-0">
+          <h2 className="text-[13px] font-medium text-muted mb-2">Client Signature:</h2>
+          <div className="border border-[#E5E7EB] rounded-[12px] p-6 bg-[#F8F9FA] flex flex-col items-center justify-center min-h-[120px]">
+            {job.signatureUrl ? (
+              <img src={job.signatureUrl} alt="Client Signature" className="max-h-[80px] object-contain mix-blend-multiply" />
+            ) : (
+              <span className="text-[14px] font-semibold text-muted italic">Signed physically</span>
+            )}
+            <span className="text-[11px] font-medium text-muted mt-4">Signed: {formattedTime}</span>
+          </div>
+        </div>
+      </Page>
+
+      {/* PAGE 4 */}
+      <Page page={4}>
+        <PhotoSection title="Is the van organized?" src={organizedPhoto} />
+      </Page>
+
     </div>
   );
 }

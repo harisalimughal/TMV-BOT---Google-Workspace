@@ -9,6 +9,9 @@ import {
   AlertTriangle,
   ArrowRight
 } from "lucide-react";
+import { PdfPreviewModal } from "../components/PdfPreviewModal";
+import { PaperDossierReport } from "../components/PaperDossierReport";
+import { FileText } from "lucide-react";
 import { fetchJobs } from "../api/client";
 import { NormalizedJob, toPounds } from "../types";
 import { DateRangePicker } from "../components/DateRangePicker";
@@ -22,6 +25,7 @@ export function FinishedJobsPage() {
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [previewJob, setPreviewJob] = useState<NormalizedJob | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["jobs", "COMPLETED", page, pageSize, from, to],
@@ -91,7 +95,7 @@ export function FinishedJobsPage() {
                   <th className="py-4 px-6 font-semibold text-[12px] text-muted uppercase tracking-wider text-right">Total (£)</th>
                   <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Photos</th>
                   <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Signature</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Folder</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Export</th>
                   <th className="py-4 px-4 w-10"></th>
                 </tr>
               </thead>
@@ -253,6 +257,20 @@ export function FinishedJobsPage() {
              <button disabled={page * pageSize >= data.pagination.total} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink">Next</button>
            </div>
          </div>
+      )}
+          {previewJob && (
+        <>
+          <PaperDossierReport job={previewJob} />
+          <PdfPreviewModal
+            job={previewJob}
+            isOpen={!!previewJob}
+            onClose={() => setPreviewJob(null)}
+            onDownload={() => {
+              setPreviewJob(null);
+              setTimeout(() => window.print(), 100);
+            }}
+          />
+        </>
       )}
     </div>
   );

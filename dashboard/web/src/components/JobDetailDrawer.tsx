@@ -23,6 +23,7 @@ import { JobStatusBadge } from "./StatusBadge";
 import { DelayBandBadge } from "./StatusBadge";
 import { EvidenceCompletenessPill } from "./EvidenceCompletenessPill";
 import { PaperDossierReport } from "./PaperDossierReport";
+import { PdfPreviewModal } from "./PdfPreviewModal";
 import { PhotoModal } from "./PhotoModal";
 import { ThumbnailPreview } from "./ThumbnailPreview";
 import { getDrivers, resolveDriver, formatVanReg } from "../utils/drivers";
@@ -56,6 +57,7 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
 
   // PDF Generation
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   useEffect(() => {
     setJob(initialJob);
@@ -84,11 +86,17 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
   };
 
   const handlePdfDownload = () => {
+    setIsPreviewOpen(true);
+  };
+  
+  const handleActualDownload = () => {
+    setIsPreviewOpen(false);
     setIsGeneratingPdf(true);
     setTimeout(() => {
+      window.print();
       setIsGeneratingPdf(false);
       showToast(`Report generated — ${job.jobId}_Dossier.pdf downloaded`);
-    }, 1500);
+    }, 800);
   };
 
   const showToast = (msg: string) => {
@@ -482,6 +490,13 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
           driveUrl={activePhoto.driveUrl}
         />
       )}
+    
+      <PdfPreviewModal 
+        job={job} 
+        isOpen={isPreviewOpen} 
+        onClose={() => setIsPreviewOpen(false)} 
+        onDownload={handleActualDownload} 
+      />
     </div>
   );
 }
