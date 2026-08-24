@@ -9,7 +9,7 @@ import {
   AlertTriangle,
   ArrowRight
 } from "lucide-react";
-import { PdfPreviewModal } from "../components/PdfPreviewModal";
+import { SubmissionDetailDrawer } from "../components/SubmissionDetailDrawer";
 import { FolderActionDropdown } from "../components/FolderActionDropdown";
 import { PaperDossierReport } from "../components/PaperDossierReport";
 import { FileText } from "lucide-react";
@@ -122,7 +122,7 @@ export function FinishedJobsPage() {
                   return (
                     <React.Fragment key={job.jobId}>
                       <tr
-                        onClick={() => setExpandedJobId(isExpanded ? null : job.jobId)}
+                        onClick={() => setPreviewJob(job)}
                         className={`h-[64px] group cursor-pointer transition select-none ${
                           isExpanded ? "bg-surface/50" : "hover:bg-[#F9FAFB]"
                         } ${isTest ? "opacity-70" : ""} ${resolvedDriver.needsReassignment ? 'bg-[#FFFBEB]/50' : ''}`}
@@ -208,17 +208,22 @@ export function FinishedJobsPage() {
                         </td>
                         
                         <td className="px-4 text-center">
-                          <button 
-                            className="p-1.5 rounded-md text-muted hover:text-[#2563EB] hover:bg-[#2563EB]/10 transition inline-flex items-center justify-center"
-                            title="Open Evidence Folder"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (job.driveFolderUrl) window.open(job.driveFolderUrl, "_blank");
-                            }}
-                          >
-                            <FolderOpen className="w-4 h-4" />
-                          </button>
-                        </td>
+      <FolderActionDropdown 
+        hasFolderUrl={!!job.driveFolderUrl}
+        onOpenFolder={() => window.open(job.driveFolderUrl, "_blank")}
+        onPreview={() => setPreviewJob(job)}
+        onDownload={() => {
+          setPreviewJob(job);
+          setTimeout(() => {
+            const originalTitle = document.title;
+            const dateStr = new Date().toISOString().slice(0, 10);
+            document.title = `Job_Completed_${job.jobId}_${job.driverName?.replace(/\s+/g, '')}_${dateStr}`;
+            window.print();
+            document.title = originalTitle;
+          }, 500);
+        }}
+      />
+    </td>
 
                         <td className="px-4 text-center">
                           <div className="opacity-0 group-hover:opacity-100 transition text-muted">
@@ -250,15 +255,7 @@ export function FinishedJobsPage() {
           {previewJob && (
         <>
           <PaperDossierReport job={previewJob} />
-          <PdfPreviewModal
-            job={previewJob}
-            isOpen={!!previewJob}
-            onClose={() => setPreviewJob(null)}
-            onDownload={() => {
-              setPreviewJob(null);
-              setTimeout(() => window.print(), 100);
-            }}
-          />
+          
         </>
       )}
     </div>

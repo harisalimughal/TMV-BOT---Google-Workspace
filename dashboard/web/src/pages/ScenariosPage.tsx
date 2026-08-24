@@ -12,7 +12,7 @@ import {
   Download
 } from "lucide-react";
 import { FolderActionDropdown } from "../components/FolderActionDropdown";
-import { PdfPreviewModal } from "../components/PdfPreviewModal";
+import { SubmissionDetailDrawer } from "../components/SubmissionDetailDrawer";
 import { PaperDossierReport } from "../components/PaperDossierReport";
 import { NormalizedJob } from "../types";
 import { fetchScenarios } from "../api/client";
@@ -265,7 +265,7 @@ export function ScenariosPage({ kind }: Props) {
                   return (
                     <React.Fragment key={item.id}>
                       <tr
-                        onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                        onClick={() => setPreviewJob(item)}
                         className={`h-[60px] group cursor-pointer transition select-none ${isExpanded ? "bg-surface/50" : "hover:bg-[#F9FAFB]"}`}
                       >
                         <td className="px-6 text-[13px] text-muted tabular-nums">
@@ -362,22 +362,19 @@ export function ScenariosPage({ kind }: Props) {
                           )}
                         </td>
 
-                        <td className="px-4 pr-6 text-right relative">
-                           {/* Hover Action Cluster */}
-                           <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1 justify-end">
-                             <button className="p-1.5 rounded-[6px] text-muted hover:text-brand hover:bg-brand-soft transition" title="View Report" onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : item.id); }}>
-                               <FileText className="w-4 h-4" />
-                             </button>
-                             <button className="p-1.5 rounded-[6px] text-muted hover:text-ink hover:bg-surface transition" title="More Actions">
-                               <MoreHorizontal className="w-4 h-4" />
-                             </button>
-                           </div>
-                           
-                           {/* Static Arrow when not hovering */}
-                           <div className="opacity-100 group-hover:opacity-0 absolute right-6 top-1/2 -translate-y-1/2">
-                             <ChevronRight className="w-4 h-4 text-muted/50" />
-                           </div>
-                        </td>
+                        <td className="px-4 pr-6 text-center">
+    <FolderActionDropdown 
+      hasFolderUrl={!!(item.folderUrl || item.driveFolderUrl)}
+      onOpenFolder={() => window.open((item.folderUrl || item.driveFolderUrl), "_blank")}
+      onPreview={() => setPreviewJob(item)}
+      onDownload={() => {
+        setPreviewJob(item);
+        setTimeout(() => {
+          window.print();
+        }, 500);
+      }}
+    />
+  </td>
                       </tr>
 
                       {isExpanded && (

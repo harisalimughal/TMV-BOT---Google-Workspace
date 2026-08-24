@@ -1,22 +1,26 @@
 import React, { useState } from "react";
 import { X, Download, Eye, Maximize2, ZoomIn, ZoomOut, Check, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { PaperDossierReport } from "./PaperDossierReport";
-import { NormalizedJob } from "../types"; // Using NormalizedJob as a mock for PDF report rendering
+import { NormalizedJob } from "../types";
+import { formatLondonDateTime } from "../utils/date";
 
 interface Props {
-  submission: any;
+  job: NormalizedJob;
   isOpen: boolean;
   onClose: () => void;
+  onNavigate?: (dir: 'next' | 'prev') => void;
+  hasNext?: boolean;
+  hasPrev?: boolean;
 }
 
-export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
+export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNext, hasPrev }: Props) {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState<"Activity" | "Comments">("Activity");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  if (!isOpen || !job) return null;
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -25,53 +29,40 @@ export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
 
   const handleDownload = () => {
     setIsGeneratingPdf(true);
+    // Render the report and trigger print
     setTimeout(() => {
+      // Temporarily set document title for nice PDF filename
+      const originalTitle = document.title;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      document.title = `Job_Completed_${job.jobId}_${job.driverName?.replace(/\\s+/g, '')}_${dateStr}`;
+      
       window.print();
+      
+      document.title = originalTitle;
       setIsGeneratingPdf(false);
       showToast("PDF Downloaded");
     }, 800);
   };
 
-  const mockJobForPdf: NormalizedJob = {
-    jobId: submission.jobId || `SUB-${Math.floor(Math.random() * 1000)}`,
-    status: "COMPLETED",
-    driverName: submission.resolvedDriver?.name,
-    driverInitials: submission.resolvedDriver?.code,
-    actualFinish: submission.timestamp,
-    bookedStart: submission.timestamp,
-    pickup: submission.rawAddress,
-    dropoff: submission.rawAddress,
-    customerName: submission.clientName,
-    clientConfirmedName: submission.clientName,
-    signatureUrl: submission.signatureUrl,
-    evidenceItems: [
-      { id: "1", category: "Arrival", state: "COMPLETED", fileId: "123", provenance: "recorded" },
-      { id: "2", category: "VanLoaded", state: "COMPLETED", fileId: "456", provenance: "recorded" },
-    ]
-  } as any;
+  const formattedTime = job.actualFinish ? formatLondonDateTime(job.actualFinish) : (job.bookedStart ? formatLondonDateTime(job.bookedStart) : 'Unknown Time');
 
   const SidebarLeft = () => (
-    <div className="w-[300px] flex-shrink-0 border-r border-line bg-white flex flex-col p-6 space-y-6 overflow-y-auto custom-scrollbar relative z-10">
-      <h3 className="text-[14px] font-bold text-ink">Manager fields</h3>
-      
-      <div className="bg-[#F8F9FA] rounded-[16px] p-4 border border-[#E5E7EB] space-y-3">
-        <label className="text-[13px] font-semibold text-muted flex items-center gap-1.5">Note <Eye className="w-3.5 h-3.5 text-muted/60" /></label>
-        <textarea 
-          placeholder="Type here..." 
-          className="w-full h-24 rounded-xl border border-line bg-white p-3 text-[13px] text-ink outline-none focus:border-brand resize-none shadow-sm"
-        />
-        <div className="flex justify-end">
-          <button className="px-4 h-8 rounded-full bg-brand text-white text-[12px] font-bold shadow-sm hover:bg-brand-dark transition">Save</button>
+    <div className="w-[300px] flex-shrink-0 border-r border-line bg-white flex flex-col p-6 overflow-y-auto custom-scrollbar relative z-10">
+      <h3 className="text-[14px] font-bold text-ink mb-6">Manager fields</h3>
+      <div className="space-y-6">
+        <div className="bg-[#F8F9FA] border border-line rounded-[16px] p-4 relative shadow-sm">
+          <label className="flex items-center gap-2 text-[13px] font-semibold text-ink mb-3">Note <Eye className="w-4 h-4 text-muted" /></label>
+          <textarea className="w-full bg-white border border-line rounded-xl p-3 text-[13px] text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand/20 min-h-[100px] resize-none" placeholder="Type here..." />
+          <button className="absolute bottom-4 right-4 bg-brand hover:bg-brand-dark text-white text-[12px] font-bold px-4 py-1.5 rounded-full transition shadow-sm">Save</button>
         </div>
-      </div>
-
-      <div className="bg-[#F8F9FA] rounded-[16px] p-4 border border-[#E5E7EB] flex items-center justify-between">
-        <label className="text-[13px] font-semibold text-muted flex items-center gap-1.5">Status <Eye className="w-3.5 h-3.5 text-muted/60" /></label>
-        <select className="h-8 px-3 rounded-[8px] bg-white border border-line text-[12px] font-semibold text-ink outline-none cursor-pointer shadow-sm">
-          <option>Select</option>
-          <option>Approved</option>
-          <option>Flagged</option>
-        </select>
+        <div className="bg-[#F8F9FA] border border-line rounded-[16px] p-4 flex items-center justify-between shadow-sm">
+          <label className="flex items-center gap-2 text-[13px] font-semibold text-ink">Status <Eye className="w-4 h-4 text-muted" /></label>
+          <select className="bg-white border border-line rounded-lg px-3 py-1.5 text-[13px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 outline-none">
+            <option>Select</option>
+            <option>Approved</option>
+            <option>Flagged</option>
+          </select>
+        </div>
       </div>
     </div>
   );
@@ -89,11 +80,13 @@ export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
             <div className="relative flex flex-col">
                <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-brand ring-4 ring-white" />
                <div className="flex items-center gap-2 mb-1">
-                 <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${submission.resolvedDriver?.code || 'UN'}`} className="w-6 h-6 rounded-full" />
-                 <span className="text-[13px] font-bold text-ink">{submission.resolvedDriver?.name}</span>
+                 <div className="w-6 h-6 rounded-full bg-brand-soft text-brand font-bold text-[9px] flex items-center justify-center">
+                    {job.driverInitials || 'UN'}
+                 </div>
+                 <span className="text-[13px] font-bold text-ink">{job.driverName || 'Unknown Driver'}</span>
                </div>
                <span className="text-[13px] text-muted mb-1">submitted the form</span>
-               <span className="text-[11px] font-medium text-muted/60">{submission.formattedTime}</span>
+               <span className="text-[11px] font-medium text-muted/60">{formattedTime}</span>
             </div>
           </div>
         )}
@@ -101,26 +94,71 @@ export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
     </div>
   );
 
+  const photos = job.evidenceItems?.filter(e => true && e.fileId) || [];
+
   const FormAnswersView = () => (
     <div className="max-w-2xl mx-auto space-y-6 w-full py-8 px-6">
       <div className="bg-white rounded-[20px] p-6 shadow-sm border border-line">
-         <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80&w=1200&h=400" className="w-full h-48 object-cover rounded-[12px] mb-6" alt="Header illustration" />
-      </div>
-
-      <div className="bg-white rounded-[20px] p-6 shadow-sm border border-line">
-         <label className="text-[13px] font-semibold text-muted block mb-2">Address <span className="text-status-red">*</span></label>
-         <div className="text-[14px] font-medium text-ink">{submission.rawAddress}</div>
+         <label className="text-[13px] font-semibold text-muted block mb-2">Customer & Details</label>
+         <div className="grid grid-cols-2 gap-4">
+           <div>
+             <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Customer Name</span>
+             <div className="text-[14px] font-medium text-ink mt-1">{job.customerName || "N/A"}</div>
+           </div>
+           <div>
+             <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Confirmed By</span>
+             <div className="text-[14px] font-medium text-ink mt-1">{job.clientConfirmedName || "N/A"}</div>
+           </div>
+           <div className="col-span-2">
+             <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Pickup</span>
+             <div className="text-[14px] font-medium text-ink mt-1">{job.pickup || "N/A"}</div>
+           </div>
+           <div className="col-span-2">
+             <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Dropoff</span>
+             <div className="text-[14px] font-medium text-ink mt-1">{job.dropoff || "N/A"}</div>
+           </div>
+         </div>
       </div>
       
       <div className="bg-white rounded-[20px] p-6 shadow-sm border border-line">
-         <label className="text-[13px] font-semibold text-muted block mb-4">Evidence that the items have been loaded. <span className="text-status-red">*</span></label>
-         <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
-           {Array.from({length: 8}).map((_, i) => (
-             <div key={i} className="aspect-square rounded-[12px] bg-surface overflow-hidden border border-line shadow-sm hover:ring-2 hover:ring-brand/50 transition cursor-pointer">
-               <img src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&q=80&w=200&h=200`} className="w-full h-full object-cover" alt="Evidence" />
-             </div>
-           ))}
-         </div>
+         <label className="text-[13px] font-semibold text-muted block mb-4">Evidence that the items have been loaded.</label>
+         {photos.length > 0 ? (
+           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+             {photos.map((p, i) => (
+               <a 
+                 key={i} 
+                 href={p.driveUrl || p.thumbProxyUrl || `/ops/api/jobs/${job.jobId}/photos/${p.fileId}`}
+                 target="_blank" rel="noreferrer"
+                 className="aspect-square rounded-[12px] bg-surface overflow-hidden border border-line shadow-sm hover:ring-2 hover:ring-brand/50 transition cursor-pointer block relative group"
+               >
+                 <img src={p.thumbProxyUrl || `/ops/api/jobs/${job.jobId}/photos/${p.fileId}`} className="w-full h-full object-cover" alt={p.category} />
+                 <div className="absolute inset-0 bg-ink/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    <Maximize2 className="w-5 h-5 text-white" />
+                 </div>
+                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-ink/80 to-transparent p-2 text-[9px] text-white font-bold truncate">
+                    {p.category}
+                 </div>
+               </a>
+             ))}
+           </div>
+         ) : (
+           <div className="p-8 text-center bg-surface border border-dashed border-line rounded-xl">
+              <span className="text-muted text-[13px]">No photos captured.</span>
+           </div>
+         )}
+      </div>
+
+      <div className="bg-white rounded-[20px] p-6 shadow-sm border border-line">
+         <label className="text-[13px] font-semibold text-muted block mb-4">Client Signature</label>
+         {job.signatureUrl ? (
+            <div className="border border-line rounded-xl p-4 bg-surface max-w-sm flex justify-center">
+              <img src={job.signatureUrl} alt="Signature" className="max-h-24 mix-blend-multiply" />
+            </div>
+         ) : (
+            <div className="p-8 text-center bg-surface border border-dashed border-line rounded-xl max-w-sm">
+              <span className="text-muted text-[13px]">No physical signature captured.</span>
+            </div>
+         )}
       </div>
     </div>
   );
@@ -141,20 +179,26 @@ export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
         {/* TOP HEADER */}
         <div className="h-[72px] bg-white border-b border-line shadow-sm px-6 flex items-center justify-between shrink-0 relative z-20">
           <div className="flex items-center gap-4">
-             <div className="w-10 h-10 rounded-full bg-surface border border-line flex items-center justify-center font-bold text-[13px] text-muted">
-               {submission.resolvedDriver?.code || "UN"}
+             <div className="w-10 h-10 rounded-full bg-brand-soft text-brand border border-brand/20 flex items-center justify-center font-bold text-[14px]">
+               {job.driverInitials || "UN"}
              </div>
              <div>
-               <h2 className="text-[15px] font-bold text-ink leading-tight">{submission.resolvedDriver?.name || "Unknown"}</h2>
-               <div className="text-[12px] text-muted mt-0.5">{submission.formattedTime}, Submission ID: {submission.id || "32"}</div>
+               <h2 className="text-[15px] font-bold text-ink leading-tight">{job.driverName || "Unknown"}</h2>
+               <div className="text-[12px] text-muted mt-0.5">{formattedTime}, Job ID: {job.jobId}</div>
              </div>
           </div>
           <div className="flex items-center gap-3">
+             {onNavigate && (
+               <div className="flex items-center gap-1 mr-4 bg-surface rounded-xl border border-line p-1">
+                 <button onClick={() => onNavigate('prev')} disabled={!hasPrev} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-white disabled:opacity-30 transition"><ChevronLeft className="w-4 h-4" /></button>
+                 <button onClick={() => onNavigate('next')} disabled={!hasNext} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-white disabled:opacity-30 transition"><ChevronRight className="w-4 h-4" /></button>
+               </div>
+             )}
              <button 
                onClick={() => setIsPreviewing(!isPreviewing)}
                className={`h-10 px-4 rounded-xl border font-bold text-[13px] transition flex items-center gap-2 shadow-sm ${isPreviewing ? 'bg-surface border-line text-ink' : 'border-line bg-white hover:bg-surface text-ink'}`}
              >
-               <Eye className="w-4 h-4 text-muted" /> {isPreviewing ? "Back to Form" : "Preview"}
+               <Eye className="w-4 h-4 text-muted" /> {isPreviewing ? "Back to Form" : "Preview PDF"}
              </button>
              <button 
                onClick={handleDownload}
@@ -162,7 +206,7 @@ export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
                className="h-10 px-4 rounded-xl border border-transparent bg-brand hover:bg-brand-dark text-white font-bold text-[13px] transition flex items-center gap-2 shadow-sm disabled:opacity-70"
              >
                {isGeneratingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-               <span>Download</span>
+               <span>Download PDF</span>
              </button>
              <div className="w-px h-6 bg-line mx-2" />
              <button onClick={onClose} className="p-2 -mr-2 rounded-full text-muted hover:text-ink hover:bg-surface transition">
@@ -182,7 +226,7 @@ export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
              {isPreviewing ? (
                <div className="min-h-full py-8 flex flex-col items-center">
                   <div className="w-full max-w-[210mm] relative">
-                     <PaperDossierReport job={mockJobForPdf} isPreview={true} />
+                     <PaperDossierReport job={job} isPreview={true} />
                   </div>
                   
                   {/* Floating Toolbar */}
@@ -205,6 +249,13 @@ export function SubmissionDetailDrawer({ submission, isOpen, onClose }: Props) {
           {(!isPreviewing || !isFullscreen) && <SidebarRight />}
         </div>
       </div>
+      
+      {/* Hidden PDF renderer just for printing */}
+      {!isPreviewing && (
+        <div className="hidden">
+           <PaperDossierReport job={job} isPreview={false} />
+        </div>
+      )}
     </div>
   );
 }

@@ -202,7 +202,7 @@ export function ParkingLiabilityPage() {
         <SubmissionDetailDrawer
           isOpen={!!selectedSubmission}
           onClose={() => setSelectedSubmission(null)}
-          submission={selectedSubmission}
+          job={selectedSubmission as any}
           
         />
       )}
