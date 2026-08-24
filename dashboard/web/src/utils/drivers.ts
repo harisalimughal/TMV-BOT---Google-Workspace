@@ -18,30 +18,39 @@ const SEED_DRIVERS: Driver[] = [
   { name: "Rafael", code: "RF", vehicleReg: "YC68 VJZ", email: "Rafael.cruz.rh7@gmail.com", phone: "07479025903", active: true, color: "bg-cyan-100 text-cyan-700" }
 ];
 
+
+const TEST_DRIVERS: Driver[] = [
+  { name: "John Test (Removable)", code: "JT", vehicleReg: "TS24 AAA", email: "john.test@example.com", phone: "07700900001", active: true, color: "bg-slate-100 text-slate-700" },
+  { name: "Sarah Test (Removable)", code: "ST", vehicleReg: "TS24 BBB", email: "sarah.test@example.com", phone: "07700900002", active: true, color: "bg-slate-100 text-slate-700" },
+  { name: "Mike Test (Removable)", code: "MT", vehicleReg: "TS24 CCC", email: "mike.test@example.com", phone: "07700900003", active: true, color: "bg-slate-100 text-slate-700" }
+];
+
 export const getDrivers = (): Driver[] => {
   try {
-    const stored = localStorage.getItem("tmv_roster");
+    const stored = localStorage.getItem("tmv_roster_v2");
     if (stored) return JSON.parse(stored);
   } catch (e) {}
-  return SEED_DRIVERS;
+  const combined = [...SEED_DRIVERS, ...TEST_DRIVERS];
+  localStorage.setItem("tmv_roster_v2_v2", JSON.stringify(combined));
+  return combined;
 };
 
 export const addDriver = (driver: Driver) => {
   const current = getDrivers();
   const next = [...current, driver];
-  localStorage.setItem("tmv_roster", JSON.stringify(next));
+  localStorage.setItem("tmv_roster_v2", JSON.stringify(next));
   window.dispatchEvent(new Event('roster_updated'));
 };
 
 export const removeDriver = (code: string) => {
   const current = getDrivers();
   const next = current.filter(d => d.code !== code);
-  localStorage.setItem("tmv_roster", JSON.stringify(next));
+  localStorage.setItem("tmv_roster_v2", JSON.stringify(next));
   window.dispatchEvent(new Event('roster_updated'));
 };
 
 // Aliased for components that haven't migrated to the hook yet, though ideally they use getDrivers()
-export const ACTIVE_DRIVERS = SEED_DRIVERS;
+export const ACTIVE_DRIVERS = [...SEED_DRIVERS, ...TEST_DRIVERS];
 
 export const getAvatarColor = (code: string) => {
   if (code === "UN") return "bg-surface border border-line text-muted";
