@@ -94,7 +94,7 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
     </div>
   );
 
-  const photos = job.evidenceItems?.filter(e => true && e.fileId) || [];
+  const photos = job.evidenceItems?.filter(e => !!e.fileId) || [];
 
   const FormAnswersView = () => (
     <div className="max-w-2xl mx-auto space-y-6 w-full py-8 px-6">

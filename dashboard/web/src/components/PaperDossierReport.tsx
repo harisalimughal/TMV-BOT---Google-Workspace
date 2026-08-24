@@ -14,7 +14,7 @@ export function PaperDossierReport({ job, isPreview = false }: Props) {
   const formatPounds = (cents: number | undefined) => `£${((cents || 0) / 100).toFixed(2)}`;
 
   // Get ALL image evidence items
-  const photos = job.evidenceItems?.filter(e => true && e.fileId) || [];
+  const photos = job.evidenceItems?.filter(e => !!e.fileId) || [];
   
   // If there are NO photos, create a fake empty array with 1 item so we still render the structure
   // but with a "Not captured" state as requested by the user.
