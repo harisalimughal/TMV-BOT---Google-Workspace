@@ -128,11 +128,11 @@ export function ScenariosPage({ kind }: Props) {
               <div className="w-[1px] h-6 bg-line mx-1" />
             </>
           )}
-          <button className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
+          <button
+            onClick={() => { window.location.href = `/ops/api/scenarios/${kind}/export.csv`; }}
+            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
+          >
             <Download className="w-4 h-4" /> Export CSV
-          </button>
-          <button className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
-            <Download className="w-4 h-4" /> Export PDF
           </button>
         </div>
       </div>

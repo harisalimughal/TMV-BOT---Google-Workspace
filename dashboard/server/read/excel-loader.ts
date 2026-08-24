@@ -93,7 +93,8 @@ export function loadExcelDataset(filePath?: string): SheetDataset | null {
       pendingSignatures: sheetMap.get("PendingSignatures") || [],
       scenarioProgress: sheetMap.get("ScenarioProgress") || [],
       fetchedAt: new Date().toISOString(),
-      durationMs: 5
+      durationMs: 5,
+      source: "fallback"
     };
   } catch (error) {
     log.warn("failed to parse fallback excel file", { error: String(error) });

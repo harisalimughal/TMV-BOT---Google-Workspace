@@ -66,7 +66,12 @@ const JOB_OVERDUE = "TMV-FLOW0003";
 function addBooking(jobId, eventId, daysAgo = 0, overrides = {}) {
   const row = new Array(HEADERS.Bookings.length).fill("");
   const set = (c, v) => { row[HEADERS.Bookings.indexOf(c)] = String(v); };
-  const start = new Date(Date.now() - daysAgo * 86400e3 + (overrides.hourOffset ?? 0) * 3600e3);
+  // "at" bypasses the daysAgo/hourOffset math entirely with an explicit Date -- used
+  // by the Tomorrow's Jobs fixtures below, which need a time that's safely nowhere
+  // near a midnight boundary regardless of what wall-clock time this script happens
+  // to run at (a plain "now +24h +/- a few hours" offset genuinely crossed into the
+  // day after tomorrow when this suite ran late evening in the operating timezone).
+  const start = overrides.at ?? new Date(Date.now() - daysAgo * 86400e3 + (overrides.hourOffset ?? 0) * 3600e3);
   set("Job ID", jobId); set("Calendar Event ID", eventId); set("Driver Initials", overrides.driverInitials ?? "WD");
   set("Customer", overrides.customer ?? "Barry"); set("Customer Email", "barry@example.test");
   set("Pickup", overrides.pickup ?? "10 Example Street"); set("Dropoff", overrides.dropoff ?? "74 Ferndale Road, N15 6UQ");
@@ -129,8 +134,17 @@ googleapis.google.drive = () => ({ files: {
 googleapis.google.calendar = () => ({ events: { list: async () => ({ data: { items: [] } }) } });
 googleapis.google.gmail = () => ({ users: { messages: { send: async () => { bump("email"); return { data: {} }; } } } });
 let lastChatPatch = null;
+let chatPatchFailuresRemaining = 0;
 googleapis.google.chat = () => ({ spaces: { messages: {
-  patch: async ({ name, requestBody }) => { bump("chatPatch"); lastChatPatch = { name, requestBody }; return { data: {} }; }
+  patch: async ({ name, requestBody }) => {
+    bump("chatPatch");
+    if (chatPatchFailuresRemaining > 0) {
+      chatPatchFailuresRemaining -= 1;
+      throw new Error("simulated Chat API failure");
+    }
+    lastChatPatch = { name, requestBody };
+    return { data: {} };
+  }
 } } });
 // The classic workflow's background worker downloads each Chat-attached photo before
 // uploading it to Drive -- the one bit of real network I/O the merged scripts still
@@ -316,10 +330,14 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const menuFromSpace = await handleChatEvent({ type: "ADDED_TO_SPACE", user: USER });
   check("bot added to space -> menu shown", title(menuFromSpace), "TMV Driver Bot");
   check("nothing disabled before either job is started", disabledButtons(menuFromSpace).length, 0);
-  check("menu has exactly 6 buttons (no Finish Job)", menuButtons(menuFromSpace).length, 6);
+  check("menu has exactly 4 buttons (no Finish Job, no standalone Parking/Liability)", menuButtons(menuFromSpace).length, 4);
   check("no button is labelled Finish Job", menuButtons(menuFromSpace).some(b => b.text === "Finish Job"), false);
+  check("no standalone Parking Liability button (only reachable inline from Next Job now)",
+    menuButtons(menuFromSpace).some(b => b.text === "Parking Liability"), false);
+  check("no standalone Liability Report button (only reachable inline from Next Job now)",
+    menuButtons(menuFromSpace).some(b => b.text === "Liability Report"), false);
   check("menu includes Tomorrow's Jobs", menuButtons(menuFromSpace).some(b => b.text === "Tomorrow's Jobs"), true);
-  check("every menu button carries a distinct color", new Set(menuButtons(menuFromSpace).map(b => JSON.stringify(b.color))).size, 6);
+  check("every menu button carries a distinct color", new Set(menuButtons(menuFromSpace).map(b => JSON.stringify(b.color))).size, 4);
 
   console.log("\n" + "=".repeat(74));
   console.log("Tomorrow's Jobs: read-only, chronological, assigned-to-this-driver-only");
@@ -330,14 +348,25 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("empty state explains nothing is scheduled", hasText(emptyTomorrow, "No jobs are scheduled for you tomorrow"), true);
   check("empty state offers only Main Menu", menuButtons(emptyTomorrow).length, 1);
 
+  // Anchored to tomorrow at noon UTC (safely midday in the operating timezone either
+  // side of a DST change) rather than "now +24h +/- a few hours" -- that relative
+  // offset genuinely crossed into the day after tomorrow when this suite happened to
+  // run in the evening, since +3h from "now" can push past midnight.
+  const tomorrowNoonUtc = (hourOffset = 0) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCHours(12 + hourOffset, 0, 0, 0);
+    return d;
+  };
+
   // Deliberately added out of chronological order, so the ordering check below actually
   // proves the card sorts them rather than just reflecting insertion order.
-  addBooking("TMV-FLOW0004", "evt-flow-tomorrow-late", -1, { hourOffset: 3, customer: "Later Tomorrow Client" });
-  addBooking("TMV-FLOW0005", "evt-flow-tomorrow-early", -1, { hourOffset: -3, customer: "Earlier Tomorrow Client" });
+  addBooking("TMV-FLOW0004", "evt-flow-tomorrow-late", 0, { at: tomorrowNoonUtc(3), customer: "Later Tomorrow Client" });
+  addBooking("TMV-FLOW0005", "evt-flow-tomorrow-early", 0, { at: tomorrowNoonUtc(-3), customer: "Earlier Tomorrow Client" });
   // Must NOT appear on WD's list: someone else's job, an unclaimed job, and a cancelled one.
-  addBooking("TMV-FLOW0006", "evt-flow-tomorrow-other-driver", -1, { driverInitials: "ZZ", customer: "Other Driver Client" });
-  addBooking("TMV-FLOW0007", "evt-flow-tomorrow-unassigned", -1, { driverInitials: "", customer: "Unassigned Client" });
-  addBooking("TMV-FLOW0008", "evt-flow-tomorrow-cancelled", -1, { customer: "Cancelled Tomorrow Client", status: "CANCELLED" });
+  addBooking("TMV-FLOW0006", "evt-flow-tomorrow-other-driver", 0, { at: tomorrowNoonUtc(), driverInitials: "ZZ", customer: "Other Driver Client" });
+  addBooking("TMV-FLOW0007", "evt-flow-tomorrow-unassigned", 0, { at: tomorrowNoonUtc(), driverInitials: "", customer: "Unassigned Client" });
+  addBooking("TMV-FLOW0008", "evt-flow-tomorrow-cancelled", 0, { at: tomorrowNoonUtc(), customer: "Cancelled Tomorrow Client", status: "CANCELLED" });
 
   const tomorrowCard = await click("MENU_TOMORROW_JOBS", "");
   check("tomorrow card title", title(tomorrowCard), "Tomorrow's Jobs");
@@ -481,9 +510,9 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
 
   const signatureStepCard = await clickWithInputs("SUBMIT_CLIENT_DETAILS", JOB_CLASSIC, { client_name_postcode: si("Barry, N15 6UQ") });
   check("client details advance to signature step", stateOf(JOB_CLASSIC), "WAITING_CLIENT_CONFIRMATION");
-  // Confirmed live: the server-side push (not onClose: RELOAD) reliably advances this
-  // card once the customer signs, so there's no manual fallback button anymore.
-  check("signature step has no manual CHECK AGAIN button",
+  // No permanent CHECK AGAIN button on the ordinary card -- only signature.routes.ts's
+  // fallback recovery card (pushed if the post-sign push itself fails) has one.
+  check("signature step has no manual CHECK AGAIN button on the ordinary card",
     JSON.stringify(signatureStepCard.message).includes('"CHECK AGAIN"'), false);
 
   check("pending-signature message recorded for the push-forward", tabs.PendingSignatures.length - 1, 1);
@@ -537,7 +566,12 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
     JSON.stringify(doneCard.message).includes('"Main Menu"'), true);
 
   console.log("\n" + "=".repeat(74));
-  console.log("Menu scenarios run standalone -- step by step in Chat, no Start Job needed");
+  console.log("Menu scenarios -- step by step in Chat, no Start Job needed. Check In/Check");
+  console.log("Out are reached from the main menu for real; Parking Liability/Liability");
+  console.log("Report no longer have a main-menu button (see above -- only reachable inline");
+  console.log("from Next Job's 'any issues?' checkpoints now), but exercise the exact same");
+  console.log("MENU_PARKING_LIABILITY/MENU_LIABILITY_REPORT action handlers the inline");
+  console.log("'which one?' card uses, so this is still real coverage of that mechanism");
   console.log("=".repeat(74));
 
   // JOB_CLASSIC is now COMPLETED, so the driver's only eligible job is JOB_STANDALONE --
@@ -609,7 +643,7 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("final field goes straight to signature -- photo step is not asked again", title(checkInSig), "Check In");
   check("signature step subtitle", subtitle(checkInSig), "Waiting on signature");
   check("signature step shows the verbatim Check In confirmation text", hasText(checkInSig, CHECK_IN_SIGNATURE_TEXT), true);
-  check("signature step has no manual CHECK AGAIN button (auto-push only)", hasText(checkInSig, "CHECK AGAIN"), false);
+  check("signature step has no manual CHECK AGAIN button on the ordinary card", hasText(checkInSig, "CHECK AGAIN"), false);
   const checkInSigUrl = buttonUrl(checkInSig, "OPEN SIGNATURE PAD");
   check("signature link points at the checkin sign-only route", typeof checkInSigUrl === "string" && checkInSigUrl.includes("/forms/checkin/"), true);
 
@@ -728,6 +762,23 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
     tabs.ParkingLiability[1][HEADERS.ParkingLiability.indexOf("Address")], "12 High Street");
 
   console.log("\n" + "-".repeat(74));
+  console.log("Reopening an already-signed link, and CHECK AGAIN after finalize: a driver");
+  console.log("unsure whether an earlier sign went through must see the real state, not a");
+  console.log("blank form leading to a confusing 'not ready to be signed off' error");
+  console.log("-".repeat(74));
+
+  const parkingReopenedGet = await fetch(parkingTarget);
+  check("reopening the (already-used) sign link -> 200, not an error", parkingReopenedGet.status, 200);
+  const parkingReopenedHtml = await parkingReopenedGet.text();
+  check("reopened link shows 'already submitted', not a blank signature form",
+    parkingReopenedHtml.includes("Already submitted"), true);
+  check("reopened link does NOT show the signature canvas again", parkingReopenedHtml.includes('id="pad"'), false);
+
+  const parkingCheckAgain = await scenarioClick("SCENARIO_CHECK_AGAIN", JOB_STANDALONE, "parking");
+  check("SCENARIO_CHECK_AGAIN after finalize shows the submitted card, not an error",
+    hasText(parkingCheckAgain, "Parking Liability has been recorded"), true);
+
+  console.log("\n" + "-".repeat(74));
   console.log("Liability Report: full damage-category dropdown + conditional Overloading waiver");
   console.log("-".repeat(74));
 
@@ -761,19 +812,132 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
     hasText(liabilitySig, LIABILITY_REPORT_SIGNATURE_TEXT), true);
   await drain();
 
+  console.log("\n" + "-".repeat(74));
+  console.log("Navigating away and back before signing must not leave the post-sign push");
+  console.log("aimed at a stale message: reported live as 'signed it, came back to chat,");
+  console.log("but it didn't proceed to next step'");
+  console.log("-".repeat(74));
+
+  // Simulates the driver leaving this card (e.g. tapping Main Menu) and reopening the
+  // scenario from a genuinely different Chat message -- SCENARIO_CHECK_AGAIN must
+  // refresh the tracked push-forward target to THIS message, not leave it on the one
+  // that showed the photo/notice steps earlier.
+  const resumedMessageName = "spaces/S/messages/liability-resumed-elsewhere";
+  const resumedSig = await handleChatEvent({
+    type: "CARD_CLICKED", user: USER,
+    action: {
+      function: "SCENARIO_CHECK_AGAIN",
+      parameters: [{ key: "jobId", value: JOB_STANDALONE }, { key: "scenario", value: "liability" }]
+    },
+    message: { name: resumedMessageName },
+    common: { formInputs: {} }
+  });
+  check("SCENARIO_CHECK_AGAIN re-shows the same real step (still waiting on signature)",
+    subtitle(resumedSig), "Waiting on signature");
+  check("the tracked message target moved to the message that just re-showed this card",
+    tabs.ScenarioProgress.slice(1).find(r =>
+      r[HEADERS.ScenarioProgress.indexOf("Job ID")] === JOB_STANDALONE && r[HEADERS.ScenarioProgress.indexOf("Scenario")] === "liability"
+    )[HEADERS.ScenarioProgress.indexOf("Message Name")],
+    resumedMessageName);
+
   const liabilityLinkUrl = new URL(scenarioLinkFor("liability", JOB_STANDALONE));
   const liabilityTarget = `http://127.0.0.1:${port}${liabilityLinkUrl.pathname}${liabilityLinkUrl.search}`;
+  lastChatPatch = null;
   const liabilitySubmit = await fetch(liabilityTarget, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: png })
   });
   const liabilityBody = await liabilitySubmit.json();
   check("liability sign submit succeeds", liabilitySubmit.status, 200);
   check("liability sign submit ok", liabilityBody.ok, true);
+  check("the post-sign push targeted the message the driver actually resumed on, not the original one",
+    lastChatPatch && lastChatPatch.name, resumedMessageName);
   // 2, not 1: the classic-flow section above already wrote one LiabilityReport row for
   // its inline "any issues?" detour on JOB_CLASSIC.
   check("LiabilityReport row written", tabs.LiabilityReport.length - 1, 2);
   check("LiabilityReport stores the selected category",
     tabs.LiabilityReport[2][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
+
+  console.log("\n" + "-".repeat(74));
+  console.log("If the post-sign push to Chat itself fails, a recovery card with its own");
+  console.log("CHECK AGAIN goes out instead of nothing at all -- reported live: 'there");
+  console.log("should be reload button if sign pad expires'. It must only ever appear");
+  console.log("when the real push actually failed, never as a permanent fixture.");
+  console.log("-".repeat(74));
+
+  // Classic flow (signature.routes.ts): seed a fresh job straight into the signature-
+  // waiting state -- submitDrawnSignature only cares about job.currentState and
+  // getPendingSignatureMessage's row, so this is a faithful shortcut for "a driver is
+  // sitting at the signature step", without re-walking the whole classic flow again.
+  const JOB_PUSH_FAILURE = "TMV-FLOW0009";
+  addBooking(JOB_PUSH_FAILURE, "evt-flow-push-failure");
+  row(JOB_PUSH_FAILURE)[HEADERS.Bookings.indexOf("Current State")] = "WAITING_CLIENT_CONFIRMATION";
+  const pushFailureMsgName = `spaces/S/messages/${JOB_PUSH_FAILURE}`;
+  tabs.PendingSignatures.push([JOB_PUSH_FAILURE, pushFailureMsgName, new Date().toISOString()]);
+
+  lastChatPatch = null;
+  chatPatchFailuresRemaining = 1;
+  const classicPatchCallsBefore = calls.chatPatch ?? 0;
+  const pushFailureLinkUrl = new URL(signatureLinkFor(JOB_PUSH_FAILURE));
+  const pushFailureTarget = `http://127.0.0.1:${port}${pushFailureLinkUrl.pathname}${pushFailureLinkUrl.search}`;
+  const pushFailureRes = await fetch(pushFailureTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: png })
+  });
+  const pushFailureBody = await pushFailureRes.json();
+  check("sign POST still succeeds even though the Chat push fails", pushFailureRes.status, 200);
+  check("sign POST still reports ok even though the Chat push fails", pushFailureBody.ok, true);
+  check("signature was still recorded despite the push failure", stateOf(JOB_PUSH_FAILURE), "WAITING_REVIEW_CHECK");
+  check("two push attempts were made: the failed real one, then the recovery fallback",
+    (calls.chatPatch ?? 0) - classicPatchCallsBefore, 2);
+  check("the fallback recovery card is what actually landed, not the normal next-step card",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes("CHECK AGAIN"), true);
+  check("recovery card's button re-resumes the job (RESUME_JOB), not a dead end",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes('"RESUME_JOB"'), true);
+  check("recovery card still targeted the same message the driver was looking at",
+    lastChatPatch && lastChatPatch.name, pushFailureMsgName);
+
+  // Standalone scenario (scenario.routes.ts, resumedClassicState === undefined): a real
+  // minimal walkthrough on a fresh job, same shape as the Parking Liability section
+  // above, so finalizeScenario's own evidence/step checks are exercised for real rather
+  // than hand-faked.
+  const JOB_SCENARIO_PUSH_FAILURE = "TMV-FLOW0010";
+  addBooking(JOB_SCENARIO_PUSH_FAILURE, "evt-flow-scenario-push-failure");
+  // Unambiguously this driver's "active" job (see jobs.service.ts's getActiveJobForDriver)
+  // so the bare photo() message below -- which carries no jobId/scenario of its own --
+  // resolves here rather than to some other fixture job also sitting at READY today.
+  row(JOB_SCENARIO_PUSH_FAILURE)[HEADERS.Bookings.indexOf("Status")] = "IN_PROGRESS";
+  await menuTap("MENU_PARKING_LIABILITY", JOB_SCENARIO_PUSH_FAILURE, "parking");
+  await submitField(JOB_SCENARIO_PUSH_FAILURE, "parking", 0, "address", "1 Test Street");
+  await submitField(JOB_SCENARIO_PUSH_FAILURE, "parking", 1, "client_name", "Barry Thompson");
+  await photo();
+  await continuePhotos(JOB_SCENARIO_PUSH_FAILURE, "parking");
+  await drain();
+
+  lastChatPatch = null;
+  chatPatchFailuresRemaining = 1;
+  const scenarioPatchCallsBefore = calls.chatPatch ?? 0;
+  const scenarioPushFailureLinkUrl = new URL(scenarioLinkFor("parking", JOB_SCENARIO_PUSH_FAILURE));
+  const scenarioPushFailureTarget = `http://127.0.0.1:${port}${scenarioPushFailureLinkUrl.pathname}${scenarioPushFailureLinkUrl.search}`;
+  const scenarioPushFailureRes = await fetch(scenarioPushFailureTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: png })
+  });
+  const scenarioPushFailureBody = await scenarioPushFailureRes.json();
+  check("scenario sign POST still succeeds even though the Chat push fails", scenarioPushFailureRes.status, 200);
+  check("scenario sign POST still reports ok even though the Chat push fails", scenarioPushFailureBody.ok, true);
+  check("ParkingLiability row was still written despite the push failure",
+    tabs.ParkingLiability.slice(1).some(r => r[HEADERS.ParkingLiability.indexOf("Job ID")] === JOB_SCENARIO_PUSH_FAILURE), true);
+  check("two push attempts were made: the failed real one, then the recovery fallback",
+    (calls.chatPatch ?? 0) - scenarioPatchCallsBefore, 2);
+  check("the fallback recovery card is what actually landed, not the normal 'submitted' card",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes("CHECK AGAIN"), true);
+  check("recovery card's button re-checks the scenario (SCENARIO_CHECK_AGAIN), not a dead end",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes('"SCENARIO_CHECK_AGAIN"'), true);
+  check("recovery card still targeted the same message the driver was looking at",
+    lastChatPatch && lastChatPatch.name, scenarioMsgName(JOB_SCENARIO_PUSH_FAILURE, "parking"));
+
+  // Revert: only needed IN_PROGRESS to win "active" job resolution for the bare
+  // photo() message above. Leaving it IN_PROGRESS would wrongly outrank JOB_OVERDUE in
+  // the "overdue jobs still surface as Next Job" check further down the script.
+  row(JOB_SCENARIO_PUSH_FAILURE)[HEADERS.Bookings.indexOf("Status")] = "READY";
 
   console.log("\n" + "-".repeat(74));
   console.log("Add Job refuses to silently fall back to the broken direct-share behavior");

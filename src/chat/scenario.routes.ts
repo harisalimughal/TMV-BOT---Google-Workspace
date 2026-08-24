@@ -1,16 +1,26 @@
 import { Request, Response, Router } from "express";
-import { getJob, getSetting } from "../google/sheets";
+import { getJob, getScenarioProgress, getSetting } from "../google/sheets";
 import { updateChatCard } from "../google/chat";
 import { finalizeScenario } from "./scenario.engine";
 import { verifyScenarioLink } from "./scenario.link";
 import { ScenarioKey, SCENARIOS } from "./scenario.spec";
-import { scenarioSubmittedCard, workflowCard } from "./cards";
+import { scenarioRecoveryCard, scenarioSubmittedCard, signatureRecoveryCard, workflowCard } from "./cards";
 import { CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
 import { log } from "../utils/logger";
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+/** Shown when the signature-pad link is reopened after it already succeeded --
+ *  without this, a driver unsure whether an earlier sign actually went through (e.g.
+ *  because the post-sign push to Chat didn't visibly update the card they're looking
+ *  at) would see the same blank signing form again, sign a second time, and hit a
+ *  confusing "This scenario isn't ready to be signed off yet" error instead of
+ *  learning they were already done. */
+function alreadySubmittedPage(title: string): string {
+  return page(title, `<h1>Already submitted ✓</h1><p>This was signed and recorded already — you're done here. Go back to Chat; if the card there hasn't updated, tap Main Menu (or Next Job) to refresh it.</p>`);
 }
 
 function page(title: string, bodyHtml: string): string {
@@ -171,6 +181,13 @@ export function scenarioRouter(): Router {
     const authorized = await loadAuthorized(scenario, req, res);
     if (!authorized) return;
     const spec = SCENARIOS[scenario];
+
+    const jobId = String(req.params.jobId);
+    const progress = await getScenarioProgress(jobId, scenario, 0);
+    if (!progress || progress.step === "done") {
+      return res.status(200).send(alreadySubmittedPage(spec.title));
+    }
+
     return res.status(200).send(signOnlyPage(spec.title, spec.signatureText));
   });
 
@@ -194,11 +211,16 @@ export function scenarioRouter(): Router {
 
       // Best-effort: push the next card into the driver's Chat conversation so they
       // don't have to tap anything — same pattern as the classic flow's signature step.
-      // If this fails, the data is already safely recorded either way; the driver just
-      // needs to tap Main Menu (or Next Job) manually. A resumedClassicState means this
+      // The data is already safely recorded either way, so a failure here must never
+      // turn into an error for the driver -- but it falls back to a small recovery
+      // card with its own manual CHECK AGAIN, rather than silently leaving a stale
+      // card with nothing to tap (reported live). A resumedClassicState means this
       // scenario ran inline as one of the classic flow's "any issues?" detours -- push
-      // the classic flow's own next card instead of the generic "submitted" card, so
-      // the detour is transparent to the driver.
+      // the classic flow's own next card instead of the generic "submitted" card (so
+      // the detour is transparent), and its recovery fallback is RESUME_JOB-based
+      // (signatureRecoveryCard), not the scenario's own CHECK AGAIN -- the scenario
+      // itself really is "done" at this point, so SCENARIO_CHECK_AGAIN would just
+      // re-show the generic submitted card instead of the classic flow's real state.
       if (messageName) {
         const nextCard = resumedClassicState
           ? await (async () => {
@@ -207,9 +229,13 @@ export function scenarioRouter(): Router {
               return job ? workflowCard(job, confirmationText) : scenarioSubmittedCard(spec, jobId);
             })()
           : scenarioSubmittedCard(spec, jobId);
-        await updateChatCard(messageName, nextCard).catch(error =>
-          log.warn("failed to push next card after scenario finalize", { job_id: jobId, scenario, error: String(error) })
-        );
+        await updateChatCard(messageName, nextCard).catch(async error => {
+          log.warn("failed to push next card after scenario finalize; pushing a recovery card instead", { job_id: jobId, scenario, error: String(error) });
+          const recoveryCard = resumedClassicState ? signatureRecoveryCard(jobId) : scenarioRecoveryCard(spec, scenario, jobId);
+          await updateChatCard(messageName, recoveryCard).catch(fallbackError =>
+            log.warn("recovery card push also failed", { job_id: jobId, scenario, error: String(fallbackError) })
+          );
+        });
       }
 
       log.info("scenario finalized", { job_id: jobId, scenario });

@@ -1,4 +1,5 @@
 import { listObjects, SHEETS } from "../../../src/google/sheets";
+import { env } from "../../../src/config/env";
 import { sheetCache } from "./cache";
 import { loadExcelDataset } from "./excel-loader";
 import { ReadOptions, SheetDataset } from "./types";
@@ -78,10 +79,17 @@ async function fetchFromLiveSheets(): Promise<SheetDataset> {
       pendingSignatures,
       scenarioProgress,
       fetchedAt: new Date().toISOString(),
-      durationMs
+      durationMs,
+      source: "live"
     };
   } catch (error) {
-    // If live Google API fails (e.g. offline dev or missing credentials), try local Excel dataset
+    // The local Excel snapshot is a dev convenience only (working offline / no
+    // credentials) -- in production, a live-Sheets failure must surface as a real
+    // error, not silently serve a static file that could be arbitrarily stale. This
+    // is now the primary admin panel's data source, so wrong-looking-right numbers
+    // here are a much bigger deal than they were as a secondary reporting view.
+    if (env.nodeEnv === "production") throw error;
+
     log.warn("live sheets read failed; attempting local fallback dataset", { error: String(error) });
     const local = loadExcelDataset();
     if (local) {

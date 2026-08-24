@@ -235,7 +235,8 @@ export function helpCard(): ChatResponse {
   return card("tmv-help", "TMV Driver Bot", "Google Chat operations workflow", [
     { textParagraph: { text: "Tap below for the menu, or send any message." } },
     { textParagraph: { text: "Next Job takes you to your active or next job; Start Job on that runs the full move workflow (photos, charges, payment, signature) step by step." } },
-    { textParagraph: { text: "Check In, Check Out, Parking Liability and Liability Report are separate, independent forms — pick one any time, whether or not Start Job has been run." } },
+    { textParagraph: { text: "Check In and Check Out are separate, independent forms — pick one any time, whether or not Start Job has been run." } },
+    { textParagraph: { text: "Parking Liability and Liability Report come up automatically inside Next Job's workflow if you report an issue after arrival or before the empty-van photo." } },
     { textParagraph: { text: "Tomorrow's Jobs shows what's booked for you the next day, oldest first, so you can plan ahead." } },
     { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } }
   ]);
@@ -247,15 +248,20 @@ export function helpCard(): ChatResponse {
  * remember, any message shows it.
  *
  * Every option is independent and always enabled: Next Job drills into the classic
- * move workflow (see showCurrentOrNext() / workflowCard()), while Check In, Check Out,
- * Parking Liability and Liability Report each run their own standalone flow against
- * whatever job the driver currently has — none of them require Next Job's workflow to
- * have been started first (see chat.controller.ts's withActiveJob()). No standalone
- * Finish Job button: a job now only completes via the classic workflow's own final
- * step (COMPLETE_JOB) — see workflow.engine.ts's handleAction(). Tomorrow's Jobs is
- * read-only and always available too -- a driver checking their schedule ahead (to
- * plan, arrange helpers, review details) isn't gated on finishing today's jobs first,
- * it's simply the point in the day they're most likely to tap it.
+ * move workflow (see showCurrentOrNext() / workflowCard()), while Check In and Check
+ * Out each run their own standalone flow against whatever job the driver currently
+ * has — neither requires Next Job's workflow to have been started first (see
+ * chat.controller.ts's withActiveJob()). Parking Liability and Liability Report are
+ * deliberately NOT here: they're only reachable from inside the classic flow's own
+ * "any issues?" checkpoints now (see issuesChoiceCard() below) — the action names
+ * (MENU_PARKING_LIABILITY/MENU_LIABILITY_REPORT) and their handlers are unchanged and
+ * still used by that inline card, just no longer exposed as a standalone top-level
+ * entry point. No standalone Finish Job button: a job now only completes via the
+ * classic workflow's own final step (COMPLETE_JOB) — see workflow.engine.ts's
+ * handleAction(). Tomorrow's Jobs is read-only and always available too -- a driver
+ * checking their schedule ahead (to plan, arrange helpers, review details) isn't
+ * gated on finishing today's jobs first, it's simply the point in the day they're
+ * most likely to tap it.
  */
 export function mainMenuCard(job: Job | null): ChatResponse {
   const jobId = job?.jobId ?? "";
@@ -263,8 +269,6 @@ export function mainMenuCard(job: Job | null): ChatResponse {
     { buttonList: { buttons: [menuButton("Next Job", "RESUME_JOB", jobId, true, "FILLED", MENU_COLORS.nextJob)] } },
     { buttonList: { buttons: [menuButton("Check In", "MENU_CHECK_IN", jobId, true, "FILLED", MENU_COLORS.checkIn)] } },
     { buttonList: { buttons: [menuButton("Check Out", "MENU_CHECK_OUT", jobId, true, "FILLED", MENU_COLORS.checkOut)] } },
-    { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, true, "FILLED", MENU_COLORS.parkingLiability)] } },
-    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true, "FILLED", MENU_COLORS.liabilityReport)] } },
     { buttonList: { buttons: [menuButton("Tomorrow's Jobs", "MENU_TOMORROW_JOBS", jobId, true, "FILLED", MENU_COLORS.tomorrowJobs)] } }
   ]);
 }
@@ -476,10 +480,12 @@ export function workflowCard(
       ]);
 
     case WorkflowState.WAITING_CLIENT_CONFIRMATION:
-      // No manual button: the server proactively pushes the next card the moment the
-      // customer signs (see google/chat.ts's updateChatCard(), wired from
-      // signature.routes.ts) — confirmed working live. onClose: RELOAD stays on the
-      // overlay button as a harmless no-op in case Chat's own reload ever also fires.
+      // No manual button here by design: the server proactively pushes the next card
+      // the moment the customer signs (see google/chat.ts's updateChatCard(), wired
+      // from signature.routes.ts). If that push itself fails, signature.routes.ts
+      // falls back to pushing a small recovery card with its own CHECK AGAIN button
+      // instead — the button only ever appears when it's actually needed, not as a
+      // permanent fixture on every ordinary view of this card.
       return card(id, "9. Client Signature", "Customer completion confirmation", [
         { textParagraph: { text: escapeHtml(confirmationText) } },
         { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
@@ -545,6 +551,20 @@ function issuesChoiceCard(id: string, jobId: string): ChatResponse {
     { buttonList: { buttons: [
       menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true, "FILLED", MENU_COLORS.liabilityReport)
     ] } }
+  ]);
+}
+
+/**
+ * Fallback pushed in place of the real next-step card only when that push itself
+ * fails (see signature.routes.ts's POST handler) — the customer's signature was
+ * already recorded successfully either way; this is purely "we couldn't show you
+ * what's next automatically". CHECK AGAIN (RESUME_JOB, same action "Next Job" uses)
+ * re-reads the job fresh and re-renders its real current state.
+ */
+export function signatureRecoveryCard(jobId: string): ChatResponse {
+  return card("tmv-signature-recovery", "Signed ✓", "Couldn't refresh this card automatically", [
+    { textParagraph: { text: "The customer's signature was recorded. Tap below to see what's next." } },
+    { buttonList: { buttons: [button("CHECK AGAIN", "RESUME_JOB", jobId)] } }
   ]);
 }
 
@@ -661,8 +681,11 @@ export function scenarioSignatureCard(spec: ScenarioSpec, scenario: ScenarioKey,
   if (spec.signatureText) widgets.push({ textParagraph: { text: escapeHtml(spec.signatureText) } });
   widgets.push({ textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } });
   widgets.push({ buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", url)] } });
-  // No manual button: the server proactively pushes the submitted card the moment the
-  // customer signs (see scenario.engine.ts's finalizeScenario / scenario.routes.ts).
+  // No manual button here by design: the server proactively pushes the submitted card
+  // the moment the customer signs (see scenario.engine.ts's finalizeScenario /
+  // scenario.routes.ts). If that push itself fails, scenario.routes.ts falls back to
+  // pushing a small recovery card with its own CHECK AGAIN (SCENARIO_CHECK_AGAIN)
+  // button instead -- it only ever appears when it's actually needed.
   return card(`scenario-${jobId}-${scenario}-signature`, spec.title, "Waiting on signature", widgets);
 }
 
@@ -670,6 +693,20 @@ export function scenarioSubmittedCard(spec: ScenarioSpec, jobId: string): ChatRe
   return card(`scenario-${jobId}-${spec.key}-done`, `${spec.title} submitted`, `Job ${jobId}`, [
     { textParagraph: { text: `${spec.title} has been recorded.` } },
     { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", jobId, true)] } }
+  ]);
+}
+
+/**
+ * Fallback pushed in place of the real next-step card only when that push itself
+ * fails (see scenario.routes.ts's POST handler) — the signature was already recorded
+ * successfully either way; this is purely "we couldn't show you what's next
+ * automatically". CHECK AGAIN re-reads the real current step, same as the ordinary
+ * SCENARIO_CHECK_AGAIN path.
+ */
+export function scenarioRecoveryCard(spec: ScenarioSpec, scenario: ScenarioKey, jobId: string): ChatResponse {
+  return card(`scenario-${jobId}-${scenario}-recovery`, `${spec.title} signed ✓`, "Couldn't refresh this card automatically", [
+    { textParagraph: { text: "Your signature was recorded. Tap below to see what's next." } },
+    { buttonList: { buttons: [scenarioButton("CHECK AGAIN", "SCENARIO_CHECK_AGAIN", jobId, scenario)] } }
   ]);
 }
 

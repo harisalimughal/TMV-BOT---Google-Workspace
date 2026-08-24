@@ -75,9 +75,11 @@ export function summaryRoute(): Router {
           }
         }
 
-        // Evidence counts
+        // Evidence counts. "Organized" is excluded -- it's a retired photo step
+        // (see workflow.states.ts) that no job collects anymore, so counting it would
+        // inflate photosMissing by one for every job forever.
         const comp = j.evidenceCompleteness;
-        const states = [comp.arrival, comp.vanLoaded, comp.emptyVan, comp.organized];
+        const states = [comp.arrival, comp.vanLoaded, comp.emptyVan];
         photosMissing += states.filter(s => s === "MISSING").length;
         photosProcessing += states.filter(s => s === "PROCESSING").length;
         photosFailed += states.filter(s => s === "FAILED").length;

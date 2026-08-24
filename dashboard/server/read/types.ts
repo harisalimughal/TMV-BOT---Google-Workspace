@@ -19,6 +19,9 @@ export interface SheetDataset {
   scenarioProgress: Record<string, string>[];
   fetchedAt: string;
   durationMs: number;
+  /** "fallback" means this came from the local Excel snapshot, not live Sheets --
+   *  see sheet-reader.ts. Surfaced so a caller can tell the data might be stale. */
+  source: "live" | "fallback";
 }
 
 export interface ReadOptions {

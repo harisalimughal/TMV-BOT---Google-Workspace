@@ -1,9 +1,16 @@
 import { Router } from "express";
+import { DateTime } from "luxon";
+import { env } from "../../../src/config/env";
+import { getDriverByInitials } from "../../../src/google/sheets";
+import { createCalendarEvent } from "../../../src/google/calendar";
+import { parseCalendarEvent, syncBookingsForDate } from "../../../src/jobs/booking.service";
+import { log } from "../../../src/utils/logger";
 import { formatGBP, toPounds } from "../../../src/utils/money";
 import { normalizeDataset } from "../normalize/normalize";
 import { formatLondonDate } from "../normalize/timezone";
 import { NormalizedJob } from "../normalize/types";
 import { generateJobPdf } from "../pdf/pdf-generator";
+import { sheetCache } from "../read/cache";
 import { readDataset } from "../read/sheet-reader";
 
 function escapeCsvField(val: unknown): string {
@@ -21,6 +28,136 @@ function escapeCsvField(val: unknown): string {
 
 export function jobsRoute(): Router {
   const router = Router();
+
+  // Jobs are a live mirror of Calendar, not standalone data (see booking.service.ts's
+  // reconcileDisappeared) -- a row written straight into Bookings would be
+  // auto-cancelled by the next sync. So this creates a real Calendar event, formatted
+  // exactly the way parseCalendarEvent() expects, and lets the normal sync path pick
+  // it up. Ported verbatim from src/admin/admin.routes.ts's POST /api/jobs.
+  router.post("/", async (req, res) => {
+    const body = req.body ?? {};
+    const customerName = String(body.customerName ?? "").trim();
+    const customerEmail = String(body.customerEmail ?? "").trim();
+    const customerPhone = String(body.customerPhone ?? "").trim();
+    const pickup = String(body.pickup ?? "").trim();
+    const dropoff = String(body.dropoff ?? "").trim();
+    const crewSize = Number(body.crewSize ?? 0);
+    const price = Number(body.price ?? 0);
+    const paidOnline = Boolean(body.paidOnline);
+    const driverInitials = String(body.driverInitials ?? "").trim().toUpperCase();
+    const start = String(body.start ?? "");
+    const finish = String(body.finish ?? "");
+
+    if (!customerName || !pickup || !dropoff || !start || !finish) {
+      return res.status(400).json({
+        error: { code: "VALIDATION_FAILED", message: "Customer name, pickup, drop-off, start and finish time are all required." }
+      });
+    }
+    if (!Number.isInteger(crewSize) || crewSize <= 0) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "Crew size must be a whole number greater than 0." } });
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "Price must be a number greater than 0." } });
+    }
+    const startDt = DateTime.fromISO(start, { zone: env.timezone });
+    const finishDt = DateTime.fromISO(finish, { zone: env.timezone });
+    if (!startDt.isValid || !finishDt.isValid || finishDt <= startDt) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "Start/finish time is invalid." } });
+    }
+    if (driverInitials && !/^[A-Z]{1,5}$/.test(driverInitials)) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "Driver initials must be 1-5 letters, e.g. JD." } });
+    }
+
+    // Job<->driver matching is purely by initials string equality (see
+    // jobs.service.ts's getNextJobForDriver) -- a typo here wouldn't error anywhere
+    // downstream, it would just make the job invisible to every driver. Catch that at
+    // creation time instead.
+    if (driverInitials) {
+      const driver = await getDriverByInitials(driverInitials);
+      if (!driver) {
+        return res.status(400).json({
+          error: {
+            code: "VALIDATION_FAILED",
+            message: `No driver with initials "${driverInitials}" in the Drivers sheet. Add that driver first, or leave initials blank to leave the job unassigned.`
+          }
+        });
+      }
+      if (!driver.active) {
+        return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: `Driver "${driverInitials}" exists but is marked inactive.` } });
+      }
+    }
+
+    // Reproduces the exact title shape parseTitle() parses: "<name> - <n> Men -
+    // £<price> / Y-<initials>" (or "/ N" with no dash+initials, which parseTitle
+    // reads as unassigned -- open to any driver, same as a calendar booking nobody
+    // typed initials onto).
+    const title =
+      `${customerName} - ${crewSize} Men - £${price} / ${paidOnline ? "Y" : "N"}` +
+      (driverInitials ? `-${driverInitials}` : "");
+    const description = [
+      `Client name: ${customerName}`,
+      `Email: ${customerEmail}`,
+      `Phone: ${customerPhone}`,
+      `Pickup: ${pickup}`,
+      `Drop-off: ${dropoff}`
+    ].join("\n");
+
+    // Round-trip through the exact parser production uses (parseCalendarEvent),
+    // instead of duplicating its regexes here -- the two can never silently drift
+    // apart this way. Anything the bot wouldn't read back correctly is rejected
+    // before it ever reaches Calendar, rather than being discovered later as a job
+    // with a blank field or the wrong crew size.
+    const parsed = parseCalendarEvent({
+      id: "dashboard-validation-check",
+      status: "confirmed",
+      summary: title,
+      description,
+      start: { dateTime: startDt.toISO()! },
+      end: { dateTime: finishDt.toISO()! }
+    });
+    const mismatches: string[] = [];
+    if (!parsed) mismatches.push("event");
+    else {
+      if (parsed.driverInitials !== driverInitials) mismatches.push("driver initials");
+      if (parsed.crewSize !== crewSize) mismatches.push("crew size");
+      if (parsed.price !== price) mismatches.push("price");
+      if (parsed.paidOnline !== paidOnline) mismatches.push("paid online");
+      if (parsed.customerName !== customerName) mismatches.push("customer name");
+      if (parsed.customerEmail !== customerEmail) mismatches.push("customer email");
+      if (parsed.customerPhone !== customerPhone) mismatches.push("customer phone");
+      if (parsed.pickup !== pickup) mismatches.push("pickup address");
+      if (parsed.dropoff !== dropoff) mismatches.push("drop-off address");
+    }
+    if (mismatches.length) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_FAILED",
+          message:
+            `This job wouldn't be read back correctly by the bot (${mismatches.join(", ")}). ` +
+            "Avoid colons, dashes, slashes or line breaks inside name/address fields — those characters " +
+            "are part of the calendar format the bot parses."
+        }
+      });
+    }
+
+    try {
+      await createCalendarEvent({
+        summary: title,
+        description,
+        start: { dateTime: startDt.toISO()! },
+        end: { dateTime: finishDt.toISO()! }
+      });
+      // Sync immediately so the new job shows up in the dashboard without waiting on
+      // the throttled background sync, and invalidate this dashboard's own separate
+      // SWR cache so the next read doesn't serve a pre-sync snapshot for up to 30s.
+      await syncBookingsForDate(startDt);
+      sheetCache.invalidate();
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      log.error("dashboard add job failed", error);
+      return res.status(500).json({ error: { code: "JOB_CREATE_FAILED", message: "Failed to create job." } });
+    }
+  });
 
   // Export CSV of filtered jobs
   router.get("/export.csv", async (req, res) => {

@@ -5,7 +5,7 @@ import { updateChatCard } from "../google/chat";
 import { CUSTOMER_CONFIRMATION_TEXT, SignatureAlreadyCapturedError, submitDrawnSignature } from "../workflow/workflow.engine";
 import { WorkflowState } from "../workflow/workflow.states";
 import { verifySignatureLink } from "./signature.link";
-import { workflowCard } from "./cards";
+import { signatureRecoveryCard, workflowCard } from "./cards";
 import { log } from "../utils/logger";
 
 function escapeHtml(value: string): string {
@@ -211,17 +211,21 @@ export function signatureRouter(): Router {
 
     log.info("customer signature captured", { job_id: jobId });
 
-    // Best-effort: push the next-step card into the driver's Chat conversation so they
-    // don't have to tap CHECK AGAIN. If this fails for any reason (the tracked message
-    // was deleted, a stale reference, an API hiccup), CHECK AGAIN on the still-showing
-    // signature card is the fallback — the signature itself is already safely recorded
-    // either way, so a failure here must not turn into an error for the customer.
+    // Best-effort: push the next-step card into the driver's Chat conversation. The
+    // signature itself is already safely recorded either way, so a failure here must
+    // never turn into an error for the customer -- but leaving the driver looking at
+    // a stale card with nothing to tap is exactly what was reported live, so a failed
+    // push falls back to a small recovery card that DOES have a manual CHECK AGAIN
+    // button, rather than silently doing nothing.
     const messageName = await getPendingSignatureMessage(jobId);
     if (messageName) {
       const confirmationText = await getSetting("CUSTOMER_CONFIRMATION_TEXT", CUSTOMER_CONFIRMATION_TEXT);
-      await updateChatCard(messageName, workflowCard(signedJob, confirmationText)).catch(error =>
-        log.warn("failed to push next-step card after signing", { job_id: jobId, error: String(error) })
-      );
+      await updateChatCard(messageName, workflowCard(signedJob, confirmationText)).catch(async error => {
+        log.warn("failed to push next-step card after signing; pushing a recovery card instead", { job_id: jobId, error: String(error) });
+        await updateChatCard(messageName, signatureRecoveryCard(jobId)).catch(fallbackError =>
+          log.warn("recovery card push also failed", { job_id: jobId, error: String(fallbackError) })
+        );
+      });
     }
 
     return res.status(200).json({ ok: true });

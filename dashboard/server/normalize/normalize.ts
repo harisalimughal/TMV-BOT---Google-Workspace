@@ -371,12 +371,15 @@ function calculateWorkflowCompletionPct(
   if (status === "COMPLETED") return 100;
   if (status === "CANCELLED") return 0;
 
+  // "Organized" is a retired photo step (see workflow.states.ts) -- no job collects
+  // it anymore, so it's excluded here entirely rather than capping every in-progress
+  // job's score at 85. completeness.organized is still classified above for any old
+  // job that happens to have one, purely informational.
   let score = 10; // Start job initiated
-  if (completeness.arrival === "COMPLETED") score += 20;
-  if (completeness.vanLoaded === "COMPLETED") score += 20;
-  if (completeness.emptyVan === "COMPLETED") score += 20;
-  if (completeness.organized === "COMPLETED") score += 15;
-  if (completeness.signature === "COMPLETED" || signatureDoc) score += 15;
+  if (completeness.arrival === "COMPLETED") score += 22;
+  if (completeness.vanLoaded === "COMPLETED") score += 23;
+  if (completeness.emptyVan === "COMPLETED") score += 22;
+  if (completeness.signature === "COMPLETED" || signatureDoc) score += 23;
 
   return Math.min(score, 100);
 }

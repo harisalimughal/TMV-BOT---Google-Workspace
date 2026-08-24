@@ -1,27 +1,38 @@
 import React, { useState, useEffect } from "react";
-import { X, AlertTriangle, ShieldAlert } from "lucide-react";
-import { getDrivers, addDriver, updateDriver, Driver } from "../utils/drivers";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { X, AlertTriangle } from "lucide-react";
+import { fetchDrivers, saveDriver } from "../api/client";
+import { DriverSummaryItem } from "../types";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  driverToEdit?: Driver | null;
+  driverToEdit?: DriverSummaryItem | null;
 }
 
 export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [vehicleReg, setVehicleReg] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [active, setActive] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  // Real roster (see dashboard/server/routes/drivers.route.ts) -- used to catch a
+  // duplicate initials before the write, mirroring what driverWrite()'s Email-keyed
+  // upsert would otherwise do silently.
+  const { data: driversData } = useQuery({ queryKey: ["drivers_summary"], queryFn: () => fetchDrivers() });
+  const roster = driversData?.drivers ?? [];
 
   // Sync state with driverToEdit when modal opens or driver changes
   useEffect(() => {
     if (driverToEdit) {
-      setName(driverToEdit.name);
-      setCode(driverToEdit.code);
-      setVehicleReg(driverToEdit.vehicleReg || "");
+      setName(driverToEdit.fullName);
+      setCode(driverToEdit.initials);
+      setVehicleReg(driverToEdit.vanRegistration || "");
       setEmail(driverToEdit.email || "");
       setPhone(driverToEdit.phone || "");
       setActive(driverToEdit.active !== false);
@@ -33,6 +44,7 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
       setPhone("");
       setActive(true);
     }
+    setSaveError("");
   }, [driverToEdit, isOpen]);
 
   if (!isOpen) return null;
@@ -44,29 +56,30 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
     }
   };
 
-  // Code is taken if it exists AND we aren't editing the driver that already owns this code
-  const isCodeTaken = getDrivers().some(d => 
-    d.code === code.toUpperCase() && (!driverToEdit || driverToEdit.code !== code.toUpperCase())
+  // Initials are taken if they exist AND we aren't editing the driver that already owns them
+  const isCodeTaken = roster.some(d =>
+    d.initials === code.toUpperCase() && (!driverToEdit || driverToEdit.initials !== code.toUpperCase())
   );
 
-  const handleSubmit = () => {
-    const payload = {
-      name,
-      code: code.toUpperCase(),
-      vehicleReg,
-      email,
-      phone,
-      active,
-      color: driverToEdit ? driverToEdit.color : "bg-blue-100 text-blue-700"
-    };
-
-    if (driverToEdit) {
-      updateDriver(driverToEdit.code, payload);
-    } else {
-      addDriver(payload);
+  const handleSubmit = async () => {
+    setSaveError("");
+    setIsSaving(true);
+    try {
+      await saveDriver({
+        initials: code.toUpperCase(),
+        fullName: name,
+        email,
+        active,
+        phone,
+        vanRegistration: vehicleReg
+      });
+      queryClient.invalidateQueries({ queryKey: ["drivers_summary"] });
+      onClose();
+    } catch (err: any) {
+      setSaveError(err?.message || "Failed to save driver.");
+    } finally {
+      setIsSaving(false);
     }
-    
-    onClose();
   };
 
   return (
@@ -117,14 +130,17 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
             </div>
 
             <div className="col-span-2">
-              <label className="block text-[12px] font-semibold text-muted uppercase tracking-wider mb-1.5">Email Address</label>
-              <input 
-                type="email" 
+              <label className="block text-[12px] font-semibold text-muted uppercase tracking-wider mb-1.5">
+                Email Address <span className="text-status-red">*</span>
+              </label>
+              <input
+                type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 className="w-full h-11 px-3 rounded-[12px] border border-line bg-surface text-[14px] text-ink outline-none focus:border-brand focus:bg-white transition"
                 placeholder="driver@example.com"
               />
+              <span className="text-[11px] text-muted mt-1 block">Used to sign the driver in from Google Chat, and as the unique key for this record.</span>
             </div>
 
             <div className="col-span-2">
@@ -166,17 +182,24 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-line bg-surface flex items-center justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 rounded-[12px] text-[13px] font-semibold text-muted hover:text-ink transition">
-            Cancel
-          </button>
-          <button 
-            onClick={handleSubmit} 
-            disabled={isCodeTaken || !name || !code} 
-            className="px-6 py-2 rounded-[12px] bg-[#2563EB] disabled:bg-[#93C5FD] disabled:cursor-not-allowed hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition"
-          >
-            {driverToEdit ? "Save Changes" : "Add Driver"}
-          </button>
+        <div className="px-6 py-4 border-t border-line bg-surface">
+          {saveError && (
+            <p className="text-[12px] text-status-red font-medium mb-3 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {saveError}
+            </p>
+          )}
+          <div className="flex items-center justify-end gap-3">
+            <button onClick={onClose} disabled={isSaving} className="px-4 py-2 rounded-[12px] text-[13px] font-semibold text-muted hover:text-ink transition disabled:opacity-50">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSaving || isCodeTaken || !name || !code || !email}
+              className="px-6 py-2 rounded-[12px] bg-[#2563EB] disabled:bg-[#93C5FD] disabled:cursor-not-allowed hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition"
+            >
+              {isSaving ? "Saving…" : driverToEdit ? "Save Changes" : "Add Driver"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
-import { 
-  X, 
-  User, 
-  MapPin, 
-  Calendar, 
-  Users, 
+import React, { useEffect, useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  X,
+  User,
+  MapPin,
+  Calendar,
+  Users,
   PoundSterling,
   Check,
   Search,
@@ -13,7 +14,8 @@ import {
   AlertTriangle,
   ClipboardList
 } from "lucide-react";
-import { getDrivers } from "../utils/drivers";
+import { addJob, fetchDrivers } from "../api/client";
+import { getAvatarColor } from "../utils/drivers";
 
 interface Props {
   isOpen: boolean;
@@ -21,7 +23,10 @@ interface Props {
 }
 
 export function AddJobModal({ isOpen, onClose }: Props) {
+  const queryClient = useQueryClient();
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [form, setForm] = useState({
     customerName: "",
     customerEmail: "",
@@ -30,20 +35,18 @@ export function AddJobModal({ isOpen, onClose }: Props) {
     dropoff: "",
     crewSize: 2,
     price: "",
+    paidOnline: false,
     start: "",
     finish: "",
-    driverId: "" // "" means unassigned
+    driverId: "" // "" means unassigned -- holds a real driver's initials
   });
 
   const [driverSearchOpen, setDriverSearchOpen] = useState(false);
   const [driverSearchQuery, setDriverSearchQuery] = useState("");
-  const [roster, setRoster] = useState(getDrivers());
-
-  useEffect(() => {
-    const handler = () => setRoster(getDrivers());
-    window.addEventListener('roster_updated', handler);
-    return () => window.removeEventListener('roster_updated', handler);
-  }, []);
+  // Real roster (initials/fullName/email/vanRegistration), not the old localStorage mock --
+  // this modal's whole point is creating a job the real bot can assign to a real driver.
+  const { data: driversData } = useQuery({ queryKey: ["drivers_summary"], queryFn: () => fetchDrivers() });
+  const roster = (driversData?.drivers ?? []).filter(d => d.active);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -81,11 +84,32 @@ export function AddJobModal({ isOpen, onClose }: Props) {
            !isFinishBeforeStart();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setAttemptedSubmit(true);
-    if (isFormValid()) {
-      // API call would go here
+    setSaveError("");
+    if (!isFormValid()) return;
+    setIsSaving(true);
+    try {
+      await addJob({
+        customerName: form.customerName,
+        customerEmail: form.customerEmail || undefined,
+        customerPhone: form.customerPhone || undefined,
+        pickup: form.pickup,
+        dropoff: form.dropoff,
+        crewSize: form.crewSize,
+        price: Number(form.price),
+        paidOnline: form.paidOnline,
+        driverInitials: form.driverId || undefined,
+        start: form.start,
+        finish: form.finish
+      });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["summary"] });
       onClose();
+    } catch (err: any) {
+      setSaveError(err?.message || "Failed to create job.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -97,11 +121,11 @@ export function AddJobModal({ isOpen, onClose }: Props) {
     return `${hrs > 0 ? `${hrs}h ` : ""}${mins}m`;
   };
 
-  const selectedDriver = roster.find(d => d.code === form.driverId);
-  const filteredRoster = roster.filter(d => 
-    d.name.toLowerCase().includes(driverSearchQuery.toLowerCase()) || 
-    d.code.toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
-    d.vehicleReg.toLowerCase().includes(driverSearchQuery.toLowerCase())
+  const selectedDriver = roster.find(d => d.initials === form.driverId);
+  const filteredRoster = roster.filter(d =>
+    d.fullName.toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
+    d.initials.toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
+    (d.vanRegistration || "").toLowerCase().includes(driverSearchQuery.toLowerCase())
   );
 
   return (
@@ -249,6 +273,15 @@ export function AddJobModal({ isOpen, onClose }: Props) {
                 {isInvalid("price") && <p className="text-[11px] text-status-red mt-1.5">Price is required</p>}
               </div>
             </div>
+            <label className="flex items-center gap-2 mt-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.paidOnline}
+                onChange={e => setForm({ ...form, paidOnline: e.target.checked })}
+                className="w-4 h-4 text-brand rounded border-line focus:ring-brand cursor-pointer"
+              />
+              <span className="text-[13px] font-medium text-ink">Paid online</span>
+            </label>
           </section>
 
           {/* 4. SCHEDULE */}
@@ -318,11 +351,11 @@ export function AddJobModal({ isOpen, onClose }: Props) {
               >
                 {selectedDriver ? (
                   <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center text-[11px] font-bold ${selectedDriver.color}`}>
-                      {selectedDriver.code}
+                    <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center text-[11px] font-bold ${getAvatarColor(selectedDriver.initials)}`}>
+                      {selectedDriver.initials}
                     </div>
                     <div className="text-left">
-                      <div className="text-[13px] font-medium text-ink leading-tight">{selectedDriver.name}</div>
+                      <div className="text-[13px] font-medium text-ink leading-tight">{selectedDriver.fullName}</div>
                     </div>
                   </div>
                 ) : (
@@ -369,24 +402,28 @@ export function AddJobModal({ isOpen, onClose }: Props) {
                     </button>
 
                     {filteredRoster.map(driver => (
-                      <button 
-                        key={driver.code}
-                        onClick={() => { setForm({...form, driverId: driver.code}); setDriverSearchOpen(false); }}
-                        className={`w-full flex items-center gap-3 p-2 rounded-[8px] hover:bg-surface transition ${form.driverId === driver.code ? "bg-surface" : ""}`}
+                      <button
+                        key={driver.initials}
+                        onClick={() => { setForm({...form, driverId: driver.initials}); setDriverSearchOpen(false); }}
+                        className={`w-full flex items-center gap-3 p-2 rounded-[8px] hover:bg-surface transition ${form.driverId === driver.initials ? "bg-surface" : ""}`}
                       >
-                        <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center text-[12px] font-bold shrink-0 ${driver.color}`}>
-                          {driver.code}
+                        <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center text-[12px] font-bold shrink-0 ${getAvatarColor(driver.initials)}`}>
+                          {driver.initials}
                         </div>
                         <div className="flex-1 text-left">
-                          <div className="text-[13px] font-medium text-ink">{driver.name}</div>
+                          <div className="text-[13px] font-medium text-ink">{driver.fullName}</div>
                           <div className="text-[11px] text-muted flex items-center gap-1 mt-0.5">
-                            <span className="bg-line/50 px-1.5 py-[1px] rounded-[4px] font-mono font-bold uppercase text-[10px] text-ink">{driver.vehicleReg}</span>
-                            <span>•</span>
+                            {driver.vanRegistration && (
+                              <>
+                                <span className="bg-line/50 px-1.5 py-[1px] rounded-[4px] font-mono font-bold uppercase text-[10px] text-ink">{driver.vanRegistration}</span>
+                                <span>•</span>
+                              </>
+                            )}
                             <span>{driver.email}</span>
                           </div>
                         </div>
                         <div className="shrink-0 flex items-center gap-3">
-                          {form.driverId === driver.code && <Check className="w-4 h-4 text-ink" />}
+                          {form.driverId === driver.initials && <Check className="w-4 h-4 text-ink" />}
                         </div>
                       </button>
                     ))}
@@ -406,22 +443,30 @@ export function AddJobModal({ isOpen, onClose }: Props) {
         </div>
 
         {/* FOOTER */}
-        <div className="px-6 py-4 border-t border-line bg-white shadow-[0_-4px_10px_rgba(0,0,0,0.02)] flex items-center justify-between rounded-b-[24px] z-10 sticky bottom-0">
-          <span className="text-[12px] text-muted">* Required fields</span>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={onClose} 
-              className="px-5 py-2.5 rounded-[8px] border border-line bg-white font-medium text-ink hover:bg-surface transition text-[13px]"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={handleSave} 
-              disabled={attemptedSubmit && !isFormValid()}
-              className="px-5 py-2.5 rounded-[8px] font-medium bg-brand text-white hover:bg-brand-dark shadow-sm transition text-[13px] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Create Job
-            </button>
+        <div className="px-6 py-4 border-t border-line bg-white shadow-[0_-4px_10px_rgba(0,0,0,0.02)] rounded-b-[24px] z-10 sticky bottom-0">
+          {saveError && (
+            <p className="text-[12px] text-status-red font-medium mb-3 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {saveError}
+            </p>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] text-muted">* Required fields</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                disabled={isSaving}
+                className="px-5 py-2.5 rounded-[8px] border border-line bg-white font-medium text-ink hover:bg-surface transition text-[13px] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving || (attemptedSubmit && !isFormValid())}
+                className="px-5 py-2.5 rounded-[8px] font-medium bg-brand text-white hover:bg-brand-dark shadow-sm transition text-[13px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? "Creating…" : "Create Job"}
+              </button>
+            </div>
           </div>
         </div>
         

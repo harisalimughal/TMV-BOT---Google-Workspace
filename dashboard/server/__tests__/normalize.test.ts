@@ -220,7 +220,8 @@ describe("Dataset Normalization & Three-Way Evidence Classifier", () => {
     pendingSignatures: [],
     scenarioProgress: [],
     fetchedAt: new Date().toISOString(),
-    durationMs: 10
+    durationMs: 10,
+    source: "live"
   };
 
   it("normalizes dataset into NormalizedJob with proper joins", () => {

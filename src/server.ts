@@ -87,8 +87,10 @@ app.use("/forms", scenarioRouter());
 // than the driver's opens it (see chat/signature.link.ts).
 app.use("/sign", signatureRouter());
 
-// Admin dashboard: password-gated, session cookie issued at /admin/login.
-app.use("/admin", adminRouter());
+// The classic server-rendered /admin panel has been replaced by the /ops dashboard
+// (see below) -- adminRouter() is deliberately left imported but unmounted, so
+// rolling back is a one-line change (restore `app.use("/admin", adminRouter());`)
+// rather than needing to resurrect deleted code.
 
 app.post("/chat", verifyGoogleChatRequest, async (req, res) => {
   const requestId = req.header("x-cloud-trace-context")?.split("/")[0] || randomUUID();
@@ -147,7 +149,15 @@ app.post("/internal/sync", async (req, res) => {
   });
 });
 
-if (dashboardRouter) app.use("/ops", dashboardRouter());
+// Mounted at both paths: /admin is now the primary URL (replacing the classic panel
+// above), and /ops stays mounted too since the SPA's own fetch() calls are hardcoded
+// to absolute /ops/api/... paths throughout dashboard/web/src/api/client.ts -- those
+// must keep resolving regardless of which URL actually loaded the page.
+if (dashboardRouter) {
+  const opsRouter = dashboardRouter();
+  app.use("/admin", opsRouter);
+  app.use("/ops", opsRouter);
+}
 
 app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
   log.error("unhandled express error", error);

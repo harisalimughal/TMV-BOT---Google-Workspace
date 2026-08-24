@@ -17,7 +17,14 @@ const WINDOW_MS = Number(process.env.TMV_DASHBOARD_RATE_LIMIT_WINDOW_MS) || 60_0
 const MAX_REQUESTS = Number(process.env.TMV_DASHBOARD_RATE_LIMIT_MAX) || 120;
 
 function sign(exp: number): string {
-  return createHmac("sha256", env.signatureLinkSecret || "default-dev-secret-key").update(`admin-session.${exp}`).digest("hex");
+  // No fallback key: src/server.ts's assertRuntimeConfig() already requires
+  // TMV_SIGNATURE_LINK_SECRET to be set whenever NODE_ENV=production, but that check
+  // doesn't fire for a deployment that's reachable without NODE_ENV actually set to
+  // "production". A hardcoded fallback string here was a real login bypass in that
+  // case: it's public (baked into this open-source-style code), so anyone could
+  // compute a valid session cookie with it and skip the password entirely. Matching
+  // src/admin/admin.auth.ts's sign(), which has never had this fallback.
+  return createHmac("sha256", env.signatureLinkSecret).update(`admin-session.${exp}`).digest("hex");
 }
 
 function parseCookies(header: string | undefined): Record<string, string> {

@@ -45,7 +45,9 @@ export const DRIVERS_MAP = {
   email: "Email",
   chatUserName: "Chat User Name",
   active: "Active",
-  role: "Role"
+  role: "Role",
+  phone: "Phone",
+  vanRegistration: "Van Registration"
 } as const;
 
 export const EVIDENCE_MAP = {

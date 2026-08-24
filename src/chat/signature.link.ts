@@ -1,8 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../config/env";
 
-/** How long a signature-pad link stays valid after a card renders it. */
-export const SIGNATURE_LINK_TTL_MS = 30 * 60 * 1000;
+/** How long a signature-pad link stays valid after a card renders it. See
+ *  scenario.link.ts's SCENARIO_LINK_TTL_MS for why this was extended from 30 minutes. */
+export const SIGNATURE_LINK_TTL_MS = 6 * 60 * 60 * 1000;
 
 function sign(jobId: string, exp: number): string {
   return createHmac("sha256", env.signatureLinkSecret).update(`${jobId}.${exp}`).digest("hex");

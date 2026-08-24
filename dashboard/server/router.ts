@@ -10,16 +10,18 @@ import { driversRoute } from "./routes/drivers.route";
 import { exceptionsRoute } from "./routes/exceptions.route";
 import { financeRoute } from "./routes/finance.route";
 import { jobsRoute } from "./routes/jobs.route";
+import { notificationsRoute } from "./routes/notifications.route";
 import { photosRoute } from "./routes/photos.route";
 import { scenariosRoute } from "./routes/scenarios.route";
+import { settingsRoute } from "./routes/settings.route";
 import { summaryRoute } from "./routes/summary.route";
 
 export function dashboardRouter(): Router {
   const router = Router();
 
   // Authentication & Rate Limiting guard for all /ops routes
-  // router.use(requireDashboardAuth);
   router.use(dashboardRateLimit);
+  router.use(requireDashboardAuth);
 
   // Mount API endpoints under /api
   const api = Router();
@@ -52,6 +54,8 @@ export function dashboardRouter(): Router {
   api.use("/exceptions", exceptionsRoute());
   api.use("/scenarios", scenariosRoute());
   api.use("/activity", activityRoute());
+  api.use("/settings", settingsRoute());
+  api.use("/notifications", notificationsRoute());
 
   // Force cache refresh endpoint
   api.post("/refresh", async (_req: Request, res: Response) => {

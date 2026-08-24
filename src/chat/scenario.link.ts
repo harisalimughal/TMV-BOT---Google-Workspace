@@ -2,8 +2,13 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../config/env";
 import { ScenarioKey } from "./scenario.spec";
 
-/** How long a scenario-form link stays valid after a card renders it. */
-export const SCENARIO_LINK_TTL_MS = 30 * 60 * 1000;
+/** How long a scenario-form link stays valid after a card renders it. 30 minutes was
+ *  too tight for real field conditions (a driver dealing with an actual parking/
+ *  liability incident can easily be delayed past that) -- 6 hours comfortably covers
+ *  a full shift while still eventually expiring. The link is scoped to one specific
+ *  job+scenario and HMAC-signed, so a longer window isn't a meaningful new exposure;
+ *  it only changes how long a leaked/screenshotted link would stay usable. */
+export const SCENARIO_LINK_TTL_MS = 6 * 60 * 60 * 1000;
 
 function sign(scenario: ScenarioKey, jobId: string, exp: number): string {
   return createHmac("sha256", env.signatureLinkSecret).update(`${scenario}.${jobId}.${exp}`).digest("hex");

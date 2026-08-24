@@ -4,114 +4,101 @@ import {
   Download,
   Search,
   Bell,
-  RefreshCw,
-  Eye,
   AlertTriangle,
   Mail,
   Smartphone
 } from "lucide-react";
-import { fetchJobs } from "../api/client";
-import { NormalizedJob } from "../types";
+import { fetchNotifications, NotificationRow } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { formatLondonDateTime } from "../utils/date";
+import { getAvatarColor } from "../utils/drivers";
 
-// Stable pseudo-random generator based on string
-const hashString = (str: string) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
+const STATUS_PILL: Record<NotificationRow["email"]["state"], string> = {
+  sent: "bg-status-green-bg text-status-green",
+  failed: "bg-status-red-bg text-status-red",
+  pending: "bg-amber-100 text-amber-700",
+  skipped: "bg-surface text-muted",
+  disabled: "bg-surface text-muted"
 };
 
-const getAvatarColor = (initials: string) => {
-  const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-emerald-100 text-emerald-700",
-    "bg-purple-100 text-purple-700",
-    "bg-rose-100 text-rose-700",
-    "bg-amber-100 text-amber-700",
-    "bg-indigo-100 text-indigo-700",
-    "bg-cyan-100 text-cyan-700",
-    "bg-teal-100 text-teal-700",
-  ];
-  const charCode = initials.charCodeAt(0) || 0;
-  return colors[charCode % colors.length];
+const STATUS_LABEL: Record<NotificationRow["email"]["state"], string> = {
+  sent: "Sent",
+  failed: "Failed",
+  pending: "Pending",
+  skipped: "No target",
+  disabled: "SMS off"
 };
 
 const normalizePhone = (phone?: string) => {
   if (!phone) return { formatted: "—", isInvalid: true };
   const cleaned = phone.replace(/\D/g, "");
-  
-  // Flag malformed/test
-  if (cleaned.length < 10 || cleaned.startsWith("4342") || cleaned === "0000000000") {
-    return { formatted: phone, isInvalid: true };
-  }
-
-  // Format as 07XXX XXXXXX if it starts with 447 or 07
+  if (cleaned.length < 10) return { formatted: phone, isInvalid: true };
   if (cleaned.startsWith("447") && cleaned.length === 12) {
     return { formatted: `0${cleaned.slice(2, 6)} ${cleaned.slice(6)}`, isInvalid: false };
   }
   if (cleaned.startsWith("07") && cleaned.length === 11) {
     return { formatted: `${cleaned.slice(0, 5)} ${cleaned.slice(5)}`, isInvalid: false };
   }
-
   return { formatted: phone, isInvalid: false };
 };
 
+function downloadCsv(filename: string, rows: NotificationRow[]) {
+  const columns = ["Job ID", "Customer", "Driver", "Started", "Email address", "Email", "Phone number", "SMS"];
+  const csvValue = (v: unknown) => {
+    let s = v == null ? "" : String(v);
+    if (/[",\n]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const lines = [columns.join(",")];
+  for (const r of rows) {
+    lines.push([
+      r.jobId, r.customerName, r.driverInitials, formatLondonDateTime(r.actualStart),
+      r.customerEmail, STATUS_LABEL[r.email.state], r.customerPhone, STATUS_LABEL[r.sms.state]
+    ].map(csvValue).join(","));
+  }
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// Real email/SMS delivery status, from the classic bot's own ActivityLog rows (see
+// dashboard/server/routes/notifications.route.ts) -- not a fabricated per-job hash.
 export function NotificationsPage() {
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const pageSize = 25;
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["notifications_jobs", page, pageSize, from, to],
-    queryFn: () => fetchJobs({ page, pageSize, from, to }) // Fetch all jobs, active and finished
+    queryKey: ["notifications"],
+    queryFn: () => fetchNotifications()
   });
 
-  const isTestOrIncomplete = (job: NormalizedJob) => {
-    const cust = (job.customerName || "").toLowerCase();
-    if (cust.includes("test") || cust === "hh" || cust === "hdh" || cust === "number test") return true;
-    return false;
-  };
+  const allRows = data?.rows || [];
 
-  // Process data to generate stable notification statuses
-  const notifications = (data?.items || []).map(job => {
-    const hash = hashString(job.jobId);
-    
-    // Deterministic simulation
-    const emailStatus = hash % 10 === 0 ? "Failed" : "Sent";
-    let smsStatus = "Pending";
-    if (hash % 10 === 1 || hash % 10 === 2) smsStatus = "Failed";
-    else if (hash % 2 === 0) smsStatus = "Sent";
-
-    return {
-      ...job,
-      emailStatus,
-      smsStatus
-    };
-  });
-
-  const filteredNotifications = notifications.filter(n => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (!n.jobId.toLowerCase().includes(q) && !(n.customerName || "").toLowerCase().includes(q)) return false;
-    }
-    
-    if (statusFilter !== "All") {
-      // If filtering by Failed, check if either email or sms failed
-      if (statusFilter === "Failed" && n.emailStatus !== "Failed" && n.smsStatus !== "Failed") return false;
-      if (statusFilter === "Sent" && n.emailStatus !== "Sent" && n.smsStatus !== "Sent") return false;
-      if (statusFilter === "Pending" && n.smsStatus !== "Pending") return false;
-    }
-    
+  const dateFiltered = allRows.filter(r => {
+    if (from && r.actualStart < from) return false;
+    if (to && r.actualStart > to) return false;
     return true;
   });
+
+  const filtered = dateFiltered.filter(r => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!r.jobId.toLowerCase().includes(q) && !(r.customerName || "").toLowerCase().includes(q)) return false;
+    }
+    if (statusFilter === "Sent" && r.email.state !== "sent" && r.sms.state !== "sent") return false;
+    if (statusFilter === "Failed" && r.email.state !== "failed" && r.sms.state !== "failed") return false;
+    if (statusFilter === "Pending" && r.email.state !== "pending" && r.sms.state !== "pending") return false;
+    return true;
+  });
+
+  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto">
@@ -121,29 +108,25 @@ export function NotificationsPage() {
           <Bell className="w-6 h-6 text-brand" />
           <h1 className="text-[20px] font-bold text-ink">Notifications</h1>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <button
-            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
+            onClick={() => downloadCsv(`notifications-${new Date().toISOString().slice(0, 10)}.csv`, filtered)}
+            disabled={!filtered.length}
+            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2 disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> Export CSV
-          </button>
-          <button
-            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" /> Export PDF
           </button>
         </div>
       </div>
 
       {/* TOOLBAR */}
       <div className="p-2 bg-white rounded-[16px] shadow-sm border border-line flex flex-wrap items-center gap-4">
-        {/* Status Filter */}
         <div className="flex items-center gap-1 bg-surface p-1 rounded-xl">
           {["All", "Sent", "Failed", "Pending"].map((s) => (
-            <button 
-              key={s} 
-              onClick={() => setStatusFilter(s)}
+            <button
+              key={s}
+              onClick={() => { setStatusFilter(s); setPage(1); }}
               className={`px-3 py-1.5 rounded-[8px] text-[12px] font-medium transition ${
                 statusFilter === s ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"
               }`}
@@ -155,33 +138,23 @@ export function NotificationsPage() {
 
         <div className="w-[1px] h-6 bg-line mx-2" />
 
-        {/* Date Ranges */}
-        <div className="flex items-center gap-1 bg-surface p-1 rounded-xl">
-          {["All Time", "Today", "7 Days", "30 Days"].map((l) => (
-            <button key={l} className="px-3 py-1.5 rounded-[8px] text-[12px] font-medium text-muted hover:text-ink hover:bg-white/50 transition">
-              {l}
-            </button>
-          ))}
-        </div>
-        
         <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
 
         <div className="w-[1px] h-6 bg-line mx-2" />
 
-        {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-muted absolute left-3 top-2.5" />
-          <input 
-            type="text" 
-            placeholder="Search Job ID or Customer..." 
+          <input
+            type="text"
+            placeholder="Search Job ID or Customer..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
             className="w-full h-9 pl-9 pr-3 rounded-[8px] border border-line bg-white text-[13px] outline-none focus:border-brand focus:ring-1 focus:ring-brand transition"
           />
         </div>
-        
+
         <span className="text-[13px] text-muted font-medium pr-2">
-          {isLoading ? "..." : `${filteredNotifications.length} records`}
+          {isLoading ? "..." : `${filtered.length} records`}
         </span>
       </div>
 
@@ -197,7 +170,6 @@ export function NotificationsPage() {
         </div>
       )}
 
-      {/* Main Table View */}
       {!isLoading && !error && (
         <div className="bg-white rounded-[20px] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-line overflow-hidden">
           <div className="overflow-x-auto custom-scrollbar">
@@ -212,36 +184,23 @@ export function NotificationsPage() {
                   <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Email</th>
                   <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Phone Number</th>
                   <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">SMS</th>
-                  <th className="py-4 px-4 w-12"></th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-line">
-                {filteredNotifications.map((job) => {
-                  const startedTime = job.actualStart || job.bookedStart ? formatLondonDateTime(job.actualStart || job.bookedStart) : "—";
-                  
-                  const isTest = isTestOrIncomplete(job);
-                  const driverInit = job.driverInitials || "UN";
-                  const phoneInfo = normalizePhone(job.customerPhone);
+                {pageRows.map((row) => {
+                  const startedTime = row.actualStart ? formatLondonDateTime(row.actualStart) : "—";
+                  const driverInit = row.driverInitials || "UN";
+                  const phoneInfo = normalizePhone(row.customerPhone);
 
                   return (
-                    <tr
-                      key={job.jobId}
-                      className={`h-[60px] group transition select-none hover:bg-[#F9FAFB] ${isTest ? "opacity-60 bg-surface/30" : ""}`}
-                    >
+                    <tr key={row.jobId} className="h-[60px] group transition select-none hover:bg-[#F9FAFB]">
                       <td className="px-6">
-                        <button className="font-medium text-[#2563EB] hover:underline text-[14px]">
-                          {job.jobId}
-                        </button>
-                        {isTest && (
-                           <span className="ml-2 px-1.5 py-0.5 rounded-[4px] bg-white border border-line text-muted text-[10px] font-semibold uppercase tracking-wider" title="Test Record">
-                             Test
-                           </span>
-                        )}
+                        <span className="font-medium text-ink text-[14px]">{row.jobId}</span>
                       </td>
 
                       <td className="px-4 text-[14px] text-ink font-medium">
-                        <span className="truncate max-w-[150px] inline-block">{job.customerName || "—"}</span>
+                        <span className="truncate max-w-[150px] inline-block">{row.customerName || "—"}</span>
                       </td>
 
                       <td className="px-4">
@@ -249,66 +208,52 @@ export function NotificationsPage() {
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] ${driverInit === "UN" ? "bg-surface border border-line text-muted" : getAvatarColor(driverInit)}`}>
                             {driverInit}
                           </div>
-                          <div className="text-[13px] text-ink">{job.driverName || "Unassigned"}</div>
                         </div>
                       </td>
 
                       <td className="px-4 text-[13px] text-muted tabular-nums">{startedTime}</td>
 
                       <td className="px-4 text-[13px] text-ink">
-                        {job.customerEmail ? (
-                           <span className="flex items-center gap-1.5">
-                             <Mail className="w-3.5 h-3.5 text-muted shrink-0" />
-                             <span className="truncate max-w-[180px]">{job.customerEmail}</span>
-                           </span>
+                        {row.customerEmail ? (
+                          <span className="flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-muted shrink-0" />
+                            <span className="truncate max-w-[180px]">{row.customerEmail}</span>
+                          </span>
                         ) : (
-                           <span className="text-muted italic">No email</span>
+                          <span className="text-muted italic">No email</span>
                         )}
                       </td>
 
                       <td className="px-4">
-                        <span className={`px-2 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${
-                          job.emailStatus === "Sent" ? "bg-status-green-bg text-status-green" : "bg-status-red-bg text-status-red"
-                        }`}>
-                          {job.emailStatus}
+                        <span
+                          className={`px-2 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${STATUS_PILL[row.email.state]}`}
+                          title={row.email.detail || undefined}
+                        >
+                          {STATUS_LABEL[row.email.state]}
                         </span>
                       </td>
 
                       <td className="px-4 text-[13px]">
                         {phoneInfo.isInvalid ? (
-                           <span className="flex items-center gap-1.5 text-muted" title="Malformed or test number">
-                             <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                             {phoneInfo.formatted}
-                           </span>
+                          <span className="flex items-center gap-1.5 text-muted">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            {phoneInfo.formatted}
+                          </span>
                         ) : (
-                           <span className="flex items-center gap-1.5 text-ink tabular-nums font-mono">
-                             <Smartphone className="w-3.5 h-3.5 text-muted shrink-0" />
-                             {phoneInfo.formatted}
-                           </span>
+                          <span className="flex items-center gap-1.5 text-ink tabular-nums font-mono">
+                            <Smartphone className="w-3.5 h-3.5 text-muted shrink-0" />
+                            {phoneInfo.formatted}
+                          </span>
                         )}
                       </td>
 
                       <td className="px-4">
-                        <span className={`px-2 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${
-                          job.smsStatus === "Sent" ? "bg-status-green-bg text-status-green" :
-                          job.smsStatus === "Failed" ? "bg-status-red-bg text-status-red" :
-                          "bg-amber-100 text-amber-700"
-                        }`}>
-                          {job.smsStatus}
+                        <span
+                          className={`px-2 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${STATUS_PILL[row.sms.state]}`}
+                          title={row.sms.detail || undefined}
+                        >
+                          {STATUS_LABEL[row.sms.state]}
                         </span>
-                      </td>
-
-                      <td className="px-4 pr-6">
-                        <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1 justify-end">
-                           <button className="p-1.5 rounded-md text-muted hover:text-ink hover:bg-surface transition" title="View Job Details">
-                             <Eye className="w-4 h-4" />
-                           </button>
-                           {(job.emailStatus === "Failed" || job.smsStatus === "Failed") && (
-                             <button className="p-1.5 rounded-md text-brand hover:bg-brand-soft transition" title="Resend Notification">
-                               <RefreshCw className="w-4 h-4" />
-                             </button>
-                           )}
-                        </div>
                       </td>
                     </tr>
                   );
@@ -318,16 +263,15 @@ export function NotificationsPage() {
           </div>
         </div>
       )}
-      
-      {/* Pagination */}
-      {!isLoading && !error && data?.pagination && (
-         <div className="flex items-center justify-between px-2 text-[13px] text-muted pb-8">
-           <span>Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, data.pagination.total)} of {data.pagination.total}</span>
-           <div className="flex gap-2">
-             <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink shadow-sm">Previous</button>
-             <button disabled={page * pageSize >= data.pagination.total} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink shadow-sm">Next</button>
-           </div>
-         </div>
+
+      {!isLoading && !error && filtered.length > 0 && (
+        <div className="flex items-center justify-between px-2 text-[13px] text-muted pb-8">
+          <span>Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length}</span>
+          <div className="flex gap-2">
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink shadow-sm">Previous</button>
+            <button disabled={page * pageSize >= filtered.length} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink shadow-sm">Next</button>
+          </div>
+        </div>
       )}
     </div>
   );

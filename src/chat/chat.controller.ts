@@ -23,7 +23,7 @@ import {
 } from "./scenario.engine";
 import {
   commitWrites, getDriverByInitials, getJob, getScenarioProgress, getSetting, listScenarioProgressForJob,
-  pendingSignatureWrite
+  pendingSignatureWrite, scenarioProgressWrite
 } from "../google/sheets";
 import { JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE, renderMessageTemplate } from "../notifications/message";
 import { Job } from "../jobs/job.types";
@@ -100,15 +100,25 @@ async function showCurrentOrNext(event: GoogleChatEvent, confirmationText: strin
   const { job } = await getNextJobForDriver(identifier(event), { sync });
   if (!job) return noJobsCard();
   setContext({ jobId: job.jobId });
-  return job.status === "IN_PROGRESS" ? await resolveWorkflowCard(job, confirmationText) : jobCard(job);
+  return job.status === "IN_PROGRESS" ? await resolveWorkflowCard(job, confirmationText, event.message?.name) : jobCard(job);
 }
 
 /**
  * Wraps workflowCard() with the async lookups a few of its steps need. Every other
  * state's work here is a plain string compare, so it's safe (and simpler) to route
  * every workflow-card render through this rather than cherry-picking call sites.
+ *
+ * `messageName`, when given, is also used to keep the "push the next card once
+ * signed" target (PendingSignatures / a scenario's own ScenarioProgress.messageName)
+ * pointed at whatever message the driver is actually looking at right now. Both of
+ * those are otherwise only recorded once, at the moment the flow first transitions
+ * into a signature-waiting state — if the driver navigates away before signing (e.g.
+ * "Next Job" back to the menu and back) and this card gets re-rendered onto a
+ * DIFFERENT message, the stored target goes stale: the eventual post-signature push
+ * updates a message nobody is looking at anymore, so signing silently appears to do
+ * nothing until the driver notices and manually refreshes.
  */
-async function resolveWorkflowCard(job: Job, confirmationText: string): Promise<ChatResponse> {
+async function resolveWorkflowCard(job: Job, confirmationText: string, messageName?: string): Promise<ChatResponse> {
   const state = job.currentState as WorkflowState;
 
   if (state === WorkflowState.WAITING_ARRIVAL_ISSUES_CHOICE || state === WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE) {
@@ -120,6 +130,11 @@ async function resolveWorkflowCard(job: Job, confirmationText: string): Promise<
     if (active) {
       const scenario = active.scenario as ScenarioKey;
       const spec = SCENARIOS[scenario];
+      if (messageName && messageName !== active.messageName) {
+        await commitWrites([scenarioProgressWrite({ ...active, messageName })]).catch(error =>
+          log.warn("failed to refresh scenario progress message target", { job_id: job.jobId, scenario, error: String(error) })
+        );
+      }
       const step = await describeStep(spec, active);
       return renderScenarioStep(spec, scenario, job.jobId, step);
     }
@@ -139,6 +154,12 @@ async function resolveWorkflowCard(job: Job, confirmationText: string): Promise<
     const template = await getSetting("REVIEW_REQUEST_EMAIL_TEXT", REVIEW_REQUEST_EMAIL_TEMPLATE);
     const reviewEmailPreview = renderMessageTemplate(template, job);
     return workflowCard(job, confirmationText, { reviewEmailPreview });
+  }
+
+  if (state === WorkflowState.WAITING_CLIENT_CONFIRMATION && messageName) {
+    await commitWrites([pendingSignatureWrite(job.jobId, messageName)]).catch(error =>
+      log.warn("failed to refresh pending-signature message target", { job_id: job.jobId, error: String(error) })
+    );
   }
 
   return workflowCard(job, confirmationText);
@@ -278,7 +299,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
                 ...timer.fields()
               });
               return {
-                result: createResponse(photoAckCard(job, accepted, await resolveWorkflowCard(job, confirmationText))),
+                result: createResponse(photoAckCard(job, accepted, await resolveWorkflowCard(job, confirmationText, event.message?.name))),
                 outcomeState: job.currentState,
                 jobId: job.jobId
               };
@@ -286,7 +307,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
             async replay => {
               // Show the card the original delivery produced, not an out-of-order error.
               const job = replay.jobId ? await getJob(replay.jobId) : null;
-              return createResponse(job ? await resolveWorkflowCard(job, confirmationText) : helpCard());
+              return createResponse(job ? await resolveWorkflowCard(job, confirmationText, event.message?.name) : helpCard());
             }
           );
         }
@@ -319,6 +340,33 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
           // to see what's coming tomorrow.
           const { jobs } = await getTomorrowJobsForDriver(identifier(event));
           return updateResponse(tomorrowJobsCard(jobs));
+        }
+
+        if (fn === "SCENARIO_CHECK_AGAIN") {
+          const scenario = actionParam(event, "scenario") as ScenarioKey;
+          const spec = SCENARIOS[scenario];
+          if (!spec) throw new ValidationError("This scenario is no longer available.");
+
+          return updateResponse(await withActiveJob(event, async job => {
+            const progress = await getScenarioProgress(job.jobId, scenario, 0);
+            if (!progress) throw new ValidationError("This scenario isn't in progress. Tap Main Menu and start it again.");
+
+            // Re-reading and re-rendering the real current step is the whole point --
+            // if the customer already signed since this card last showed, this alone
+            // surfaces that (a "done" step renders the submitted card) instead of the
+            // driver being stuck looking at a stale signature-waiting card. Also
+            // refreshes the push-forward target the same way resolveWorkflowCard()
+            // does for the classic flow, in case this tap is what brings the driver
+            // back to a message that wasn't the one last recorded.
+            const messageName = event.message?.name;
+            if (messageName && messageName !== progress.messageName) {
+              await commitWrites([scenarioProgressWrite({ ...progress, messageName })]).catch(error =>
+                log.warn("failed to refresh scenario progress message target", { job_id: job.jobId, scenario, error: String(error) })
+              );
+            }
+            const step = await describeStep(spec, progress);
+            return renderScenarioStep(spec, scenario, job.jobId, step);
+          }));
         }
 
         if (fn === "SCENARIO_FIELD_SUBMIT" || fn === "SCENARIO_NOTICE_ACK" || fn === "SCENARIO_PHOTOS_CONTINUE") {
@@ -354,7 +402,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (fn === "REOPEN_PHOTO_STEP") {
           const evidenceType = (actionParam(event, "evidenceType") || "Arrival") as EvidenceType;
           const job = await reopenPhotoStep(jobId, identifier(event), evidenceType);
-          return updateResponse(await resolveWorkflowCard(job, confirmationText));
+          return updateResponse(await resolveWorkflowCard(job, confirmationText, event.message?.name));
         }
 
         // Card clicks are replay-guarded too: a double-tap or a Chat retry must not
@@ -379,28 +427,20 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
             timer.mark("action");
             log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
 
-            // This click's response card is about to become "waiting on the customer
-            // to sign" — remember which Chat message that is, so the signature POST
-            // handler can push it forward automatically once they've signed (see
-            // chat/signature.routes.ts). Best-effort: CHECK AGAIN is still the fallback
-            // if this write or the later push fails for any reason.
-            if (job.currentState === WorkflowState.WAITING_CLIENT_CONFIRMATION && event.message?.name) {
-              await commitWrites([pendingSignatureWrite(job.jobId, event.message.name)]).catch(error =>
-                log.warn("failed to record pending-signature message", { job_id: job.jobId, error: String(error) })
-              );
-            }
-
             // SEND_ON_MY_WAY_MESSAGE's response is the one workflow card that needs a
             // render-time-only flag (the one-time "message sent" notice) rather than
             // an async lookup, so it renders directly instead of via resolveWorkflowCard.
+            // Every other response goes through resolveWorkflowCard(), which is also
+            // what keeps the "waiting on the customer to sign" push-forward target
+            // (PendingSignatures) pointed at this exact message.
             const responseCard = fn === "SEND_ON_MY_WAY_MESSAGE"
               ? workflowCard(job, confirmationText, { justSentOnMyWayMessage: true })
-              : await resolveWorkflowCard(job, confirmationText);
+              : await resolveWorkflowCard(job, confirmationText, event.message?.name);
             return { result: updateResponse(responseCard), outcomeState: job.currentState, jobId: job.jobId };
           },
           async () => {
             const job = await getJob(jobId);
-            return updateResponse(job ? await resolveWorkflowCard(job, confirmationText) : helpCard());
+            return updateResponse(job ? await resolveWorkflowCard(job, confirmationText, event.message?.name) : helpCard());
           }
         );
       }

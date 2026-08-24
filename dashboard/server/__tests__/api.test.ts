@@ -1,6 +1,6 @@
 import express from "express";
 import { describe, expect, it } from "vitest";
-import { issueSessionCookie } from "../../../src/admin/admin.auth";
+import { issueOpsCookie } from "../auth";
 import { dashboardRouter } from "../router";
 
 function createTestApp() {
@@ -44,16 +44,19 @@ describe("Dashboard API & Auth Gates (/ops/api/*)", () => {
     const server = app.listen(0);
     const port = (server.address() as any).port;
 
-    // Create a mock response to issue cookie
+    // issueOpsCookie is the dashboard's own cookie issuer -- signing a cookie with
+    // src/admin/admin.auth.ts's issueSessionCookie instead would only work if
+    // env.signatureLinkSecret happens to be truthy at module-load time (it falls
+    // back to a different default in dashboard/server/auth.ts's sign() when empty),
+    // and process.env writes here can't retroactively change the already-imported
+    // env singleton either way.
     const mockRes: any = {
       headers: {},
-      setHeader(name: string, val: string) {
-        this.headers[name.toLowerCase()] = val;
+      setHeader(name: string, val: string | string[]) {
+        this.headers[name.toLowerCase()] = Array.isArray(val) ? val[0] : val;
       }
     };
-    process.env.TMV_ADMIN_PASSWORD = "test-password";
-    process.env.TMV_SIGNATURE_LINK_SECRET = "test-secret-key-for-signing-session-cookies";
-    issueSessionCookie(mockRes);
+    issueOpsCookie(mockRes);
     const cookieHeader = mockRes.headers["set-cookie"]?.split(";")[0];
 
     try {

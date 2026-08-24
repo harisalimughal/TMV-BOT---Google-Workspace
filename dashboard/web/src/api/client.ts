@@ -123,3 +123,89 @@ export async function triggerDatasetRefresh(): Promise<void> {
   const res = await fetch("/ops/api/refresh", { method: "POST" });
   if (!res.ok) throw new Error("Failed to refresh dataset");
 }
+
+async function postJson(path: string, body: unknown): Promise<void> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error?.message || "Request failed");
+  }
+}
+
+export interface AddJobPayload {
+  customerName: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  pickup: string;
+  dropoff: string;
+  crewSize: number;
+  price: number;
+  paidOnline?: boolean;
+  driverInitials?: string;
+  start: string;
+  finish: string;
+}
+
+/** Creates a real Calendar event (see dashboard/server/routes/jobs.route.ts) --
+ *  not a local write, the classic bot's own sync path picks this up. */
+export async function addJob(payload: AddJobPayload): Promise<void> {
+  return postJson("/ops/api/jobs", payload);
+}
+
+export interface SaveDriverPayload {
+  initials: string;
+  fullName: string;
+  email: string;
+  chatUserName?: string;
+  role?: string;
+  active?: boolean;
+  phone?: string;
+  vanRegistration?: string;
+}
+
+/** Upserts a Drivers-sheet row, keyed on email -- add and edit both go through this. */
+export async function saveDriver(payload: SaveDriverPayload): Promise<void> {
+  return postJson("/ops/api/drivers", payload);
+}
+
+export interface EditableSetting {
+  key: string;
+  label: string;
+  description: string;
+  value: string;
+  fallback: string;
+}
+
+export async function fetchSettings(): Promise<{ settings: EditableSetting[] }> {
+  const res = await fetch("/ops/api/settings");
+  if (!res.ok) throw new Error("Failed to load settings");
+  return res.json();
+}
+
+export async function saveSetting(key: string, value: string): Promise<void> {
+  return postJson("/ops/api/settings", { key, value });
+}
+
+export interface NotificationRow {
+  jobId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  driverInitials: string;
+  actualStart: string;
+  email: { state: "sent" | "failed" | "pending" | "skipped" | "disabled"; detail: string; at: string };
+  sms: { state: "sent" | "failed" | "pending" | "skipped" | "disabled"; detail: string; at: string };
+}
+
+/** Real email/SMS delivery status, from the same ActivityLog rows the classic /admin
+ *  panel's Notifications tab reads -- not the fabricated per-job hash the old
+ *  NotificationsPage.tsx used. */
+export async function fetchNotifications(): Promise<{ rows: NotificationRow[] }> {
+  const res = await fetch("/ops/api/notifications");
+  if (!res.ok) throw new Error("Failed to load notifications");
+  return res.json();
+}

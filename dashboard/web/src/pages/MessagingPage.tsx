@@ -1,177 +1,78 @@
-import React, { useState } from "react";
-import { MessageSquare, Save, RotateCcw, AlertTriangle, User, Hash, Clock, MapPin } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquare, Save, RotateCcw, AlertTriangle } from "lucide-react";
+import { EditableSetting, fetchSettings, saveSetting } from "../api/client";
 
-interface Template {
-  id: string;
-  title: string;
-  description: string;
-  content: string;
-  defaultContent: string;
-  channels: string[];
+// The real, single-shared placeholder syntax renderMessageTemplate() (src/notifications/message.ts)
+// actually substitutes -- not every setting supports every token, see VARIABLES_BY_KEY.
+const MOCK_DATA: Record<string, string> = {
+  "{customerName}": "Sarah Jenkins",
+  "{companyName}": "The Man Van",
+  "{pickup}": "142 Battersea Park Road, London",
+  "{dropoff}": "45 Depot Road, London",
+  "{driverPhone}": "07455 123456",
+  "{vanRegistration}": "LV24 MVO"
+};
+
+const VARIABLES_BY_KEY: Record<string, string[]> = {
+  confirmationText: [],
+  jobStartedMessage: ["{customerName}", "{companyName}", "{pickup}", "{dropoff}", "{driverPhone}", "{vanRegistration}"],
+  reviewRequestEmail: ["{customerName}", "{companyName}", "{pickup}", "{dropoff}"]
+};
+
+const CHANNELS_BY_KEY: Record<string, string[]> = {
+  confirmationText: ["Signature pad"],
+  jobStartedMessage: ["SMS", "Email"],
+  reviewRequestEmail: ["Email"]
+};
+
+function renderPreview(content: string): string {
+  let preview = content;
+  for (const [token, value] of Object.entries(MOCK_DATA)) {
+    preview = preview.split(token).join(value);
+  }
+  return preview;
 }
 
-const SEED_TEMPLATES = {
-  customer: [
-    {
-      id: "client_reminder",
-      title: "Client Reminder / \"On My Way\"",
-      description: "Sent to customer automatically before job start (SMS & Email).",
-      channels: ["SMS", "Email"],
-      defaultContent: "Hi, I'm {{driver_name}}, your driver from The Man Van. My vehicle registration is {{vehicle_registration}}. I'm on my way to your pickup location. If you have any questions, please call me on {{driver_phone}}.",
-      content: "Hi, I'm {{driver_name}}, your driver from The Man Van. My vehicle registration is {{vehicle_registration}}. I'm on my way to your pickup location. If you have any questions, please call me on {{driver_phone}}."
-    },
-    {
-      id: "review_request",
-      title: "Review Request Email",
-      description: "Sent to customer automatically upon successful job completion (Email only).",
-      channels: ["Email"],
-      defaultContent: "Hi {{client_name}},\nYour driver mentioned how smoothly everything went and asked us to say a big THANK YOU for being so kind and easy to work with! 😊\nIf you have a moment, we'd really appreciate it if you could leave us a quick 5-star ⭐⭐⭐⭐⭐ review. Your review will be featured on The Man Van website and helps our drivers build their reputation and get more work — so it genuinely means a lot to us.\nThanks again for choosing The Man Van and for making the move such a pleasure! 🤗\nReview us here 👉 {{review_link}}",
-      content: "Hi {{client_name}},\nYour driver mentioned how smoothly everything went and asked us to say a big THANK YOU for being so kind and easy to work with! 😊\nIf you have a moment, we'd really appreciate it if you could leave us a quick 5-star ⭐⭐⭐⭐⭐ review. Your review will be featured on The Man Van website and helps our drivers build their reputation and get more work — so it genuinely means a lot to us.\nThanks again for choosing The Man Van and for making the move such a pleasure! 🤗\nReview us here 👉 {{review_link}}"
-    },
-    {
-      id: "job_started",
-      title: "Customer Message — Job Started",
-      description: "Sent to customer when driver arrives (SMS only).",
-      channels: ["SMS"],
-      defaultContent: "Hi {{client_name}}, your TMV driver {{driver_name}} has officially arrived and started the job clock at {{job_time}}.",
-      content: "Hi {{client_name}}, your TMV driver {{driver_name}} has officially arrived and started the job clock at {{job_time}}."
-    }
-  ],
-  driver: [
-    {
-      id: "job_assigned_sms_chat",
-      title: "Job Assigned — SMS / Chat (short form)",
-      description: "Sent immediately when a driver is assigned to a job, via SMS or Chat",
-      channels: ["SMS", "Chat"],
-      defaultContent: "Hi {{driver_name}}, you've been assigned a new job: {{job_id}} for {{client_name}}. Pickup: {{pickup_address}} at {{job_time}} on {{job_date}}. Crew: {{crew_size}}. Vehicle: {{vehicle_registration}}. Reply to confirm.",
-      content: "Hi {{driver_name}}, you've been assigned a new job: {{job_id}} for {{client_name}}. Pickup: {{pickup_address}} at {{job_time}} on {{job_date}}. Crew: {{crew_size}}. Vehicle: {{vehicle_registration}}. Reply to confirm."
-    },
-    {
-      id: "job_assigned_email",
-      title: "Job Assigned — Email (fuller detail)",
-      description: "Sent immediately when a driver is assigned to a job, via Email",
-      channels: ["Email"],
-      defaultContent: "Hi {{driver_name}},\n\nYou've been assigned a new job.\n\nJob ID: {{job_id}}\nClient: {{client_name}}\nDate & Time: {{job_date}} at {{job_time}}\nPickup: {{pickup_address}}\nDrop-off: {{dropoff_address}}\nCrew size: {{crew_size}}\nVehicle: {{vehicle_registration}}\nPrice: {{job_price}}\n\nPlease confirm you've received this job in the app/Chat bot. If you have any questions, contact the office before the scheduled start time.\n\n— The Man Van Operations",
-      content: "Hi {{driver_name}},\n\nYou've been assigned a new job.\n\nJob ID: {{job_id}}\nClient: {{client_name}}\nDate & Time: {{job_date}} at {{job_time}}\nPickup: {{pickup_address}}\nDrop-off: {{dropoff_address}}\nCrew size: {{crew_size}}\nVehicle: {{vehicle_registration}}\nPrice: {{job_price}}\n\nPlease confirm you've received this job in the app/Chat bot. If you have any questions, contact the office before the scheduled start time.\n\n— The Man Van Operations"
-    },
-    {
-      id: "job_reassigned_removed",
-      title: "Job Reassigned / Removed — SMS",
-      description: "Sent to the previous driver if a job is reassigned or removed",
-      channels: ["SMS"],
-      defaultContent: "Hi {{driver_name}}, job {{job_id}} ({{client_name}}, {{job_date}} {{job_time}}) has been reassigned to another driver and removed from your schedule.",
-      content: "Hi {{driver_name}}, job {{job_id}} ({{client_name}}, {{job_date}} {{job_time}}) has been reassigned to another driver and removed from your schedule."
-    },
-    {
-      id: "job_assignment_reminder",
-      title: "Job Assignment Reminder — Next-Day Summary",
-      description: "Optional daily summary of tomorrow's assigned jobs",
-      channels: ["SMS", "Chat"],
-      defaultContent: "Hi {{driver_name}}, you have {{job_count}} job(s) scheduled for tomorrow ({{job_date}}). First job: {{job_time}} — {{pickup_address}}. Check the app for full details.",
-      content: "Hi {{driver_name}}, you have {{job_count}} job(s) scheduled for tomorrow ({{job_date}}). First job: {{job_time}} — {{pickup_address}}. Check the app for full details."
-    }
-  ],
-  payment: [],
-  evidence: [],
-  legal: [],
-  other: []
-};
-
-const AVAILABLE_VARIABLES = [
-  "{{driver_name}}",
-  "{{job_id}}",
-  "{{client_name}}",
-  "{{job_date}}",
-  "{{job_time}}",
-  "{{pickup_address}}",
-  "{{dropoff_address}}",
-  "{{crew_size}}",
-  "{{vehicle_registration}}",
-  "{{job_price}}",
-  "{{job_count}}",
-  "{{driver_phone}}",
-  "{{review_link}}"
-];
-
-const MOCK_DATA: Record<string, string> = {
-  "{{driver_name}}": "Rafael Cruz",
-  "{{vehicle_registration}}": "LV24 MVO",
-  "{{driver_phone}}": "07455 123456",
-  "{{client_name}}": "Sarah Jenkins",
-  "{{job_time}}": "09:30 AM",
-  "{{pickup_address}}": "142 Battersea Park Road, London",
-  "{{review_link}}": "https://g.page/r/tmv-review/leave"
-};
-
-const TABS = [
-  { id: "customer", label: "Customer Communications" },
-  { id: "driver", label: "Driver Notifications" },
-  { id: "payment", label: "Payment Messages" },
-  { id: "evidence", label: "Photo/Evidence Requests" },
-  { id: "legal", label: "Legal & Confirmation Text" },
-  { id: "other", label: "Other Automated Messages" }
-];
-
+// The 3 real admin-editable message templates the classic /admin panel's Settings tab
+// exposes (src/admin/admin.routes.ts's EDITABLE_SETTINGS) -- rendered and saved
+// through the same GET/POST /ops/api/settings the driver-facing cards actually read
+// from (via getSetting()), not a disconnected mock with its own invented placeholder
+// syntax and template categories the bot has no capability to send.
 export function MessagingPage() {
-  const [activeTab, setActiveTab] = useState("customer");
-  const [templates, setTemplates] = useState<Record<string, Template[]>>(SEED_TEMPLATES);
-  const [unsavedChanges, setUnsavedChanges] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+  const { data, isLoading, error } = useQuery({ queryKey: ["settings"], queryFn: () => fetchSettings() });
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
 
-  // Notification Timing Config
-  const [timingVal, setTimingVal] = useState("60");
-  const [timingUnit, setTimingUnit] = useState("minutes");
-  const [sendOnBehalf, setSendOnBehalf] = useState(true);
+  const settings = data?.settings ?? [];
 
-  const handleUpdateTemplate = (tabId: string, templateId: string, newContent: string) => {
-    const updatedTabs = { ...templates };
-    const tabTemplates = [...updatedTabs[tabId]];
-    const index = tabTemplates.findIndex(t => t.id === templateId);
-    if (index > -1) {
-      tabTemplates[index].content = newContent;
-      updatedTabs[tabId] = tabTemplates;
-      setTemplates(updatedTabs);
-      
-      // Mark unsaved
-      if (newContent !== tabTemplates[index].defaultContent) {
-        setUnsavedChanges(prev => new Set(prev).add(templateId));
-      } else {
-        const next = new Set(unsavedChanges);
-        next.delete(templateId);
-        setUnsavedChanges(next);
+  useEffect(() => {
+    if (!data) return;
+    setDrafts(prev => {
+      const next = { ...prev };
+      for (const s of data.settings) {
+        if (!(s.key in next)) next[s.key] = s.value;
       }
-    }
-  };
-
-  const handleReset = (tabId: string, templateId: string) => {
-    const updatedTabs = { ...templates };
-    const tabTemplates = [...updatedTabs[tabId]];
-    const index = tabTemplates.findIndex(t => t.id === templateId);
-    if (index > -1) {
-      tabTemplates[index].content = tabTemplates[index].defaultContent;
-      updatedTabs[tabId] = tabTemplates;
-      setTemplates(updatedTabs);
-      
-      const next = new Set(unsavedChanges);
-      next.delete(templateId);
-      setUnsavedChanges(next);
-    }
-  };
-
-  const insertVariable = (tabId: string, templateId: string, variable: string) => {
-    const tabTemplates = templates[tabId];
-    const template = tabTemplates.find(t => t.id === templateId);
-    if (template) {
-      handleUpdateTemplate(tabId, templateId, template.content + variable);
-    }
-  };
-
-  const renderPreview = (content: string) => {
-    let preview = content;
-    Object.entries(MOCK_DATA).forEach(([variable, value]) => {
-      // Replace all instances
-      preview = preview.split(variable).join(value);
+      return next;
     });
-    return preview;
+  }, [data]);
+
+  const draftFor = (s: EditableSetting) => drafts[s.key] ?? s.value;
+  const isUnsaved = (s: EditableSetting) => draftFor(s) !== s.value;
+
+  const handleSave = async (s: EditableSetting) => {
+    setSavingKey(s.key);
+    setSaveErrors(prev => ({ ...prev, [s.key]: "" }));
+    try {
+      await saveSetting(s.key, draftFor(s));
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    } catch (err: any) {
+      setSaveErrors(prev => ({ ...prev, [s.key]: err?.message || "Failed to save." }));
+    } finally {
+      setSavingKey(null);
+    }
   };
 
   return (
@@ -180,211 +81,135 @@ export function MessagingPage() {
       <div className="bg-white p-6 rounded-[20px] border border-line shadow-sm">
         <h2 className="text-[20px] font-bold text-ink mb-1">Content / Messaging Management</h2>
         <p className="text-[14px] text-muted max-w-3xl">
-          Manage all automated messages sent to customers and drivers. Changes apply immediately, no code changes required.
+          Edit the customer-facing text the classic Start Job workflow actually sends. Changes save straight
+          to the Settings sheet and take effect on the driver's very next card/message -- no deploy required.
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Nav (Tabs) */}
-        <div className="w-full lg:w-64 shrink-0 space-y-1">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-[12px] text-[13px] font-medium transition ${
-                activeTab === tab.id 
-                  ? "bg-white text-brand shadow-sm border border-line font-semibold" 
-                  : "text-muted hover:bg-white/50 hover:text-ink border border-transparent"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.id && <ChevronRight className="w-4 h-4 text-brand" />}
-            </button>
-          ))}
+      {isLoading && (
+        <div className="h-64 bg-white rounded-[24px] border border-line animate-pulse flex items-center justify-center">
+          <span className="text-muted font-medium">Loading templates...</span>
         </div>
+      )}
 
-        {/* Right Content */}
-        <div className="flex-1 space-y-6">
-          
-          {/* Timing Config (Only in customer tab for demonstration) */}
-          {activeTab === "customer" && (
-            <div className="bg-white rounded-[20px] border border-line shadow-sm p-6">
-              <h3 className="text-[15px] font-bold text-ink mb-4">Notification Timing Configuration</h3>
-              
-              <div className="flex flex-col md:flex-row md:items-start gap-8">
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <label className="block text-[13px] font-semibold text-ink mb-1.5">Send client notification</label>
-                    <div className="flex items-center gap-3">
-                      <input 
-                        type="number" 
-                        value={timingVal}
-                        onChange={e => setTimingVal(e.target.value)}
-                        className="w-20 h-10 px-3 rounded-[8px] border border-line bg-surface text-[14px] text-ink outline-none focus:border-brand focus:bg-white transition"
-                      />
-                      <select 
-                        value={timingUnit}
-                        onChange={e => setTimingUnit(e.target.value)}
-                        className="h-10 px-3 rounded-[8px] border border-line bg-surface text-[14px] text-ink outline-none focus:border-brand focus:bg-white transition"
-                      >
-                        <option value="minutes">Minutes before job start</option>
-                        <option value="hours">Hours before job start</option>
-                      </select>
+      {error && (
+        <div className="p-8 text-center text-status-red bg-status-red-bg rounded-[24px] border border-status-red/20 shadow-sm">
+          Failed to load message templates.
+        </div>
+      )}
+
+      {!isLoading && !error && settings.length === 0 && (
+        <div className="bg-white rounded-[20px] border border-line shadow-sm p-12 text-center">
+          <MessageSquare className="w-8 h-8 text-muted mx-auto mb-3" />
+          <h3 className="text-[15px] font-bold text-ink">No templates configured</h3>
+        </div>
+      )}
+
+      {!isLoading && !error && settings.map(s => {
+        const draft = draftFor(s);
+        const unsaved = isUnsaved(s);
+        const isSms = (CHANNELS_BY_KEY[s.key] || []).includes("SMS");
+        const chars = draft.length;
+        const isSmsOverlimit = isSms && chars > 160;
+        const variables = VARIABLES_BY_KEY[s.key] || [];
+        const channels = CHANNELS_BY_KEY[s.key] || [];
+        const saveError = saveErrors[s.key];
+
+        return (
+          <div key={s.key} className="bg-white rounded-[20px] border border-line shadow-sm overflow-hidden flex flex-col">
+            {/* Card Header */}
+            <div className="p-5 border-b border-line bg-white flex items-center justify-between">
+              <div>
+                <h3 className="text-[15px] font-bold text-ink flex items-center gap-2">
+                  {s.label}
+                  {unsaved && <span className="w-2 h-2 rounded-full bg-status-red" title="Unsaved changes"></span>}
+                </h3>
+                <p className="text-[13px] text-muted mt-1 max-w-2xl">{s.description}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {channels.map(ch => (
+                  <span key={ch} className="px-2.5 py-1 rounded-md bg-surface border border-line text-[11px] font-bold text-muted uppercase tracking-wider">
+                    {ch}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Body (Editor + Preview) */}
+            <div className="p-5 flex flex-col xl:flex-row gap-6 bg-[#FAFAFA]">
+              {/* Editor Side */}
+              <div className="flex-1 flex flex-col">
+                {variables.length > 0 && (
+                  <div className="mb-3">
+                    <span className="text-[12px] font-semibold text-muted uppercase tracking-wider block mb-2">Available Variables</span>
+                    <div className="flex flex-wrap gap-2">
+                      {variables.map(v => (
+                        <button
+                          key={v}
+                          onClick={() => setDrafts(prev => ({ ...prev, [s.key]: draftFor(s) + v }))}
+                          className="px-2.5 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-brand text-[12px] font-medium border border-blue-200 transition"
+                        >
+                          {v}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  
-                  <p className="text-[13px] text-muted leading-relaxed bg-[#F9FAFB] p-3 rounded-lg border border-line">
-                    This message will be sent automatically at the configured time before each job, calculated from the job's scheduled start time. Example: for a 9:00 AM job with a 60-minute setting, the message sends at 8:00 AM.
-                  </p>
-                </div>
+                )}
 
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <label className="block text-[13px] font-semibold text-ink mb-2">Sender Identity</label>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer">
-                        <input type="radio" checked={sendOnBehalf} onChange={() => setSendOnBehalf(true)} className="text-brand focus:ring-brand w-4 h-4" />
-                        Send on behalf of assigned driver
-                      </label>
-                      <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer">
-                        <input type="radio" checked={!sendOnBehalf} onChange={() => setSendOnBehalf(false)} className="text-brand focus:ring-brand w-4 h-4" />
-                        Send from company account
-                      </label>
-                    </div>
+                <textarea
+                  value={draft}
+                  onChange={e => setDrafts(prev => ({ ...prev, [s.key]: e.target.value }))}
+                  className="w-full h-40 md:h-52 p-4 rounded-xl border border-line bg-white text-[14px] font-mono text-ink shadow-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand resize-none transition"
+                  placeholder="Type message template here..."
+                />
+
+                {isSms && (
+                  <div className={`mt-2 flex items-center gap-1.5 text-[12px] font-semibold ${isSmsOverlimit ? 'text-status-red' : 'text-muted'}`}>
+                    {isSmsOverlimit && <AlertTriangle className="w-3.5 h-3.5" />}
+                    <span>{chars} characters (SMS standard is 160)</span>
                   </div>
+                )}
+              </div>
 
-                  <div className="pt-2">
-                    <button className="h-10 px-5 rounded-[8px] bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold shadow-sm transition">
-                      Save Configuration
-                    </button>
+              {/* Preview Side */}
+              <div className="flex-1 flex flex-col">
+                <span className="text-[12px] font-semibold text-muted uppercase tracking-wider block mb-2">Live Preview</span>
+                <div className="flex-1 bg-white border border-line rounded-xl p-5 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand to-[#10b981]"></div>
+                  <div className="text-[14px] text-ink whitespace-pre-wrap leading-relaxed">
+                    {renderPreview(draft) || <span className="text-muted italic">Empty message...</span>}
                   </div>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Templates */}
-          {templates[activeTab]?.length === 0 ? (
-            <div className="bg-white rounded-[20px] border border-line shadow-sm p-12 text-center">
-              <MessageSquare className="w-8 h-8 text-muted mx-auto mb-3" />
-              <h3 className="text-[15px] font-bold text-ink">No templates configured</h3>
-              <p className="text-[13px] text-muted">There are no templates in this section yet.</p>
+            {/* Actions Footer */}
+            <div className="p-5 border-t border-line bg-white">
+              {saveError && (
+                <p className="text-[12px] text-status-red font-medium mb-3 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {saveError}
+                </p>
+              )}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDrafts(prev => ({ ...prev, [s.key]: s.fallback }))}
+                  disabled={draft === s.fallback}
+                  className="px-4 py-2 rounded-[8px] text-[13px] font-semibold text-muted hover:bg-surface hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" /> Reset to default
+                </button>
+                <button
+                  onClick={() => handleSave(s)}
+                  disabled={!unsaved || savingKey === s.key || !draft.trim()}
+                  className="px-5 py-2 rounded-[8px] bg-[#2563EB] disabled:bg-[#93C5FD] hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" /> {savingKey === s.key ? "Saving…" : unsaved ? "Save Changes" : "Saved"}
+                </button>
+              </div>
             </div>
-          ) : (
-            templates[activeTab]?.map((template) => {
-              const isUnsaved = unsavedChanges.has(template.id);
-              const isSms = template.channels.includes("SMS");
-              const chars = template.content.length;
-              const isSmsOverlimit = isSms && chars > 160;
-
-              return (
-                <div key={template.id} className="bg-white rounded-[20px] border border-line shadow-sm overflow-hidden flex flex-col">
-                  {/* Card Header */}
-                  <div className="p-5 border-b border-line bg-white flex items-center justify-between">
-                    <div>
-                      <h3 className="text-[15px] font-bold text-ink flex items-center gap-2">
-                        {template.title}
-                        {isUnsaved && <span className="w-2 h-2 rounded-full bg-status-red" title="Unsaved changes"></span>}
-                      </h3>
-                      <p className="text-[13px] text-muted mt-1">{template.description}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      {template.channels.map(ch => (
-                        <span key={ch} className="px-2.5 py-1 rounded-md bg-surface border border-line text-[11px] font-bold text-muted uppercase tracking-wider">
-                          {ch}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Body (Editor + Preview) */}
-                  <div className="p-5 flex flex-col xl:flex-row gap-6 bg-[#FAFAFA]">
-                    
-                    {/* Editor Side */}
-                    <div className="flex-1 flex flex-col">
-                      <div className="mb-3">
-                        <span className="text-[12px] font-semibold text-muted uppercase tracking-wider block mb-2">Available Variables</span>
-                        <div className="flex flex-wrap gap-2">
-                          {AVAILABLE_VARIABLES.map(v => (
-                            <button
-                              key={v}
-                              onClick={() => insertVariable(activeTab, template.id, v)}
-                              className="px-2.5 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-brand text-[12px] font-medium border border-blue-200 transition"
-                            >
-                              {v}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <textarea
-                        value={template.content}
-                        onChange={(e) => handleUpdateTemplate(activeTab, template.id, e.target.value)}
-                        className="w-full h-40 md:h-52 p-4 rounded-xl border border-line bg-white text-[14px] font-mono text-ink shadow-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand resize-none transition"
-                        placeholder="Type message template here..."
-                      />
-                      
-                      {/* Character Count */}
-                      {isSms && (
-                        <div className={`mt-2 flex items-center gap-1.5 text-[12px] font-semibold ${isSmsOverlimit ? 'text-status-red' : 'text-muted'}`}>
-                          {isSmsOverlimit && <AlertTriangle className="w-3.5 h-3.5" />}
-                          <span>{chars} characters (SMS standard is 160)</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Preview Side */}
-                    <div className="flex-1 flex flex-col">
-                      <span className="text-[12px] font-semibold text-muted uppercase tracking-wider block mb-2">Live Preview</span>
-                      
-                      <div className="flex-1 bg-white border border-line rounded-xl p-5 shadow-sm relative overflow-hidden">
-                        {/* Decorative Chat bubble style */}
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand to-[#10b981]"></div>
-                        
-                        <div className="text-[14px] text-ink whitespace-pre-wrap leading-relaxed">
-                          {renderPreview(template.content) || <span className="text-muted italic">Empty message...</span>}
-                        </div>
-
-                        {/* Metadata Mock */}
-                        <div className="mt-6 pt-4 border-t border-line border-dashed flex items-center justify-between text-[11px] font-semibold text-muted uppercase tracking-wider">
-                          <span>Simulated resolution</span>
-                          <span>Job ID: 4192A</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions Footer */}
-                  <div className="p-5 border-t border-line bg-white flex justify-end gap-3">
-                    <button 
-                      onClick={() => handleReset(activeTab, template.id)}
-                      disabled={!isUnsaved}
-                      className="px-4 py-2 rounded-[8px] text-[13px] font-semibold text-muted hover:bg-surface hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
-                    >
-                      <RotateCcw className="w-4 h-4" /> Reset to default
-                    </button>
-                    <button 
-                      disabled={!isUnsaved}
-                      className="px-5 py-2 rounded-[8px] bg-[#2563EB] disabled:bg-[#93C5FD] hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition flex items-center gap-2"
-                    >
-                      <Save className="w-4 h-4" /> {isUnsaved ? "Save Changes" : "Saved"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+          </div>
+        );
+      })}
     </div>
-  );
-}
-
-// Utility icon component since I can't import ChevronRight statically here if missing
-function ChevronRight(props: any) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="m9 18 6-6-6-6"/>
-    </svg>
   );
 }

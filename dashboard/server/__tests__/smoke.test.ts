@@ -1,7 +1,54 @@
 import express from "express";
-import { describe, expect, it } from "vitest";
-import { issueSessionCookie } from "../../../src/admin/admin.auth";
+import { describe, expect, it, vi } from "vitest";
+import { issueOpsCookie } from "../auth";
 import { dashboardRouter } from "../router";
+
+// Stubs the real Google Sheets/auth clients so this suite never depends on ambient
+// gcloud credentials or a real spreadsheet existing -- same technique verify/*.js
+// already uses for the classic bot's own E2E scripts, just as a vitest module mock
+// instead of a require.cache patch. Every batchGet range comes back empty (no header
+// row), so readDataset() resolves to an all-empty dataset rather than throwing.
+vi.mock("googleapis", () => ({
+  google: {
+    sheets: () => ({
+      spreadsheets: {
+        get: async () => ({ data: { sheets: [] } }),
+        values: {
+          batchGet: async ({ ranges }: { ranges: string[] }) => ({
+            data: { valueRanges: ranges.map(() => ({ values: [] })) }
+          }),
+          batchUpdate: async () => ({ data: {} })
+        },
+        batchUpdate: async () => ({ data: {} })
+      }
+    }),
+    drive: () => ({ files: { list: async () => ({ data: { files: [] } }), create: async () => ({ data: {} }) } }),
+    calendar: () => ({ events: { list: async () => ({ data: { items: [] } }) } }),
+    auth: { GoogleAuth: class {}, JWT: class { async getAccessToken() { return { token: "fake" }; } } }
+  }
+}));
+vi.mock("google-auth-library", () => ({
+  OAuth2Client: class {},
+  JWT: class {
+    async getAccessToken() {
+      return { token: "fake" };
+    }
+  },
+  GoogleAuth: class {
+    async getClient() {
+      return { getAccessToken: async () => ({ token: "fake" }) };
+    }
+  }
+}));
+
+function mockCookieRes() {
+  return {
+    headers: {} as Record<string, string>,
+    setHeader(name: string, val: string | string[]) {
+      this.headers[name.toLowerCase()] = Array.isArray(val) ? val[0] : val;
+    }
+  };
+}
 
 describe("TMV Dashboard /ops Smoke Test", () => {
   const app = express();
@@ -27,15 +74,8 @@ describe("TMV Dashboard /ops Smoke Test", () => {
     const server = app.listen(0);
     const port = (server.address() as any).port;
 
-    const mockRes: any = {
-      headers: {},
-      setHeader(name: string, val: string) {
-        this.headers[name.toLowerCase()] = val;
-      }
-    };
-    process.env.TMV_ADMIN_PASSWORD = "test-password";
-    process.env.TMV_SIGNATURE_LINK_SECRET = "test-secret-key-for-signing-session-cookies";
-    issueSessionCookie(mockRes);
+    const mockRes = mockCookieRes();
+    issueOpsCookie(mockRes as any);
     const cookieHeader = mockRes.headers["set-cookie"]?.split(";")[0];
 
     try {
@@ -54,13 +94,8 @@ describe("TMV Dashboard /ops Smoke Test", () => {
     const server = app.listen(0);
     const port = (server.address() as any).port;
 
-    const mockRes: any = {
-      headers: {},
-      setHeader(name: string, val: string) {
-        this.headers[name.toLowerCase()] = val;
-      }
-    };
-    issueSessionCookie(mockRes);
+    const mockRes = mockCookieRes();
+    issueOpsCookie(mockRes as any);
     const cookieHeader = mockRes.headers["set-cookie"]?.split(";")[0];
 
     try {

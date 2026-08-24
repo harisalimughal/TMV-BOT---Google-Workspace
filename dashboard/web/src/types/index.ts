@@ -130,6 +130,8 @@ export interface DriverSummaryItem {
   initials: string;
   fullName: string;
   email?: string;
+  phone?: string;
+  vanRegistration?: string;
   active: boolean;
   assigned: number;
   completed: number;
