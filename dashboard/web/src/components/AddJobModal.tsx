@@ -1,21 +1,24 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, User, MapPin, ClipboardList, Clock, Search, ChevronDown, Check, AlertTriangle } from "lucide-react";
+import { 
+  X, 
+  User, 
+  MapPin, 
+  Calendar, 
+  Users, 
+  PoundSterling,
+  Check,
+  Search,
+  ChevronDown,
+  Clock,
+  AlertTriangle,
+  ClipboardList
+} from "lucide-react";
+import { ACTIVE_DRIVERS } from "../utils/drivers";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const DRIVER_ROSTER = [
-  { name: "Muhammad Roman", initials: "MR", email: "roman@elevaric.online", activeJobs: 2, color: "bg-blue-100 text-blue-700" },
-  { name: "Harris", initials: "HA", email: "harris@example.com", activeJobs: 0, color: "bg-purple-100 text-purple-700" },
-  { name: "Caio Gabriel", initials: "KA", email: "caio@example.com", activeJobs: 1, color: "bg-emerald-100 text-emerald-700" },
-  { name: "Henrique Driver", initials: "HE", email: "henrique@example.com", activeJobs: 4, color: "bg-rose-100 text-rose-700" },
-  { name: "Maico Lima", initials: "MK", email: "maico@example.com", activeJobs: 0, color: "bg-amber-100 text-amber-700" },
-  { name: "Rafael Cruz", initials: "RF", email: "rafael@example.com", activeJobs: 0, color: "bg-indigo-100 text-indigo-700" },
-  { name: "Tiago Menagassi", initials: "TI", email: "tiago@example.com", activeJobs: 1, color: "bg-cyan-100 text-cyan-700" },
-  { name: "Wander Mendes", initials: "WD", email: "wander@example.com", activeJobs: 3, color: "bg-teal-100 text-teal-700" }
-];
 
 export function AddJobModal({ isOpen, onClose }: Props) {
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
@@ -87,10 +90,11 @@ export function AddJobModal({ isOpen, onClose }: Props) {
     return `${hrs > 0 ? `${hrs}h ` : ""}${mins}m`;
   };
 
-  const selectedDriver = DRIVER_ROSTER.find(d => d.initials === form.driverId);
-  const filteredRoster = DRIVER_ROSTER.filter(d => 
+  const selectedDriver = ACTIVE_DRIVERS.find(d => d.code === form.driverId);
+  const filteredRoster = ACTIVE_DRIVERS.filter(d => 
     d.name.toLowerCase().includes(driverSearchQuery.toLowerCase()) || 
-    d.initials.toLowerCase().includes(driverSearchQuery.toLowerCase())
+    d.code.toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
+    d.vehicleReg.toLowerCase().includes(driverSearchQuery.toLowerCase())
   );
 
   return (
@@ -308,7 +312,7 @@ export function AddJobModal({ isOpen, onClose }: Props) {
                 {selectedDriver ? (
                   <div className="flex items-center gap-2.5">
                     <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center text-[11px] font-bold ${selectedDriver.color}`}>
-                      {selectedDriver.initials}
+                      {selectedDriver.code}
                     </div>
                     <div className="text-left">
                       <div className="text-[13px] font-medium text-ink leading-tight">{selectedDriver.name}</div>
@@ -359,22 +363,23 @@ export function AddJobModal({ isOpen, onClose }: Props) {
 
                     {filteredRoster.map(driver => (
                       <button 
-                        key={driver.initials}
-                        onClick={() => { setForm({...form, driverId: driver.initials}); setDriverSearchOpen(false); }}
-                        className={`w-full flex items-center gap-3 p-2 rounded-[8px] hover:bg-surface transition ${form.driverId === driver.initials ? "bg-surface" : ""}`}
+                        key={driver.code}
+                        onClick={() => { setForm({...form, driverId: driver.code}); setDriverSearchOpen(false); }}
+                        className={`w-full flex items-center gap-3 p-2 rounded-[8px] hover:bg-surface transition ${form.driverId === driver.code ? "bg-surface" : ""}`}
                       >
                         <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center text-[12px] font-bold shrink-0 ${driver.color}`}>
-                          {driver.initials}
+                          {driver.code}
                         </div>
                         <div className="flex-1 text-left">
                           <div className="text-[13px] font-medium text-ink">{driver.name}</div>
-                          <div className="text-[11px] text-muted">{driver.email}</div>
+                          <div className="text-[11px] text-muted flex items-center gap-1 mt-0.5">
+                            <span className="bg-line/50 px-1.5 py-[1px] rounded-[4px] font-mono font-bold uppercase text-[10px] text-ink">{driver.vehicleReg}</span>
+                            <span>•</span>
+                            <span>{driver.email}</span>
+                          </div>
                         </div>
                         <div className="shrink-0 flex items-center gap-3">
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${driver.activeJobs > 2 ? 'bg-amber-100 text-amber-700' : 'bg-surface text-muted'}`}>
-                            {driver.activeJobs} active {driver.activeJobs === 1 ? 'job' : 'jobs'}
-                          </span>
-                          {form.driverId === driver.initials && <Check className="w-4 h-4 text-ink" />}
+                          {form.driverId === driver.code && <Check className="w-4 h-4 text-ink" />}
                         </div>
                       </button>
                     ))}

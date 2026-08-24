@@ -13,6 +13,8 @@ import { fetchJobs } from "../api/client";
 import { NormalizedJob, toPounds } from "../types";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { formatLondonDateTime } from "../utils/date";
+const isTestOrIncomplete = (job: any) => { return job.customerName === "hh" || String(job.pickup).includes("test") || String(job.dropoff).includes("test"); };
+import { resolveDriver, formatVanReg } from "../utils/drivers";
 
 export function FinishedJobsPage() {
   const [page, setPage] = useState(1);
@@ -109,6 +111,8 @@ export function FinishedJobsPage() {
                   
                   const photos = job.evidenceItems?.filter((e: any) => e.type === "IMAGE" && (e.thumbProxyUrl || e.driveUrl)) || [];
                   const isTest = isTestOrIncomplete(job);
+                  const resolvedDriver = resolveDriver(job.driverName);
+                  const isUnassigned = resolvedDriver.code === "UN";
 
                   return (
                     <React.Fragment key={job.jobId}>
@@ -116,17 +120,25 @@ export function FinishedJobsPage() {
                         onClick={() => setExpandedJobId(isExpanded ? null : job.jobId)}
                         className={`h-[64px] group cursor-pointer transition select-none ${
                           isExpanded ? "bg-surface/50" : "hover:bg-[#F9FAFB]"
-                        } ${isTest ? "opacity-70" : ""}`}
+                        } ${isTest ? "opacity-70" : ""} ${resolvedDriver.needsReassignment ? 'bg-[#FFFBEB]/50' : ''}`}
                       >
                         <td className="px-4 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
 
                         <td className="px-4">
-                          <button 
-                            className="font-medium text-[#2563EB] hover:underline text-[14px]"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {job.driverName || "Unassigned"}
-                          </button>
+                          <div className="flex flex-col items-start justify-center leading-tight">
+                            <button 
+                              className={`font-medium text-[14px] ${isUnassigned ? 'text-muted' : 'text-[#2563EB] hover:underline'}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {resolvedDriver.name}
+                            </button>
+                            {!isUnassigned && resolvedDriver.vehicleReg && (
+                              <span className="bg-line/50 px-1 py-[1px] mt-0.5 rounded-[3px] font-mono font-bold uppercase text-[9px] text-ink">{formatVanReg(resolvedDriver.vehicleReg)}</span>
+                            )}
+                            {resolvedDriver.needsReassignment && (
+                              <span className="text-[9px] uppercase tracking-wider font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 mt-0.5 rounded-full">Needs Reassignment</span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="px-4 text-[14px] text-ink">

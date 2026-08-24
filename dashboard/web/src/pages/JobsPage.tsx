@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { fetchJobs } from "../api/client";
 import { NormalizedJob, toPounds } from "../types";
+import { resolveDriver, getAvatarColor, formatVanReg } from "../utils/drivers";
 import { DelayBandBadge, JobStatusBadge } from "../components/StatusBadge";
 import { EvidenceCompletenessPill } from "../components/EvidenceCompletenessPill";
 import { PaperJobReport } from "../components/PaperJobReport";
@@ -168,21 +169,24 @@ export function JobsPage() {
                   const formattedTime = formatLondonDateTime(job.bookedStart);
                   const totalPounds = toPounds(job.totalCharges);
                   
-                  const isUnassigned = !job.driverInitials || job.driverInitials === "UN";
-                  const driverColor = isUnassigned 
-                    ? "bg-surface text-muted border border-dashed border-muted/40" 
-                    : "bg-brand-soft text-brand border border-transparent";
+
                   
                   const isCancelled = job.status === "CANCELLED";
                   
                   // Extract image count
                   const photoCount = job.evidenceItems?.filter(e => (e.thumbProxyUrl || e.driveUrl)).length || 0;
+                  
+                  const resolvedDriver = resolveDriver(job.driverName);
+                  const isUnassigned = resolvedDriver.code === "UN";
+                  const driverColor = isUnassigned 
+                    ? "bg-surface text-muted border border-dashed border-muted/40" 
+                    : resolvedDriver.color;
 
                   return (
                     <tr 
                       key={job.jobId}
                       onClick={() => setDrawerJob(job)}
-                      className="h-[64px] group cursor-pointer hover:bg-surface/40 transition select-none"
+                      className={`h-[64px] group cursor-pointer hover:bg-surface/40 transition select-none ${resolvedDriver.needsReassignment ? 'bg-[#FFFBEB]/50' : ''}`}
                     >
                       <td className="px-4 text-center" onClick={e => e.stopPropagation()}><input type="checkbox" className="rounded text-brand" /></td>
                       <td className="px-2 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
@@ -190,13 +194,23 @@ export function JobsPage() {
                       <td className="px-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] ${driverColor}`}>
-                            {job.driverInitials || "UN"}
+                            {resolvedDriver.code}
                           </div>
                           <div>
-                            <div className="font-medium text-brand text-[14px] leading-tight hover:underline">
-                              {job.jobId}
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-brand text-[14px] leading-tight hover:underline">
+                                {job.jobId}
+                              </span>
+                              {!isUnassigned && resolvedDriver.vehicleReg && (
+                                <span className="bg-line/50 px-1 py-[1px] rounded-[3px] font-mono font-bold uppercase text-[9px] text-ink">{formatVanReg(resolvedDriver.vehicleReg)}</span>
+                              )}
                             </div>
-                            <div className="text-[13px] text-muted leading-tight mt-0.5">{job.driverName || "Unassigned"}</div>
+                            <div className="text-[13px] text-muted leading-tight mt-0.5 flex items-center gap-1.5">
+                               {resolvedDriver.name}
+                               {resolvedDriver.needsReassignment && (
+                                 <span className="text-[9px] uppercase tracking-wider font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Needs Reassignment</span>
+                               )}
+                            </div>
                           </div>
                         </div>
                       </td>
