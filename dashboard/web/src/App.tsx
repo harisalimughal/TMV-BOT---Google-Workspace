@@ -12,6 +12,7 @@ import { ActivityPage } from "./pages/ActivityPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { MessagingPage } from "./pages/MessagingPage";
+import { PricingSettingsPage } from "./pages/PricingSettingsPage";
 
 export function App() {
   const [activeSection, setActiveSection] = useState<string>("overview");
@@ -84,6 +85,7 @@ export function App() {
       {activeSection === "liability" && <ScenariosPage kind="liability" />}
       {activeSection === "drivers" && <DriversPage />}
       {activeSection === "exceptions" && <ExceptionsPage onOpenJob={handleOpenJob} />}
+      {activeSection === "pricing" && <PricingSettingsPage />}
       {activeSection === "activity" && <ActivityPage />}
       {activeSection === "reports" && <ReportsPage />}
       {activeSection === "messaging" && <MessagingPage />}
