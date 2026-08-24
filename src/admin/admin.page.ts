@@ -553,6 +553,8 @@ export function dashboardShell(): string {
           { name: 'email', label: 'Email (used to sign in from Chat)', type: 'email', required: true, placeholder: 'e.g. james@tmv.co.uk' },
           { name: 'chatUserName', label: 'Chat user name (optional fallback)', type: 'text', placeholder: 'only needed if Chat login differs from email' },
           { name: 'role', label: 'Role', type: 'text', placeholder: 'e.g. Driver' },
+          { name: 'phone', label: 'Phone (shown to the customer in the "on my way" message)', type: 'tel', placeholder: 'e.g. 07123 456789' },
+          { name: 'vanRegistration', label: 'Van registration (shown to the customer in the "on my way" message)', type: 'text', placeholder: 'e.g. AB12 CDE' },
           { name: 'active', label: 'Active', type: 'checkbox', checkedByDefault: true }
         ]
       }

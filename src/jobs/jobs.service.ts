@@ -3,8 +3,6 @@ import { env } from "../config/env";
 import {
   activityWrite, commitWrites, getDriver, getJob, jobWrite, listJobs, SheetWrite, workflowWrite
 } from "../google/sheets";
-import { enqueue } from "../queue/queue.service";
-import { SendJobStartedEmailTask, SendJobStartedSmsTask } from "../queue/queue.types";
 import { WorkflowState } from "../workflow/workflow.states";
 import { DriverProfile, Job, JobStatus } from "./job.types";
 import { syncTodayBookings } from "./booking.service";
@@ -123,6 +121,33 @@ export async function getActiveJobForDriver(identifier: string): Promise<{ job: 
   return getNextJobForDriver(identifier, { fresh: true });
 }
 
+/** True for anything booked on tomorrow's calendar date, in the operating timezone. */
+function isDueTomorrow(iso: string): boolean {
+  if (!iso) return false;
+  const dt = DateTime.fromISO(iso).setZone(env.timezone);
+  const tomorrow = DateTime.now().setZone(env.timezone).plus({ days: 1 });
+  return dt.hasSame(tomorrow, "day");
+}
+
+/**
+ * The driver's own jobs booked for tomorrow, oldest first -- lets a driver plan ahead,
+ * arrange helpers, and review details once today's work is done (see cards.ts's
+ * tomorrowJobsCard()). Deliberately assigned-only (unlike getNextJobForDriver's
+ * "unassigned is up for grabs" rule for today) -- a booking nobody has claimed yet
+ * isn't "the driver's job" a day out, so it's left off this list.
+ */
+export async function getTomorrowJobsForDriver(identifier: string): Promise<{ jobs: Job[]; driver: DriverProfile }> {
+  const [driver, jobs] = await Promise.all([resolveDriver(identifier), listJobs(0)]);
+
+  const tomorrow = jobs
+    .filter(j => isDueTomorrow(j.bookedStart))
+    .filter(j => j.status !== JobStatus.CANCELLED)
+    .filter(j => j.driverInitials === driver.initials)
+    .sort((a, b) => a.bookedStart.localeCompare(b.bookedStart));
+
+  return { jobs: tomorrow, driver };
+}
+
 export interface JobLookupOptions {
   /** Bypasses the read cache. Required inside a lock, where a stale read defeats the guard. */
   fresh?: boolean;
@@ -181,8 +206,11 @@ export async function startJob(jobId: string, identifier: string): Promise<Job> 
 
     if (job.status === JobStatus.COMPLETED) throw new ValidationError("This job is already completed.");
 
-    if (job.actualStart) {
-      log.info("start job ignored; already started", { job_id: job.jobId, started_at: job.actualStart });
+    // actualStart no longer lands here (see below), so status -- not actualStart -- is
+    // the double-tap guard: it flips to IN_PROGRESS in the same write as this check
+    // reads, so a second click sees it immediately once the first click's write lands.
+    if (job.status === JobStatus.IN_PROGRESS) {
+      log.info("start job ignored; already started", { job_id: job.jobId, state: job.currentState });
       return job;
     }
 
@@ -198,31 +226,17 @@ export async function startJob(jobId: string, identifier: string): Promise<Job> 
     const from = job.currentState;
     const now = new Date().toISOString();
 
-    job.actualStart = now;
     job.status = JobStatus.IN_PROGRESS;
-    job.currentState = WorkflowState.WAITING_ARRIVAL_PHOTO;
+    // actualStart is no longer set here -- it's set when the Arrival photo actually
+    // lands (workflow.engine.ts's handlePhotoStep), since that's the real physical
+    // start of the job, not the moment the driver taps a button in the app.
+    job.currentState = WorkflowState.WAITING_ON_MY_WAY_MESSAGE;
     if (!job.driverInitials) job.driverInitials = driver.initials;
 
     // §P3-3: the Drive folder is created lazily by the image worker on the first
     // photo. START JOB used to walk Jobs/YYYY/MM/DD/Job_X — up to ten sequential
     // Drive calls — while the driver stood at the customer's door.
     await saveJob(job, driver, "START_JOB", from, `Server start timestamp ${now}`);
-
-    // Was: await sendJobStartedEmail(job) plus two more commitWrites to record the
-    // outcome, all on the driver's very first tap. Now queued.
-    await enqueue({
-      type: "SEND_JOB_STARTED_EMAIL",
-      jobId: job.jobId,
-      driverEmail: driver.email || driver.chatUserName
-    } satisfies SendJobStartedEmailTask);
-    // Same background pattern for the SMS -- the handler itself no-ops if Firetext
-    // isn't configured or the job has no phone number, so this is safe to enqueue
-    // unconditionally.
-    await enqueue({
-      type: "SEND_JOB_STARTED_SMS",
-      jobId: job.jobId,
-      driverEmail: driver.email || driver.chatUserName
-    } satisfies SendJobStartedSmsTask);
 
     return job;
   });
@@ -244,18 +258,19 @@ export async function completeJob(jobId: string, identifier: string): Promise<Jo
 
   const from = job.currentState;
   const now = new Date().toISOString();
-  job.actualFinish = now;
-  // Finish Job (the standalone menu button) can complete a job that never ran Start
-  // Job's workflow at all — e.g. one that only did Check In/Check Out — so actualStart
-  // may still be blank here. Backfill it rather than feeding an invalid ISO string into
-  // the diff below, which would silently write NaN into Actual Minutes.
+  // actualStart/actualFinish normally already landed when the Arrival/Empty Van photos
+  // were uploaded (workflow.engine.ts's handlePhotoStep). These are just a defensive
+  // fallback for a job that reaches completion without one — e.g. the standalone
+  // Finish Job menu action on a job that only did Check In/Check Out — so the diff
+  // below never feeds an invalid ISO string in and silently writes NaN.
   if (!job.actualStart) job.actualStart = now;
+  if (!job.actualFinish) job.actualFinish = now;
   job.actualMinutes = Math.max(
     0,
-    Math.round(DateTime.fromISO(now).diff(DateTime.fromISO(job.actualStart), "minutes").minutes)
+    Math.round(DateTime.fromISO(job.actualFinish).diff(DateTime.fromISO(job.actualStart), "minutes").minutes)
   );
   job.differenceMinutes = job.actualMinutes - job.bookedMinutes;
-  job.delayStatus = delayStatus(job.bookedFinish, now);
+  job.delayStatus = delayStatus(job.bookedFinish, job.actualFinish);
   job.status = JobStatus.COMPLETED;
   job.currentState = WorkflowState.COMPLETED;
   return saveJob(job, driver, "COMPLETE_JOB", from, `Server finish timestamp ${now}`);

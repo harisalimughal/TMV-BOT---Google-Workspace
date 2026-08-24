@@ -94,7 +94,8 @@ const MENU_COLORS = {
   checkIn: { red: 0.204, green: 0.659, blue: 0.325 },       // green
   checkOut: { red: 0.984, green: 0.549, blue: 0.0 },        // orange
   parkingLiability: { red: 0.851, green: 0.188, blue: 0.145 }, // red
-  liabilityReport: { red: 0.576, green: 0.204, blue: 0.902 }  // purple
+  liabilityReport: { red: 0.576, green: 0.204, blue: 0.902 }, // purple
+  tomorrowJobs: { red: 0.0, green: 0.478, blue: 0.478 }      // teal
 } as const;
 
 /**
@@ -235,6 +236,7 @@ export function helpCard(): ChatResponse {
     { textParagraph: { text: "Tap below for the menu, or send any message." } },
     { textParagraph: { text: "Next Job takes you to your active or next job; Start Job on that runs the full move workflow (photos, charges, payment, signature) step by step." } },
     { textParagraph: { text: "Check In, Check Out, Parking Liability and Liability Report are separate, independent forms — pick one any time, whether or not Start Job has been run." } },
+    { textParagraph: { text: "Tomorrow's Jobs shows what's booked for you the next day, oldest first, so you can plan ahead." } },
     { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } }
   ]);
 }
@@ -250,7 +252,10 @@ export function helpCard(): ChatResponse {
  * whatever job the driver currently has — none of them require Next Job's workflow to
  * have been started first (see chat.controller.ts's withActiveJob()). No standalone
  * Finish Job button: a job now only completes via the classic workflow's own final
- * step (COMPLETE_JOB) — see workflow.engine.ts's handleAction().
+ * step (COMPLETE_JOB) — see workflow.engine.ts's handleAction(). Tomorrow's Jobs is
+ * read-only and always available too -- a driver checking their schedule ahead (to
+ * plan, arrange helpers, review details) isn't gated on finishing today's jobs first,
+ * it's simply the point in the day they're most likely to tap it.
  */
 export function mainMenuCard(job: Job | null): ChatResponse {
   const jobId = job?.jobId ?? "";
@@ -259,7 +264,8 @@ export function mainMenuCard(job: Job | null): ChatResponse {
     { buttonList: { buttons: [menuButton("Check In", "MENU_CHECK_IN", jobId, true, "FILLED", MENU_COLORS.checkIn)] } },
     { buttonList: { buttons: [menuButton("Check Out", "MENU_CHECK_OUT", jobId, true, "FILLED", MENU_COLORS.checkOut)] } },
     { buttonList: { buttons: [menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, true, "FILLED", MENU_COLORS.parkingLiability)] } },
-    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true, "FILLED", MENU_COLORS.liabilityReport)] } }
+    { buttonList: { buttons: [menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true, "FILLED", MENU_COLORS.liabilityReport)] } },
+    { buttonList: { buttons: [menuButton("Tomorrow's Jobs", "MENU_TOMORROW_JOBS", jobId, true, "FILLED", MENU_COLORS.tomorrowJobs)] } }
   ]);
 }
 
@@ -289,23 +295,93 @@ export function noJobsCard(): ChatResponse {
 }
 
 /**
- * The classic move workflow, restored: arrival photo -> loaded photo -> charges ->
- * overtime -> total -> payment -> empty-van photo -> client details -> customer
- * signature -> organized photo -> complete. This is what "Start Job" on jobCard()
- * kicks off (see jobs.service.ts's startJob()) and what showCurrentOrNext() resumes
- * at whatever step the driver left off on. It is independent of the menu's Check In /
- * Check Out / Parking Liability / Liability Report flows, which never touch
- * job.currentState.
+ * Read-only preview of the driver's jobs booked for the following calendar day, oldest
+ * first -- lets a driver plan ahead, organise their schedule, arrange helpers, and
+ * review job details in advance, typically once today's work is wrapped up (see
+ * jobs.service.ts's getTomorrowJobsForDriver() for the underlying date/assignment
+ * filter). Deliberately separate from jobCard()/workflowCard(): nothing here is
+ * actionable (no Start Job button) since these jobs aren't due yet.
  */
-export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFIRMATION_TEXT): ChatResponse {
+export function tomorrowJobsCard(jobs: Job[]): ChatResponse {
+  const tomorrowLabel = DateTime.now().setZone(env.timezone).plus({ days: 1 }).toFormat("cccc dd LLL");
+
+  if (!jobs.length) {
+    return card("tmv-tomorrow-jobs", "Tomorrow's Jobs", tomorrowLabel, [
+      { textParagraph: { text: "No jobs are scheduled for you tomorrow yet." } },
+      { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } }
+    ]);
+  }
+
+  const widgets: any[] = [];
+  jobs.forEach((job, index) => {
+    if (index > 0) widgets.push({ divider: {} });
+    widgets.push(
+      { decoratedText: { topLabel: "Time", text: `${formatTime(job.bookedStart)} → ${formatTime(job.bookedFinish)}` } },
+      { decoratedText: { topLabel: "Customer", text: escapeHtml(job.customerName || "Not supplied") } },
+      { decoratedText: { topLabel: "Pickup", text: escapeHtml(job.pickup || "Not supplied"), wrapText: true } },
+      { decoratedText: { topLabel: "Drop-off", text: escapeHtml(job.dropoff || "Not supplied"), wrapText: true } }
+    );
+  });
+  widgets.push({ buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } });
+
+  return card(
+    "tmv-tomorrow-jobs", "Tomorrow's Jobs", `${jobs.length} job${jobs.length > 1 ? "s" : ""} — ${tomorrowLabel}`, widgets
+  );
+}
+
+export interface WorkflowCardExtras {
+  /** Rendered "I am your driver..." preview text shown on WAITING_ON_MY_WAY_MESSAGE. */
+  onMyWayPreview?: string;
+  /** Rendered review-request email preview text shown on WAITING_REVIEW_SEND. */
+  reviewEmailPreview?: string;
+  /** Set only right after SEND_ON_MY_WAY_MESSAGE runs, so the Arrival card shows a
+   *  one-time confirmation instead of on every ordinary re-view of that step. */
+  justSentOnMyWayMessage?: boolean;
+}
+
+function backButton(jobId: string): unknown {
+  return { text: "BACK", type: "OUTLINED", onClick: { action: action("GO_BACK", jobId) } };
+}
+
+/**
+ * The classic move workflow: an "on my way" message preview -> arrival photo -> "any
+ * issues?" checkpoint -> loaded photo -> charges -> overtime -> total -> payment ->
+ * second "any issues?" checkpoint -> empty-van photo -> client details -> customer
+ * signature -> review request -> complete. This is what "Start Job" on jobCard() kicks
+ * off (see jobs.service.ts's startJob()) and what showCurrentOrNext() resumes at
+ * whatever step the driver left off on. It is independent of the menu's Check In /
+ * Check Out / Parking Liability / Liability Report flows, which never touch
+ * job.currentState -- except that the two "any issues?" checkpoints can launch one of
+ * those scenarios inline and pause here until it finishes (see chat.controller.ts's
+ * resolveWorkflowCard() and scenario.engine.ts's finalizeScenario()).
+ */
+export function workflowCard(
+  job: Job, confirmationText: string = CUSTOMER_CONFIRMATION_TEXT, extras: WorkflowCardExtras = {}
+): ChatResponse {
   const state = job.currentState as WorkflowState;
   const id = `workflow-${job.jobId}`;
 
   switch (state) {
-    case WorkflowState.WAITING_ARRIVAL_PHOTO:
-      return card(id, "1. Arrival and Start the job !", "Pictures taken as proof.", [
-        { textParagraph: { text: "Upload at least <b>1 arrival/start photo</b> directly into this Google Chat conversation." } }
+    case WorkflowState.WAITING_ON_MY_WAY_MESSAGE:
+      return card(id, "On my way", "Preview the message to the customer", [
+        { textParagraph: { text: escapeHtml(extras.onMyWayPreview ?? "") } },
+        { buttonList: { buttons: [button("SEND MESSAGE", "SEND_ON_MY_WAY_MESSAGE", job.jobId)] } }
       ]);
+
+    case WorkflowState.WAITING_ARRIVAL_PHOTO: {
+      const widgets: any[] = [];
+      if (extras.justSentOnMyWayMessage) {
+        widgets.push({ textParagraph: { text: "✓ Message sent to the customer." } });
+      }
+      widgets.push({ textParagraph: { text: "Upload at least <b>1 arrival/start photo</b> directly into this Google Chat conversation." } });
+      return card(id, "1. Arrival", "Pictures taken as proof.", widgets);
+    }
+
+    case WorkflowState.WAITING_ARRIVAL_ISSUES_CHECK:
+      return issuesCheckCard(id, job.jobId, "Any issues on arrival?");
+
+    case WorkflowState.WAITING_ARRIVAL_ISSUES_CHOICE:
+      return issuesChoiceCard(id, job.jobId);
 
     case WorkflowState.WAITING_LOADED_PHOTO:
       return card(id, "2. Proof Of Van Loaded", "Take a picture, 1 or 2", [
@@ -316,7 +392,7 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
       return card(id, "Move Execution", "Job is currently in progress", [
         { decoratedText: { topLabel: "Started", text: formatTime(job.actualStart) } },
         { textParagraph: { text: "Carry out the move. When the operational move is finished, continue to charges and completion." } },
-        { buttonList: { buttons: [button("FINISH MOVE / CONTINUE", "FINISH_MOVE", job.jobId)] } }
+        { buttonList: { buttons: [button("START DRIVING", "FINISH_MOVE", job.jobId)] } }
       ]);
 
     case WorkflowState.WAITING_EXTRA_CHARGES:
@@ -334,21 +410,30 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
             ]
           }
         },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_EXTRA_CHARGES", job.jobId, ["extra_charges"]) } }] } }
+        { buttonList: { buttons: [
+          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_EXTRA_CHARGES", job.jobId, ["extra_charges"]) } },
+          backButton(job.jobId)
+        ] } }
       ]);
 
     case WorkflowState.WAITING_OVERTIME:
       return card(id, "4. Over Time Charges ?", "Extra time charges ?", [
         { textInput: { name: "overtime_minutes", label: "Overtime minutes", hintText: "Example: 30", type: "SINGLE_LINE" } },
         { textParagraph: { text: `Configured charging rule: ${formatPounds(env.overtimeRatePer30Minutes)} per 30 minutes, rounded up, after ${env.overtimeGraceMinutes} minute grace.` } },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_OVERTIME", job.jobId, ["overtime_minutes"]) } }] } }
+        { buttonList: { buttons: [
+          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_OVERTIME", job.jobId, ["overtime_minutes"]) } },
+          backButton(job.jobId)
+        ] } }
       ]);
 
     case WorkflowState.WAITING_TOTAL_CHARGES:
       return card(id, "5. Total Charges ?", "Total / Tunnel / CCL / Over time ?", [
         { decoratedText: { topLabel: "System suggested total", text: formatPounds(suggestedTotal(job)) } },
         { textInput: { name: "total_charges", label: "Final total (£)", value: suggestedTotal(job).toFixed(2), type: "SINGLE_LINE" } },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_TOTAL_CHARGES", job.jobId, ["total_charges"]) } }] } }
+        { buttonList: { buttons: [
+          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_TOTAL_CHARGES", job.jobId, ["total_charges"]) } },
+          backButton(job.jobId)
+        ] } }
       ]);
 
     case WorkflowState.WAITING_PAYMENT:
@@ -361,8 +446,17 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
             items: Object.values(PaymentMethod).map(value => ({ text: value, value }))
           }
         },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_PAYMENT", job.jobId, ["payment_method"]) } }] } }
+        { buttonList: { buttons: [
+          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_PAYMENT", job.jobId, ["payment_method"]) } },
+          backButton(job.jobId)
+        ] } }
       ]);
+
+    case WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK:
+      return issuesCheckCard(id, job.jobId, "Any issues before we finish unloading?");
+
+    case WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE:
+      return issuesChoiceCard(id, job.jobId);
 
     case WorkflowState.WAITING_EMPTY_VAN_PHOTO:
       return card(id, "7. Empty Van / Unloaded ?", "Van Empty - Photo Taken", [
@@ -375,7 +469,10 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
       // isn't asked for the name a second time.
       return card(id, "8. Client Postcode / Address", "Confirm the postcode or address", [
         { textInput: { name: "client_name_postcode", label: "Postcode or address", value: job.dropoff || "", type: "MULTIPLE_LINE" } },
-        { buttonList: { buttons: [{ text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_CLIENT_DETAILS", job.jobId, ["client_name_postcode"]) } }] } }
+        { buttonList: { buttons: [
+          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_CLIENT_DETAILS", job.jobId, ["client_name_postcode"]) } },
+          backButton(job.jobId)
+        ] } }
       ]);
 
     case WorkflowState.WAITING_CLIENT_CONFIRMATION:
@@ -389,9 +486,18 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
         { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } }
       ]);
 
-    case WorkflowState.WAITING_ORGANIZED_PHOTO:
-      return card(id, "10. Is the van organized ?", "Final evidence photo", [
-        { textParagraph: { text: "Upload a photo showing that the van is organised." } }
+    case WorkflowState.WAITING_REVIEW_CHECK:
+      return card(id, "Customer review", "Do you want to take a review from the client?", [
+        { buttonList: { buttons: [
+          { text: "YES", type: "FILLED", onClick: { action: action("REVIEW_YES", job.jobId) } },
+          { text: "NO", type: "OUTLINED", onClick: { action: action("REVIEW_NONE", job.jobId) } }
+        ] } }
+      ]);
+
+    case WorkflowState.WAITING_REVIEW_SEND:
+      return card(id, "Review request email", "Preview the email to the customer", [
+        { textParagraph: { text: escapeHtml(extras.reviewEmailPreview ?? "") } },
+        { buttonList: { buttons: [button("SEND EMAIL", "SEND_REVIEW_EMAIL", job.jobId)] } }
       ]);
 
     case WorkflowState.READY_TO_COMPLETE:
@@ -414,6 +520,32 @@ export function workflowCard(job: Job, confirmationText: string = CUSTOMER_CONFI
     default:
       return jobCard(job);
   }
+}
+
+/** Shared by both "any issues?" checkpoints (after Arrival, before Empty Van). One tap
+ *  either way -- no selection widget -- since Yes/No is the entire decision here. */
+function issuesCheckCard(id: string, jobId: string, prompt: string): ChatResponse {
+  return card(id, "Any issues?", prompt, [
+    { buttonList: { buttons: [
+      { text: "YES", type: "FILLED", onClick: { action: action("ISSUES_YES", jobId) } },
+      { text: "NO", type: "OUTLINED", onClick: { action: action("ISSUES_NONE", jobId) } }
+    ] } }
+  ]);
+}
+
+/** Shared "which one?" card for both checkpoints. Reuses the exact same
+ *  MENU_PARKING_LIABILITY / MENU_LIABILITY_REPORT action wiring the main menu uses to
+ *  launch these scenarios (see workflow.engine.ts's getActiveJob / scenario.routes.ts)
+ *  -- the scenario stepper needs no changes at all to run inline like this. */
+function issuesChoiceCard(id: string, jobId: string): ChatResponse {
+  return card(id, "Which one?", "Choose the type of issue to report", [
+    { buttonList: { buttons: [
+      menuButton("Parking Liability", "MENU_PARKING_LIABILITY", jobId, true, "FILLED", MENU_COLORS.parkingLiability)
+    ] } },
+    { buttonList: { buttons: [
+      menuButton("Liability Report", "MENU_LIABILITY_REPORT", jobId, true, "FILLED", MENU_COLORS.liabilityReport)
+    ] } }
+  ]);
 }
 
 function escapeHtml(value: string): string {

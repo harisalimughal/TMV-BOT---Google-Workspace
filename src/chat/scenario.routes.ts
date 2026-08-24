@@ -1,10 +1,11 @@
 import { Request, Response, Router } from "express";
-import { getJob } from "../google/sheets";
+import { getJob, getSetting } from "../google/sheets";
 import { updateChatCard } from "../google/chat";
 import { finalizeScenario } from "./scenario.engine";
 import { verifyScenarioLink } from "./scenario.link";
 import { ScenarioKey, SCENARIOS } from "./scenario.spec";
-import { scenarioSubmittedCard } from "./cards";
+import { scenarioSubmittedCard, workflowCard } from "./cards";
+import { CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
 import { ValidationError } from "../workflow/validation.engine";
 import { log } from "../utils/logger";
 
@@ -189,15 +190,25 @@ export function scenarioRouter(): Router {
     const signatureBuffer = Buffer.from(match[1], "base64");
 
     try {
-      const { messageName } = await finalizeScenario(scenario, jobId, signatureBuffer);
+      const { messageName, resumedClassicState } = await finalizeScenario(scenario, jobId, signatureBuffer);
 
-      // Best-effort: push the "submitted" card into the driver's Chat conversation so
-      // they don't have to tap anything — same pattern as the classic flow's signature
-      // step. If this fails, the data is already safely recorded either way; the
-      // driver just needs to tap Main Menu manually.
+      // Best-effort: push the next card into the driver's Chat conversation so they
+      // don't have to tap anything — same pattern as the classic flow's signature step.
+      // If this fails, the data is already safely recorded either way; the driver just
+      // needs to tap Main Menu (or Next Job) manually. A resumedClassicState means this
+      // scenario ran inline as one of the classic flow's "any issues?" detours -- push
+      // the classic flow's own next card instead of the generic "submitted" card, so
+      // the detour is transparent to the driver.
       if (messageName) {
-        await updateChatCard(messageName, scenarioSubmittedCard(spec, jobId)).catch(error =>
-          log.warn("failed to push scenario-submitted card", { job_id: jobId, scenario, error: String(error) })
+        const nextCard = resumedClassicState
+          ? await (async () => {
+              const job = await getJob(jobId, 0);
+              const confirmationText = await getSetting("CUSTOMER_CONFIRMATION_TEXT", CUSTOMER_CONFIRMATION_TEXT);
+              return job ? workflowCard(job, confirmationText) : scenarioSubmittedCard(spec, jobId);
+            })()
+          : scenarioSubmittedCard(spec, jobId);
+        await updateChatCard(messageName, nextCard).catch(error =>
+          log.warn("failed to push next card after scenario finalize", { job_id: jobId, scenario, error: String(error) })
         );
       }
 

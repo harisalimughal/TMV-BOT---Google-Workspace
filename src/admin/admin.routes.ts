@@ -7,7 +7,7 @@ import { createCalendarEvent } from "../google/calendar";
 import { getDriveFileMedia } from "../google/drive";
 import { parseCalendarEvent, syncBookingsForDate } from "../jobs/booking.service";
 import { CUSTOMER_CONFIRMATION_TEXT } from "../workflow/workflow.engine";
-import { JOB_STARTED_MESSAGE_TEMPLATE } from "../notifications/message";
+import { JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../notifications/message";
 import { env } from "../config/env";
 import { log } from "../utils/logger";
 
@@ -26,9 +26,15 @@ const EDITABLE_SETTINGS: Record<string, { settingsKey: string; label: string; de
   },
   jobStartedMessage: {
     settingsKey: "JOB_STARTED_MESSAGE_TEXT",
-    label: "Customer Message — Job Started (Email & SMS)",
-    description: "Sent to the customer by both email and SMS when a driver taps Start Job. Placeholders: {customerName}, {companyName}, {pickup}, {dropoff}.",
+    label: "Customer Message — On My Way (Email & SMS)",
+    description: "Previewed on the driver's \"On my way\" card and sent by both email and SMS once they tap Send Message. Placeholders: {customerName}, {companyName}, {pickup}, {dropoff}, {driverPhone}, {vanRegistration}.",
     fallback: JOB_STARTED_MESSAGE_TEMPLATE
+  },
+  reviewRequestEmail: {
+    settingsKey: "REVIEW_REQUEST_EMAIL_TEXT",
+    label: "Customer Review Request Email",
+    description: "Previewed and sent by email only, if the driver opts in on the \"Do you want to take a review from the client?\" step near the end of the job. Placeholders: {customerName}, {companyName}, {pickup}, {dropoff}.",
+    fallback: REVIEW_REQUEST_EMAIL_TEMPLATE
   }
 };
 
@@ -139,12 +145,14 @@ export function adminRouter(): Router {
     const chatUserName = String(body.chatUserName ?? "").trim();
     const role = String(body.role ?? "").trim();
     const active = body.active !== false;
+    const phone = String(body.phone ?? "").trim();
+    const vanRegistration = String(body.vanRegistration ?? "").trim();
 
     if (!initials || !fullName || !email) {
       return res.status(400).json({ error: "Initials, full name and email are required." });
     }
     try {
-      await commitWrites([driverWrite({ initials, fullName, email, chatUserName, active, role })]);
+      await commitWrites([driverWrite({ initials, fullName, email, chatUserName, active, role, phone, vanRegistration })]);
       return res.status(200).json({ ok: true });
     } catch (error) {
       log.error("admin add driver failed", error);
@@ -338,8 +346,7 @@ export function adminRouter(): Router {
   const CLASSIC_PHOTO_STEPS: { type: string; label: string }[] = [
     { type: "Arrival", label: "Arrival" },
     { type: "VanLoaded", label: "Loaded" },
-    { type: "EmptyVan", label: "Empty Van" },
-    { type: "Organized", label: "Organized" }
+    { type: "EmptyVan", label: "Empty Van" }
   ];
 
   /** The classic flow's customer signature is uploaded to Drive, but only its

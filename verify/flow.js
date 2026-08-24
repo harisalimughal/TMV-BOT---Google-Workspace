@@ -35,7 +35,7 @@ const path = require("node:path");
 const BOT = path.join(__dirname, "..", "dist");
 const HEADERS = {
   Bookings: ["Job ID","Calendar Event ID","Driver Initials","Customer","Customer Email","Phone","Pickup","Dropoff","Crew Size","Base Price","Paid Online","Booked Start","Booked Finish","Actual Start","Actual Finish","Booked Minutes","Actual Minutes","Difference Minutes","Delay Status","Extra Charges","Overtime Minutes","Overtime Charge","Total Charges","Payment Method","Payment Status","Client Name/Postcode","Client Confirmed By","Status","Current State","Drive Folder ID","Drive Folder URL","Created","Updated"],
-  Drivers: ["Initials","Full Name","Email","Chat User Name","Active","Role"],
+  Drivers: ["Initials","Full Name","Email","Chat User Name","Active","Role","Phone","Van Registration"],
   Photos: ["Timestamp","Job ID","Driver","Step","File ID","File URL","File Name","Content Type"],
   Signatures: ["Timestamp","Job ID","Driver","Customer Name","Mode","Confirmation Text"],
   DriverFlow: ["Timestamp","Job ID","Driver","Field","Value","State"],
@@ -60,16 +60,19 @@ for (const [n, h] of Object.entries(HEADERS)) tabs[n] = [h.slice()];
 const JOB_CLASSIC = "TMV-FLOW0001";
 const JOB_STANDALONE = "TMV-FLOW0002";
 const JOB_OVERDUE = "TMV-FLOW0003";
-function addBooking(jobId, eventId, daysAgo = 0) {
+// daysAgo negative shifts into the future (e.g. -1 == tomorrow) -- kept as one signed
+// offset rather than a separate "daysAhead" parameter so every existing call site
+// (JOB_OVERDUE's daysAgo=3, etc.) keeps meaning exactly what it already means.
+function addBooking(jobId, eventId, daysAgo = 0, overrides = {}) {
   const row = new Array(HEADERS.Bookings.length).fill("");
   const set = (c, v) => { row[HEADERS.Bookings.indexOf(c)] = String(v); };
-  const start = new Date(Date.now() - daysAgo * 86400e3);
-  set("Job ID", jobId); set("Calendar Event ID", eventId); set("Driver Initials", "WD");
-  set("Customer", "Barry"); set("Customer Email", "barry@example.test");
-  set("Pickup", "10 Example Street"); set("Dropoff", "74 Ferndale Road, N15 6UQ");
+  const start = new Date(Date.now() - daysAgo * 86400e3 + (overrides.hourOffset ?? 0) * 3600e3);
+  set("Job ID", jobId); set("Calendar Event ID", eventId); set("Driver Initials", overrides.driverInitials ?? "WD");
+  set("Customer", overrides.customer ?? "Barry"); set("Customer Email", "barry@example.test");
+  set("Pickup", overrides.pickup ?? "10 Example Street"); set("Dropoff", overrides.dropoff ?? "74 Ferndale Road, N15 6UQ");
   set("Base Price", 350); set("Booked Start", start.toISOString());
   set("Booked Finish", new Date(start.getTime() + 3600e3).toISOString()); set("Booked Minutes", 60);
-  set("Status", "READY"); set("Current State", "READY");
+  set("Status", overrides.status ?? "READY"); set("Current State", "READY");
   tabs.Bookings.push(row);
 }
 addBooking(JOB_CLASSIC, "evt-flow-classic");
@@ -77,7 +80,7 @@ addBooking(JOB_STANDALONE, "evt-flow-standalone");
 // JOB_OVERDUE is added later, right before the section that tests it — adding it here
 // would make it (earliest Booked Start) win driver-resolution ahead of JOB_CLASSIC in
 // the very first "Next Job" check below, which explicitly expects JOB_CLASSIC.
-tabs.Drivers.push(["WD", "Test Driver", "driver@tmv.test", "", "TRUE", "Driver"]);
+tabs.Drivers.push(["WD", "Test Driver", "driver@tmv.test", "", "TRUE", "Driver", "07900123456", "AB12 CDE"]);
 
 const calls = {};
 const bump = k => { calls[k] = (calls[k] || 0) + 1; };
@@ -190,14 +193,19 @@ const evidenceFor = jobId => tabs.Evidence.slice(1).filter(r => r[HEADERS.Eviden
 // content in place, so one job's card keeps one message identity across its whole
 // classic-flow lifecycle. Needed so the pending-signature push (see
 // chat.controller.ts) has something real to record.
+// Each real Chat click carries its own eventTime, distinct even when the same button
+// is tapped again later on the same (UPDATE_MESSAGE'd) message -- e.g. GO_BACK then
+// re-submitting the same step. The replay guard keys on message+action+eventTime, so
+// tests need a fresh one per logical click too, not just a fixed message name.
+let clickSeq = 0;
 const click = (fn, jobId) => handleChatEvent({
-  type: "CARD_CLICKED", user: USER,
+  type: "CARD_CLICKED", user: USER, eventTime: `t${++clickSeq}`,
   action: { function: fn, parameters: [{ key: "jobId", value: jobId }] },
   message: { name: `spaces/S/messages/${jobId}` },
   common: { formInputs: {} }
 });
 const clickWithInputs = (fn, jobId, formInputs) => handleChatEvent({
-  type: "CARD_CLICKED", user: USER,
+  type: "CARD_CLICKED", user: USER, eventTime: `t${++clickSeq}`,
   action: { function: fn, parameters: [{ key: "jobId", value: jobId }] },
   message: { name: `spaces/S/messages/${jobId}` },
   common: { formInputs }
@@ -249,6 +257,27 @@ const submitDateField = (jobId, scenario, fieldIndex, fieldName, msSinceEpoch) =
 const ackNotice = (jobId, scenario) => scenarioClick("SCENARIO_NOTICE_ACK", jobId, scenario);
 const continuePhotos = (jobId, scenario) => scenarioClick("SCENARIO_PHOTOS_CONTINUE", jobId, scenario);
 
+// When a scenario runs INLINE from one of the classic flow's "any issues?" checkpoints
+// (see cards.ts's issuesChoiceCard), the driver launches and drives it from the exact
+// same Chat message as the classic workflow card, not a separate menu-launched message
+// -- so these mirror scenarioClick/submitField/continuePhotos above but keep using the
+// classic flow's own message identity throughout, matching production.
+const inlineScenarioClick = (fn, jobId, scenario, extra = {}, formInputsObj = {}) => handleChatEvent({
+  type: "CARD_CLICKED", user: USER,
+  action: {
+    function: fn,
+    parameters: [
+      { key: "jobId", value: jobId }, { key: "scenario", value: scenario },
+      ...Object.entries(extra).map(([key, value]) => ({ key, value }))
+    ]
+  },
+  message: { name: `spaces/S/messages/${jobId}` },
+  common: { formInputs: formInputsObj }
+});
+const inlineSubmitField = (jobId, scenario, fieldIndex, fieldName, ...values) =>
+  inlineScenarioClick("SCENARIO_FIELD_SUBMIT", jobId, scenario, { fieldIndex: String(fieldIndex) }, { [fieldName]: si(...values) });
+const inlineContinuePhotos = (jobId, scenario) => inlineScenarioClick("SCENARIO_PHOTOS_CONTINUE", jobId, scenario);
+
 let pass = 0, fail = 0;
 function check(label, actual, expected) {
   const ok = actual === expected;
@@ -287,61 +316,168 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const menuFromSpace = await handleChatEvent({ type: "ADDED_TO_SPACE", user: USER });
   check("bot added to space -> menu shown", title(menuFromSpace), "TMV Driver Bot");
   check("nothing disabled before either job is started", disabledButtons(menuFromSpace).length, 0);
-  check("menu has exactly 5 buttons (no Finish Job)", menuButtons(menuFromSpace).length, 5);
+  check("menu has exactly 6 buttons (no Finish Job)", menuButtons(menuFromSpace).length, 6);
   check("no button is labelled Finish Job", menuButtons(menuFromSpace).some(b => b.text === "Finish Job"), false);
-  check("every menu button carries a distinct color", new Set(menuButtons(menuFromSpace).map(b => JSON.stringify(b.color))).size, 5);
+  check("menu includes Tomorrow's Jobs", menuButtons(menuFromSpace).some(b => b.text === "Tomorrow's Jobs"), true);
+  check("every menu button carries a distinct color", new Set(menuButtons(menuFromSpace).map(b => JSON.stringify(b.color))).size, 6);
 
   console.log("\n" + "=".repeat(74));
-  console.log("Classic Start Job workflow (restored)");
+  console.log("Tomorrow's Jobs: read-only, chronological, assigned-to-this-driver-only");
+  console.log("=".repeat(74));
+
+  const emptyTomorrow = await click("MENU_TOMORROW_JOBS", "");
+  check("no tomorrow bookings yet -> empty state", title(emptyTomorrow), "Tomorrow's Jobs");
+  check("empty state explains nothing is scheduled", hasText(emptyTomorrow, "No jobs are scheduled for you tomorrow"), true);
+  check("empty state offers only Main Menu", menuButtons(emptyTomorrow).length, 1);
+
+  // Deliberately added out of chronological order, so the ordering check below actually
+  // proves the card sorts them rather than just reflecting insertion order.
+  addBooking("TMV-FLOW0004", "evt-flow-tomorrow-late", -1, { hourOffset: 3, customer: "Later Tomorrow Client" });
+  addBooking("TMV-FLOW0005", "evt-flow-tomorrow-early", -1, { hourOffset: -3, customer: "Earlier Tomorrow Client" });
+  // Must NOT appear on WD's list: someone else's job, an unclaimed job, and a cancelled one.
+  addBooking("TMV-FLOW0006", "evt-flow-tomorrow-other-driver", -1, { driverInitials: "ZZ", customer: "Other Driver Client" });
+  addBooking("TMV-FLOW0007", "evt-flow-tomorrow-unassigned", -1, { driverInitials: "", customer: "Unassigned Client" });
+  addBooking("TMV-FLOW0008", "evt-flow-tomorrow-cancelled", -1, { customer: "Cancelled Tomorrow Client", status: "CANCELLED" });
+
+  const tomorrowCard = await click("MENU_TOMORROW_JOBS", "");
+  check("tomorrow card title", title(tomorrowCard), "Tomorrow's Jobs");
+  check("subtitle reports exactly the 2 jobs assigned to this driver", subtitle(tomorrowCard).startsWith("2 jobs"), true);
+  check("includes the earlier job", hasText(tomorrowCard, "Earlier Tomorrow Client"), true);
+  check("includes the later job", hasText(tomorrowCard, "Later Tomorrow Client"), true);
+  check("excludes another driver's job", hasText(tomorrowCard, "Other Driver Client"), false);
+  check("excludes an unassigned job", hasText(tomorrowCard, "Unassigned Client"), false);
+  check("excludes a cancelled job", hasText(tomorrowCard, "Cancelled Tomorrow Client"), false);
+  // JOB_CLASSIC/JOB_STANDALONE are both booked for today, not tomorrow -- their absence
+  // here is implicitly covered by the whole rest of this script never populating the
+  // tomorrow list with them.
+  check("excludes jobs booked for today, not tomorrow", hasText(tomorrowCard, "Barry"), false);
+  const tomorrowJson = JSON.stringify(tomorrowCard.message);
+  check("jobs are listed chronologically (earlier first, despite being added second)",
+    tomorrowJson.indexOf("Earlier Tomorrow Client") < tomorrowJson.indexOf("Later Tomorrow Client"), true);
+  check("tomorrow card ends with a Main Menu button", menuButtons(tomorrowCard).some(b => b.text === "Main Menu"), true);
+
+  console.log("\n" + "=".repeat(74));
+  console.log("Classic Start Job workflow (with the on-my-way message, two issue");
+  console.log("checkpoints -- one resolved inline via Liability Report -- BACK buttons,");
+  console.log("and the review-request email)");
   console.log("=".repeat(74));
 
   const jobCardBefore = await click("RESUME_JOB", JOB_CLASSIC);
   check("Next Job, not started -> job summary card with Start Job button", title(jobCardBefore), `Job ${JOB_CLASSIC}`);
 
-  await click("START_JOB", JOB_CLASSIC);
-  check("Start Job begins the classic workflow at step 1", stateOf(JOB_CLASSIC), "WAITING_ARRIVAL_PHOTO");
+  const onMyWayCard = await click("START_JOB", JOB_CLASSIC);
+  check("Start Job shows the on-my-way preview, not the arrival step yet", stateOf(JOB_CLASSIC), "WAITING_ON_MY_WAY_MESSAGE");
   check("status flips to IN_PROGRESS immediately", statusOf(JOB_CLASSIC), "IN_PROGRESS");
-  check("actualStart is a server timestamp", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_CLASSIC, "Actual Start")), true);
+  check("actualStart is NOT set yet -- only the arrival photo sets it", fieldOf(JOB_CLASSIC, "Actual Start"), "");
+  check("on-my-way preview includes the driver's phone", hasText(onMyWayCard, "07900123456"), true);
+  check("on-my-way preview includes the driver's van registration", hasText(onMyWayCard, "AB12 CDE"), true);
 
-  // Double-tap must not restart or duplicate the start email.
-  const startedAt = fieldOf(JOB_CLASSIC, "Actual Start");
+  // Double-tap must not restart the job or re-show the on-my-way card from scratch.
   await Promise.all([click("START_JOB", JOB_CLASSIC), click("START_JOB", JOB_CLASSIC)]);
-  check("double-tap START_JOB keeps the same timestamp", fieldOf(JOB_CLASSIC, "Actual Start"), startedAt);
-  await drain();
-  check("exactly one start email sent", calls.email ?? 0, 1);
-  // Firetext isn't configured in this test env (no FIRETEXT_API_KEY/SENDER_ID) -- the
-  // SMS task must still enqueue and process cleanly as a no-op, not throw or crash the
-  // drain, and must not record a fake "sent" outcome.
-  check("start SMS task no-ops cleanly when Firetext isn't configured",
+  check("double-tap START_JOB stays on the on-my-way step", stateOf(JOB_CLASSIC), "WAITING_ON_MY_WAY_MESSAGE");
+  check("double-tap START_JOB wrote exactly one START_JOB activity row",
+    tabs.ActivityLog.slice(1).filter(r => r[HEADERS.ActivityLog.indexOf("Job ID")] === JOB_CLASSIC && r[HEADERS.ActivityLog.indexOf("Action")] === "START_JOB").length, 1);
+
+  const arrivalCard = await click("SEND_ON_MY_WAY_MESSAGE", JOB_CLASSIC);
+  check("sending the on-my-way message moves straight to the (renamed) Arrival step", title(arrivalCard), "1. Arrival");
+  check("arrival card confirms the message was sent", hasText(arrivalCard, "Message sent to the customer"), true);
+  check("on-my-way email sent synchronously -- no queue/drain needed", calls.email ?? 0, 1);
+  // Firetext isn't configured in this test env and the job has no customer phone --
+  // the SMS attempt must be skipped entirely, not recorded as a fake "sent" outcome.
+  check("on-my-way SMS not attempted (no customer phone / Firetext not configured)",
     tabs.ActivityLog.slice(1).some(r => r[HEADERS.ActivityLog.indexOf("Action")] === "CLIENT_START_SMS_SENT"), false);
 
+  // Re-tapping SEND_ON_MY_WAY_MESSAGE once past that step must be rejected, not
+  // silently re-send the email.
+  const resendAttempt = await click("SEND_ON_MY_WAY_MESSAGE", JOB_CLASSIC);
+  check("SEND_ON_MY_WAY_MESSAGE rejected once past that step", title(resendAttempt), "TMV — Action blocked");
+  check("re-tap did not send a second email", calls.email ?? 0, 1);
+
   await photo(); await drain();
-  check("arrival photo advances to loaded-photo step", stateOf(JOB_CLASSIC), "WAITING_LOADED_PHOTO");
+  check("arrival photo advances to the first issues checkpoint", stateOf(JOB_CLASSIC), "WAITING_ARRIVAL_ISSUES_CHECK");
+  check("arrival photo sets actualStart -- not the earlier Start Job tap", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_CLASSIC, "Actual Start")), true);
   check("evidence uploaded by the background worker", evidenceFor(JOB_CLASSIC).some(r => r[HEADERS.Evidence.indexOf("Status")] === "COMPLETED"), true);
   // ensureJobFolder() used to resolve the Drive folder on every upload without ever
   // writing it back -- Drive Folder ID/URL stayed blank in the sheet forever.
   check("first photo upload persists the Drive folder id onto the booking row", fieldOf(JOB_CLASSIC, "Drive Folder ID") !== "", true);
   check("first photo upload persists the Drive folder url onto the booking row", fieldOf(JOB_CLASSIC, "Drive Folder URL") !== "", true);
 
+  await click("ISSUES_NONE", JOB_CLASSIC);
+  check("no arrival issues -> straight to the loaded-photo step, unchanged", stateOf(JOB_CLASSIC), "WAITING_LOADED_PHOTO");
+
   await photo(); await drain();
   check("loaded-van photo advances to move execution", stateOf(JOB_CLASSIC), "IN_PROGRESS");
 
-  await click("FINISH_MOVE", JOB_CLASSIC);
+  const inProgressCard = await click("FINISH_MOVE", JOB_CLASSIC);
   check("finish move asks about extra charges", stateOf(JOB_CLASSIC), "WAITING_EXTRA_CHARGES");
+  check("the button that got there says START DRIVING, not FINISH MOVE / CONTINUE",
+    JSON.stringify(inProgressCard.message).includes('"text":"FINISH MOVE'), false);
+
+  await click("GO_BACK", JOB_CLASSIC);
+  check("BACK from Extra Charges returns to Move Execution", stateOf(JOB_CLASSIC), "IN_PROGRESS");
+  await click("FINISH_MOVE", JOB_CLASSIC);
+  check("re-tapping START DRIVING returns to Extra Charges", stateOf(JOB_CLASSIC), "WAITING_EXTRA_CHARGES");
 
   await clickWithInputs("SUBMIT_EXTRA_CHARGES", JOB_CLASSIC, { extra_charges: si("No Extras Time") });
   check("no extra time skips straight to totals", stateOf(JOB_CLASSIC), "WAITING_TOTAL_CHARGES");
+
+  await click("GO_BACK", JOB_CLASSIC);
+  check("BACK from Total Charges returns to Extra Charges", stateOf(JOB_CLASSIC), "WAITING_EXTRA_CHARGES");
+  await clickWithInputs("SUBMIT_EXTRA_CHARGES", JOB_CLASSIC, { extra_charges: si("No Extras Time") });
 
   await clickWithInputs("SUBMIT_TOTAL_CHARGES", JOB_CLASSIC, { total_charges: si("350") });
   check("total charges accepted", stateOf(JOB_CLASSIC), "WAITING_PAYMENT");
   check("total stored", fieldOf(JOB_CLASSIC, "Total Charges"), "350");
 
+  await click("GO_BACK", JOB_CLASSIC);
+  check("BACK from Payment returns to Total Charges", stateOf(JOB_CLASSIC), "WAITING_TOTAL_CHARGES");
+  await clickWithInputs("SUBMIT_TOTAL_CHARGES", JOB_CLASSIC, { total_charges: si("350") });
+
   await clickWithInputs("SUBMIT_PAYMENT", JOB_CLASSIC, { payment_method: si("Cash") });
-  check("payment recorded", stateOf(JOB_CLASSIC), "WAITING_EMPTY_VAN_PHOTO");
+  check("payment now leads to the second issues checkpoint, BEFORE the empty-van photo",
+    stateOf(JOB_CLASSIC), "WAITING_EMPTY_VAN_ISSUES_CHECK");
   check("payment row written", tabs.Payments.length - 1, 1);
+
+  console.log("\n" + "-".repeat(74));
+  console.log("Second checkpoint resolved inline via Liability Report, then resumes");
+  console.log("the classic flow automatically once the customer signs");
+  console.log("-".repeat(74));
+
+  const issuesChoice = await click("ISSUES_YES", JOB_CLASSIC);
+  check("reporting an issue shows the which-one choice", title(issuesChoice), "Which one?");
+
+  const inlineLiabilityField0 = await click("MENU_LIABILITY_REPORT", JOB_CLASSIC);
+  check("picking Liability Report launches the exact same standalone scenario inline", title(inlineLiabilityField0), "Liability Report");
+  check("the classic flow's currentState is untouched while the inline scenario runs",
+    stateOf(JOB_CLASSIC), "WAITING_EMPTY_VAN_ISSUES_CHOICE");
+
+  // A category other than "Van Overloaded" so no conditional waiver interrupts the walk.
+  const inlineLiabilityPhotos = await inlineSubmitField(JOB_CLASSIC, "liability", 0, "damage_categories", "Glassware (e.g., glasses, plates, mirrors, vases)");
+  check("field submitted -> photo step", title(inlineLiabilityPhotos), "Liability Report");
+  await photo();
+  const inlineLiabilitySig = await inlineContinuePhotos(JOB_CLASSIC, "liability");
+  check("Liability Report reaches signature", subtitle(inlineLiabilitySig), "Waiting on signature");
+  await drain();
+
+  const inlineLiabilityLinkUrl = new URL(scenarioLinkFor("liability", JOB_CLASSIC));
+  const inlineLiabilityTarget = `http://127.0.0.1:${port}${inlineLiabilityLinkUrl.pathname}${inlineLiabilityLinkUrl.search}`;
+  lastChatPatch = null;
+  const inlineLiabilitySignRes = await fetch(inlineLiabilityTarget, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: png })
+  });
+  check("inline Liability Report sign POST status", inlineLiabilitySignRes.status, 200);
+  check("LiabilityReport row written for the inline detour", tabs.LiabilityReport.length - 1, 1);
+
+  check("signing the inline scenario resumes the classic flow automatically", stateOf(JOB_CLASSIC), "WAITING_EMPTY_VAN_PHOTO");
+  check("the resume pushed a card into Chat, not a generic 'scenario submitted' card", lastChatPatch !== null, true);
+  check("the push targeted the classic flow's own message",
+    lastChatPatch && lastChatPatch.name, `spaces/S/messages/${JOB_CLASSIC}`);
+  check("the pushed card is the classic flow's own next step (Empty Van), not a scenario-done card",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes("Empty Van"), true);
 
   await photo(); await drain();
   check("empty-van photo advances to client details", stateOf(JOB_CLASSIC), "WAITING_CLIENT_DETAILS");
+  check("empty-van photo sets actualFinish -- not a later Complete Job tap", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_CLASSIC, "Actual Finish")), true);
 
   const signatureStepCard = await clickWithInputs("SUBMIT_CLIENT_DETAILS", JOB_CLASSIC, { client_name_postcode: si("Barry, N15 6UQ") });
   check("client details advance to signature step", stateOf(JOB_CLASSIC), "WAITING_CLIENT_CONFIRMATION");
@@ -371,7 +507,7 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const signPostBody = await signPostRes.json();
   check("sign pad POST status", signPostRes.status, 200);
   check("sign pad POST ok", signPostBody.ok, true);
-  check("signature advances to the organized-photo step", stateOf(JOB_CLASSIC), "WAITING_ORGANIZED_PHOTO");
+  check("signature advances to the review-request step (Organized photo is gone)", stateOf(JOB_CLASSIC), "WAITING_REVIEW_CHECK");
   check("signature row written", tabs.Signatures.length - 1, 1);
 
   // The real point of this whole feature: signing pushed the next card into Chat on
@@ -379,16 +515,23 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   check("signing pushed a card update into Chat automatically", lastChatPatch !== null, true);
   check("the push targeted the exact message that was showing the signature step",
     lastChatPatch && lastChatPatch.name, `spaces/S/messages/${JOB_CLASSIC}`);
-  check("the pushed card shows the next step (organized photo)",
-    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes("Is the van organized"), true);
+  check("the pushed card asks about a customer review",
+    lastChatPatch && JSON.stringify(lastChatPatch.requestBody).includes("Do you want to take a review"), true);
 
-  await photo(); await drain();
-  check("organized photo makes the job ready to complete", stateOf(JOB_CLASSIC), "READY_TO_COMPLETE");
+  const reviewPreview = await click("REVIEW_YES", JOB_CLASSIC);
+  check("opting into a review shows the email preview", stateOf(JOB_CLASSIC), "WAITING_REVIEW_SEND");
+  check("review email preview includes the customer's name", hasText(reviewPreview, "Barry"), true);
+
+  await click("SEND_REVIEW_EMAIL", JOB_CLASSIC);
+  check("sending the review email makes the job ready to complete", stateOf(JOB_CLASSIC), "READY_TO_COMPLETE");
+  check("review email sent synchronously", calls.email ?? 0, 2);
+  check("review email activity row written",
+    tabs.ActivityLog.slice(1).some(r => r[HEADERS.ActivityLog.indexOf("Job ID")] === JOB_CLASSIC && r[HEADERS.ActivityLog.indexOf("Action")] === "CLIENT_REVIEW_EMAIL_SENT"), true);
 
   const doneCard = await click("COMPLETE_JOB", JOB_CLASSIC);
   check("workflow's own last step completes the job", stateOf(JOB_CLASSIC), "COMPLETED");
   check("status column completed", statusOf(JOB_CLASSIC), "COMPLETED");
-  check("finish timestamp set", /^\d{4}-\d{2}-\d{2}T/.test(fieldOf(JOB_CLASSIC, "Actual Finish")), true);
+  check("finish timestamp unchanged from the empty-van photo", fieldOf(JOB_CLASSIC, "Actual Finish") !== "", true);
   check("completion card returned", title(doneCard), "Job completed");
   check("completion card has a Main Menu button, not just typed text",
     JSON.stringify(doneCard.message).includes('"Main Menu"'), true);
@@ -626,9 +769,11 @@ const disabledButtons = r => menuButtons(r).filter(b => b.disabled).map(b => b.t
   const liabilityBody = await liabilitySubmit.json();
   check("liability sign submit succeeds", liabilitySubmit.status, 200);
   check("liability sign submit ok", liabilityBody.ok, true);
-  check("LiabilityReport row written", tabs.LiabilityReport.length - 1, 1);
+  // 2, not 1: the classic-flow section above already wrote one LiabilityReport row for
+  // its inline "any issues?" detour on JOB_CLASSIC.
+  check("LiabilityReport row written", tabs.LiabilityReport.length - 1, 2);
   check("LiabilityReport stores the selected category",
-    tabs.LiabilityReport[1][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
+    tabs.LiabilityReport[2][HEADERS.LiabilityReport.indexOf("Damage Categories")], "Van Overloaded");
 
   console.log("\n" + "-".repeat(74));
   console.log("Add Job refuses to silently fall back to the broken direct-share behavior");

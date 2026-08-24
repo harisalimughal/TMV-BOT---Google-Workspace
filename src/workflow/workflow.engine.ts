@@ -1,7 +1,7 @@
 import { env } from "../config/env";
 import {
-  activityWrite, commitWrites, driverFlowWrite, evidenceWrite, getJob, jobWrite, listEvidenceForJob, paymentWrite,
-  readEvidenceSummary, signatureWrite, SheetWrite, workflowWrite
+  activityWrite, commitWrites, driverFlowWrite, evidenceWrite, getJob, getSetting, jobWrite, listEvidenceForJob,
+  paymentWrite, readEvidenceSummary, signatureWrite, SheetWrite, workflowWrite
 } from "../google/sheets";
 import {
   ChatAttachment, EvidenceRecord, EvidenceStatus, EvidenceType, ExtraChargeType, Job
@@ -17,6 +17,9 @@ import {
 } from "./validation.engine";
 import { log, setContext } from "../utils/logger";
 import { equalPence, formatPounds, fromPounds } from "../utils/money";
+import { sendJobStartedEmail, sendReviewRequestEmail } from "../google/gmail";
+import { sendJobStartedSms } from "../integrations/firetext";
+import { JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../notifications/message";
 
 export const CUSTOMER_CONFIRMATION_TEXT =
   "By signing below, you confirm that you have inspected the van, that it is empty, that all items have been delivered, and that no items have been left behind. You also confirm that the removal service has been completed to your satisfaction.";
@@ -40,8 +43,7 @@ export async function beginJob(jobId: string, identifier: string): Promise<Job> 
 const PHOTO_FOLDER: Record<string, EvidenceType> = {
   [WorkflowState.WAITING_ARRIVAL_PHOTO]: "Arrival",
   [WorkflowState.WAITING_LOADED_PHOTO]: "VanLoaded",
-  [WorkflowState.WAITING_EMPTY_VAN_PHOTO]: "EmptyVan",
-  [WorkflowState.WAITING_ORGANIZED_PHOTO]: "Organized"
+  [WorkflowState.WAITING_EMPTY_VAN_PHOTO]: "EmptyVan"
 };
 
 export interface PhotoAcceptance {
@@ -84,6 +86,13 @@ export async function handlePhotoStep(
 
   const from = job.currentState;
   job.currentState = nextAfterPhoto(state);
+
+  // "Job start"/"job end" now track the actual physical move (arrival -> unloaded),
+  // not the administrative button-tapping around it -- set once, on the photo that
+  // marks each boundary, not overwritten on a later redo of the same step.
+  const now = new Date().toISOString();
+  if (evidenceType === "Arrival" && !job.actualStart) job.actualStart = now;
+  if (evidenceType === "EmptyVan" && !job.actualFinish) job.actualFinish = now;
 
   const extras: SheetWrite[] = [
     ...writes,
@@ -267,7 +276,10 @@ export async function handleAction(
       job.paymentMethod = method;
       job.paymentStatus = method === "Invoice" ? "Outstanding" : "Recorded";
       const from = job.currentState;
-      job.currentState = WorkflowState.WAITING_EMPTY_VAN_PHOTO;
+      // The second issues checkpoint sits right BEFORE the Empty Van photo now, not
+      // after it -- ISSUES_NONE (or an inline detour's resume) is what actually gets
+      // the driver to WAITING_EMPTY_VAN_PHOTO from here.
+      job.currentState = WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK;
       return saveJob(job, driver, action, from, method, [
         paymentWrite({ jobId, driver: actor, method, amount: job.totalCharges, status: job.paymentStatus }),
         driverFlowWrite({ jobId, driver: actor, field: "Payment Method", value: method, state: job.currentState })
@@ -287,6 +299,104 @@ export async function handleAction(
       ]);
     }
 
+    case "SEND_ON_MY_WAY_MESSAGE": {
+      assertState(job.currentState, WorkflowState.WAITING_ON_MY_WAY_MESSAGE);
+      const from = job.currentState;
+      const template = await getSetting("JOB_STARTED_MESSAGE_TEXT", JOB_STARTED_MESSAGE_TEMPLATE);
+      const extras: SheetWrite[] = [];
+
+      // Each channel is attempted and recorded independently -- one failing must never
+      // block the other or block the driver from moving on to the Arrival step. Only a
+      // channel that actually had somewhere to go gets a row at all (mirrors the
+      // no-target/not-configured no-ops already built into the send functions
+      // themselves), so this never writes a false "Sent" the way the old always-write
+      // background task once did.
+      if (job.customerEmail) {
+        try {
+          await sendJobStartedEmail(job, template, driver);
+          extras.push(activityWrite({
+            jobId, driver: actor, action: "CLIENT_START_EMAIL_SENT", fromState: from, toState: from, detail: job.customerEmail
+          }));
+        } catch (error) {
+          extras.push(activityWrite({
+            jobId, driver: actor, action: "CLIENT_START_EMAIL_FAILED", fromState: from, toState: from,
+            detail: error instanceof Error ? error.message : String(error)
+          }));
+        }
+      }
+      if (job.customerPhone && env.firetextApiKey && env.firetextSenderId) {
+        try {
+          await sendJobStartedSms(job, template, driver);
+          extras.push(activityWrite({
+            jobId, driver: actor, action: "CLIENT_START_SMS_SENT", fromState: from, toState: from, detail: job.customerPhone
+          }));
+        } catch (error) {
+          extras.push(activityWrite({
+            jobId, driver: actor, action: "CLIENT_START_SMS_FAILED", fromState: from, toState: from,
+            detail: error instanceof Error ? error.message : String(error)
+          }));
+        }
+      }
+
+      job.currentState = WorkflowState.WAITING_ARRIVAL_PHOTO;
+      return saveJob(job, driver, action, from, undefined, extras);
+    }
+
+    case "ISSUES_NONE":
+    case "ISSUES_YES": {
+      const from = job.currentState as WorkflowState;
+      const noneTarget: Partial<Record<WorkflowState, WorkflowState>> = {
+        [WorkflowState.WAITING_ARRIVAL_ISSUES_CHECK]: WorkflowState.WAITING_LOADED_PHOTO,
+        [WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK]: WorkflowState.WAITING_EMPTY_VAN_PHOTO
+      };
+      const yesTarget: Partial<Record<WorkflowState, WorkflowState>> = {
+        [WorkflowState.WAITING_ARRIVAL_ISSUES_CHECK]: WorkflowState.WAITING_ARRIVAL_ISSUES_CHOICE,
+        [WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK]: WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE
+      };
+      const target = (action === "ISSUES_NONE" ? noneTarget : yesTarget)[from];
+      if (!target) throw new ValidationError(`This action is not valid at the current step (${from}).`);
+      job.currentState = target;
+      return saveJob(job, driver, action, from);
+    }
+
+    case "REVIEW_NONE":
+    case "REVIEW_YES": {
+      assertState(job.currentState, WorkflowState.WAITING_REVIEW_CHECK);
+      const from = job.currentState;
+      job.currentState = action === "REVIEW_YES" ? WorkflowState.WAITING_REVIEW_SEND : WorkflowState.READY_TO_COMPLETE;
+      return saveJob(job, driver, action, from);
+    }
+
+    case "SEND_REVIEW_EMAIL": {
+      assertState(job.currentState, WorkflowState.WAITING_REVIEW_SEND);
+      const from = job.currentState;
+      const template = await getSetting("REVIEW_REQUEST_EMAIL_TEXT", REVIEW_REQUEST_EMAIL_TEMPLATE);
+      const extras: SheetWrite[] = [];
+      if (job.customerEmail) {
+        try {
+          await sendReviewRequestEmail(job, template);
+          extras.push(activityWrite({
+            jobId, driver: actor, action: "CLIENT_REVIEW_EMAIL_SENT", fromState: from, toState: from, detail: job.customerEmail
+          }));
+        } catch (error) {
+          extras.push(activityWrite({
+            jobId, driver: actor, action: "CLIENT_REVIEW_EMAIL_FAILED", fromState: from, toState: from,
+            detail: error instanceof Error ? error.message : String(error)
+          }));
+        }
+      }
+      job.currentState = WorkflowState.READY_TO_COMPLETE;
+      return saveJob(job, driver, action, from, undefined, extras);
+    }
+
+    case "GO_BACK": {
+      const from = job.currentState;
+      const target = BACK_TARGET[from as WorkflowState];
+      if (!target) throw new ValidationError("There's no previous step to go back to here.");
+      job.currentState = target;
+      return saveJob(job, driver, action, from);
+    }
+
     case "COMPLETE_JOB": {
       assertState(job.currentState, WorkflowState.READY_TO_COMPLETE);
       await assertCompletionGate(jobId, job);
@@ -297,6 +407,19 @@ export async function handleAction(
       throw new ValidationError(`Unknown action: ${action}`);
   }
 }
+
+/** BACK button targets for the data-entry steps -- lets a driver who mis-typed
+ *  something return and redo it, rather than being stuck once a step is submitted.
+ *  Total Charges' predecessor is ambiguous (Overtime only runs if extra time was
+ *  claimed), so it always goes back to Extra Charges, the fixed branch point, rather
+ *  than trying to reconstruct which path was actually taken. */
+const BACK_TARGET: Partial<Record<WorkflowState, WorkflowState>> = {
+  [WorkflowState.WAITING_EXTRA_CHARGES]: WorkflowState.IN_PROGRESS,
+  [WorkflowState.WAITING_OVERTIME]: WorkflowState.WAITING_EXTRA_CHARGES,
+  [WorkflowState.WAITING_TOTAL_CHARGES]: WorkflowState.WAITING_EXTRA_CHARGES,
+  [WorkflowState.WAITING_PAYMENT]: WorkflowState.WAITING_TOTAL_CHARGES,
+  [WorkflowState.WAITING_CLIENT_DETAILS]: WorkflowState.WAITING_EMPTY_VAN_PHOTO
+};
 
 export class SignatureAlreadyCapturedError extends Error {
   constructor() {
@@ -329,7 +452,7 @@ export async function submitDrawnSignature(
   job.clientConfirmedBy = name;
   job.updatedAt = new Date().toISOString();
   const from = job.currentState;
-  job.currentState = WorkflowState.WAITING_ORGANIZED_PHOTO;
+  job.currentState = WorkflowState.WAITING_REVIEW_CHECK;
 
   await commitWrites([
     jobWrite(job),
@@ -371,8 +494,7 @@ export class EvidenceFailedError extends Error {
 const REQUIRED_EVIDENCE: Array<{ type: EvidenceType; label: string; minimum: number }> = [
   { type: "Arrival", label: "arrival photo", minimum: 1 },
   { type: "VanLoaded", label: "van-loaded photo", minimum: 1 },
-  { type: "EmptyVan", label: "empty-van photo", minimum: 1 },
-  { type: "Organized", label: "organized-van photo", minimum: 1 }
+  { type: "EmptyVan", label: "empty-van photo", minimum: 1 }
 ];
 
 /**

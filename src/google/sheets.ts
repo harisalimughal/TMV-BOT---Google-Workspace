@@ -57,7 +57,7 @@ export const SCHEMA: Record<string, string[]> = {
   [SHEETS.PHOTOS]: ["Timestamp", "Job ID", "Driver", "Step", "File ID", "File URL", "File Name", "Content Type"],
   [SHEETS.SIGNATURES]: ["Timestamp", "Job ID", "Driver", "Customer Name", "Mode", "Confirmation Text"],
   [SHEETS.PAYMENTS]: ["Timestamp", "Job ID", "Driver", "Method", "Amount", "Status"],
-  [SHEETS.DRIVERS]: ["Initials", "Full Name", "Email", "Chat User Name", "Active", "Role"],
+  [SHEETS.DRIVERS]: ["Initials", "Full Name", "Email", "Chat User Name", "Active", "Role", "Phone", "Van Registration"],
   [SHEETS.CUSTOMERS]: ["Customer ID", "Name", "Email", "Phone", "Address", "Updated"],
   [SHEETS.ACTIVITY]: ["Timestamp", "Job ID", "Driver", "Action", "From State", "To State", "Detail"],
   [SHEETS.WORKFLOW]: ["Job ID", "Driver", "State", "Updated"],
@@ -799,6 +799,7 @@ export function jobWrite(job: Job): SheetWrite {
  */
 export function driverWrite(data: {
   initials: string; fullName: string; email: string; chatUserName?: string; active: boolean; role?: string;
+  phone?: string; vanRegistration?: string;
 }): SheetWrite {
   return {
     sheet: SHEETS.DRIVERS,
@@ -809,7 +810,9 @@ export function driverWrite(data: {
       "Email": data.email,
       "Chat User Name": data.chatUserName ?? "",
       "Active": data.active,
-      "Role": data.role ?? "Driver"
+      "Role": data.role ?? "Driver",
+      "Phone": data.phone ?? "",
+      "Van Registration": data.vanRegistration ?? ""
     }
   };
 }
@@ -1048,7 +1051,9 @@ function rowToDriverProfile(row: Record<string, string>): DriverProfile {
     email: (row["Email"] ?? "").trim(),
     chatUserName: (row["Chat User Name"] ?? "").trim(),
     active: boolFromSheet(row["Active"] || "TRUE"),
-    role: (row["Role"] ?? "").trim() || "Driver"
+    role: (row["Role"] ?? "").trim() || "Driver",
+    phone: (row["Phone"] ?? "").trim(),
+    vanRegistration: (row["Van Registration"] ?? "").trim()
   };
 }
 

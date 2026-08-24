@@ -27,6 +27,9 @@ export interface DriverProfile {
   chatUserName: string;
   active: boolean;
   role: string;
+  /** Shown in the "I'm on the way" message preview -- blank until an admin fills it in. */
+  phone: string;
+  vanRegistration: string;
 }
 
 export interface Job {

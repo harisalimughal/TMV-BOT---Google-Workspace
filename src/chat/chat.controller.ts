@@ -1,10 +1,10 @@
 import { DateTime } from "luxon";
 import {
   ChatResponse, ChatResult, createResponse, errorResponse, evidenceFailedCard, evidencePendingCard, helpCard,
-  jobCard, mainMenuCard, noJobsCard, photoAckCard, renderScenarioStep, updateResponse, workflowCard
+  jobCard, mainMenuCard, noJobsCard, photoAckCard, renderScenarioStep, tomorrowJobsCard, updateResponse, workflowCard
 } from "./cards";
 import { parseCommand } from "./commands";
-import { getActiveJobForDriver, getNextJobForDriver } from "../jobs/jobs.service";
+import { getActiveJobForDriver, getNextJobForDriver, getTomorrowJobsForDriver } from "../jobs/jobs.service";
 import {
   CUSTOMER_CONFIRMATION_TEXT, EvidenceFailedError, EvidencePendingError, handleAction, handlePhotoStep,
   reopenPhotoStep, retryFailedEvidence
@@ -22,8 +22,11 @@ import {
   resolveOrStartScenario, submitScenarioField
 } from "./scenario.engine";
 import {
-  commitWrites, getJob, getScenarioProgress, getSetting, listScenarioProgressForJob, pendingSignatureWrite
+  commitWrites, getDriverByInitials, getJob, getScenarioProgress, getSetting, listScenarioProgressForJob,
+  pendingSignatureWrite
 } from "../google/sheets";
+import { JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE, renderMessageTemplate } from "../notifications/message";
+import { Job } from "../jobs/job.types";
 
 export interface GoogleChatEvent {
   type?: string;
@@ -97,7 +100,48 @@ async function showCurrentOrNext(event: GoogleChatEvent, confirmationText: strin
   const { job } = await getNextJobForDriver(identifier(event), { sync });
   if (!job) return noJobsCard();
   setContext({ jobId: job.jobId });
-  return job.status === "IN_PROGRESS" ? workflowCard(job, confirmationText) : jobCard(job);
+  return job.status === "IN_PROGRESS" ? await resolveWorkflowCard(job, confirmationText) : jobCard(job);
+}
+
+/**
+ * Wraps workflowCard() with the async lookups a few of its steps need. Every other
+ * state's work here is a plain string compare, so it's safe (and simpler) to route
+ * every workflow-card render through this rather than cherry-picking call sites.
+ */
+async function resolveWorkflowCard(job: Job, confirmationText: string): Promise<ChatResponse> {
+  const state = job.currentState as WorkflowState;
+
+  if (state === WorkflowState.WAITING_ARRIVAL_ISSUES_CHOICE || state === WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE) {
+    // The driver may have navigated away mid-scenario (e.g. via "Next Job") and come
+    // back — resume exactly where that inline detour left off instead of re-asking
+    // "which one?".
+    const progressList = await listScenarioProgressForJob(job.jobId, 0);
+    const active = progressList.find(p => (p.scenario === "parking" || p.scenario === "liability") && p.step !== "done");
+    if (active) {
+      const scenario = active.scenario as ScenarioKey;
+      const spec = SCENARIOS[scenario];
+      const step = await describeStep(spec, active);
+      return renderScenarioStep(spec, scenario, job.jobId, step);
+    }
+    return workflowCard(job, confirmationText);
+  }
+
+  if (state === WorkflowState.WAITING_ON_MY_WAY_MESSAGE) {
+    const [driver, template] = await Promise.all([
+      job.driverInitials ? getDriverByInitials(job.driverInitials) : Promise.resolve(null),
+      getSetting("JOB_STARTED_MESSAGE_TEXT", JOB_STARTED_MESSAGE_TEMPLATE)
+    ]);
+    const onMyWayPreview = renderMessageTemplate(template, job, driver ?? {});
+    return workflowCard(job, confirmationText, { onMyWayPreview });
+  }
+
+  if (state === WorkflowState.WAITING_REVIEW_SEND) {
+    const template = await getSetting("REVIEW_REQUEST_EMAIL_TEXT", REVIEW_REQUEST_EMAIL_TEMPLATE);
+    const reviewEmailPreview = renderMessageTemplate(template, job);
+    return workflowCard(job, confirmationText, { reviewEmailPreview });
+  }
+
+  return workflowCard(job, confirmationText);
 }
 
 /**
@@ -234,7 +278,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
                 ...timer.fields()
               });
               return {
-                result: createResponse(photoAckCard(job, accepted, workflowCard(job, confirmationText))),
+                result: createResponse(photoAckCard(job, accepted, await resolveWorkflowCard(job, confirmationText))),
                 outcomeState: job.currentState,
                 jobId: job.jobId
               };
@@ -242,7 +286,7 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
             async replay => {
               // Show the card the original delivery produced, not an out-of-order error.
               const job = replay.jobId ? await getJob(replay.jobId) : null;
-              return createResponse(job ? workflowCard(job, confirmationText) : helpCard());
+              return createResponse(job ? await resolveWorkflowCard(job, confirmationText) : helpCard());
             }
           );
         }
@@ -269,6 +313,13 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (fn === "MENU_CHECK_OUT") return updateResponse(await scenarioMenuAction("checkout")(event));
         if (fn === "MENU_PARKING_LIABILITY") return updateResponse(await scenarioMenuAction("parking")(event));
         if (fn === "MENU_LIABILITY_REPORT") return updateResponse(await scenarioMenuAction("liability")(event));
+        if (fn === "MENU_TOMORROW_JOBS") {
+          // Read-only lookup: no active/next job is required, unlike withActiveJob()'s
+          // other menu actions -- a driver with nothing left today should still be able
+          // to see what's coming tomorrow.
+          const { jobs } = await getTomorrowJobsForDriver(identifier(event));
+          return updateResponse(tomorrowJobsCard(jobs));
+        }
 
         if (fn === "SCENARIO_FIELD_SUBMIT" || fn === "SCENARIO_NOTICE_ACK" || fn === "SCENARIO_PHOTOS_CONTINUE") {
           const scenario = actionParam(event, "scenario") as ScenarioKey;
@@ -303,13 +354,18 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
         if (fn === "REOPEN_PHOTO_STEP") {
           const evidenceType = (actionParam(event, "evidenceType") || "Arrival") as EvidenceType;
           const job = await reopenPhotoStep(jobId, identifier(event), evidenceType);
-          return updateResponse(workflowCard(job, confirmationText));
+          return updateResponse(await resolveWorkflowCard(job, confirmationText));
         }
 
         // Card clicks are replay-guarded too: a double-tap or a Chat retry must not
-        // run a state transition twice.
+        // run a state transition twice. eventTime is included alongside message name +
+        // action: the GO_BACK/redo feature lets a driver legitimately trigger the same
+        // action on the same message more than once (e.g. SUBMIT_TOTAL_CHARGES again
+        // after backing up to it), and those are genuinely distinct clicks with distinct
+        // eventTime values -- a real redelivery of one specific click always repeats the
+        // same eventTime, so this still catches that case.
         const clickKey = event.message?.name
-          ? eventKeyFor({ messageName: `${event.message.name}#${fn}` })
+          ? eventKeyFor({ messageName: `${event.message.name}#${fn}#${event.eventTime || ""}` })
           : null;
 
         // Everything else — START_JOB, FINISH_MOVE, SUBMIT_EXTRA_CHARGES, SUBMIT_OVERTIME,
@@ -334,11 +390,17 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
               );
             }
 
-            return { result: updateResponse(workflowCard(job, confirmationText)), outcomeState: job.currentState, jobId: job.jobId };
+            // SEND_ON_MY_WAY_MESSAGE's response is the one workflow card that needs a
+            // render-time-only flag (the one-time "message sent" notice) rather than
+            // an async lookup, so it renders directly instead of via resolveWorkflowCard.
+            const responseCard = fn === "SEND_ON_MY_WAY_MESSAGE"
+              ? workflowCard(job, confirmationText, { justSentOnMyWayMessage: true })
+              : await resolveWorkflowCard(job, confirmationText);
+            return { result: updateResponse(responseCard), outcomeState: job.currentState, jobId: job.jobId };
           },
           async () => {
             const job = await getJob(jobId);
-            return updateResponse(job ? workflowCard(job, confirmationText) : helpCard());
+            return updateResponse(job ? await resolveWorkflowCard(job, confirmationText) : helpCard());
           }
         );
       }

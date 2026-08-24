@@ -1,7 +1,7 @@
 import {
-  activityWrite, commitWrites, driverFlowWrite, getJob, getScenarioProgress, liabilityReportWrite,
+  activityWrite, commitWrites, driverFlowWrite, getJob, getScenarioProgress, jobWrite, liabilityReportWrite,
   listEvidenceForJob, parkingLiabilityWrite, ScenarioProgressRecord, scenarioProgressWrite, SheetWrite,
-  storageCheckInWrite, storageCheckOutWrite
+  storageCheckInWrite, storageCheckOutWrite, workflowWrite
 } from "../google/sheets";
 import { uploadEvidenceImage } from "../google/drive";
 import { buildReceivedEvidence } from "../jobs/evidence.service";
@@ -9,6 +9,7 @@ import { ChatAttachment, EvidenceStatus, Job } from "../jobs/job.types";
 import { enqueueAll } from "../queue/queue.service";
 import { ProcessJobImageTask } from "../queue/queue.types";
 import { ValidationError } from "../workflow/validation.engine";
+import { RESUME_AFTER_ISSUES, WorkflowState } from "../workflow/workflow.states";
 import { ScenarioFieldSpec, ScenarioKey, ScenarioSpec, SCENARIOS } from "./scenario.spec";
 
 // ---------------------------------------------------------------------------
@@ -259,7 +260,7 @@ function writeScenarioRow(
  */
 export async function finalizeScenario(
   scenario: ScenarioKey, jobId: string, signatureBuffer: Buffer
-): Promise<{ photoUrls: string[]; messageName: string }> {
+): Promise<{ photoUrls: string[]; messageName: string; resumedClassicState?: WorkflowState }> {
   const spec = SCENARIOS[scenario];
   const progress = await getScenarioProgress(jobId, scenario, 0);
   if (!progress || progress.step !== "signature") {
@@ -289,16 +290,30 @@ export async function finalizeScenario(
 
   const driver = job.driverInitials || "driver device";
   const sigFile = await uploadEvidenceImage(job, spec.folderKey, "sig", "signature.png", signatureBuffer, "image/png");
+  const fromState = job.currentState;
+
+  // If this scenario ran inline as one of the classic flow's "any issues?" detours
+  // (see workflow.engine.ts's ISSUES_YES / cards.ts's issuesChoiceCard), resume the
+  // classic flow right where it was paused, in the same write batch as the scenario's
+  // own submission -- this is what makes the detour transparent to the driver.
+  const resumedClassicState = RESUME_AFTER_ISSUES[fromState as WorkflowState];
+  if (resumedClassicState) {
+    job.currentState = resumedClassicState;
+    job.updatedAt = new Date().toISOString();
+  }
 
   await commitWrites([
     writeScenarioRow(spec, jobId, driver, progress.fields, photoUrls, sigFile.fileUrl),
     scenarioProgressWrite({ jobId, scenario, step: "done", fields: {}, messageName: "", startedAt: progress.startedAt }),
-    driverFlowWrite({ jobId, driver, field: spec.title, value: "Submitted", state: job.currentState }),
+    driverFlowWrite({ jobId, driver, field: spec.title, value: "Submitted", state: fromState }),
     activityWrite({
       jobId, driver, action: `${spec.title.toUpperCase().replace(/\s+/g, "_")}_SUBMITTED`,
-      fromState: job.currentState, toState: job.currentState, detail: `${photoUrls.length} photo(s)`
-    })
+      fromState, toState: fromState, detail: `${photoUrls.length} photo(s)`
+    }),
+    ...(resumedClassicState
+      ? [jobWrite(job), workflowWrite(jobId, driver, resumedClassicState)]
+      : [])
   ]);
 
-  return { photoUrls, messageName: progress.messageName };
+  return { photoUrls, messageName: progress.messageName, resumedClassicState };
 }

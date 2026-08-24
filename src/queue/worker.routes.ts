@@ -120,7 +120,6 @@ export function workerRouter(): Router {
   const router = Router();
   router.use(authorizeWorkerRequest);
   router.post("/process-image", runTask("PROCESS_JOB_IMAGE"));
-  router.post("/send-email", runTask("SEND_JOB_STARTED_EMAIL"));
   router.post("/sweep-evidence", runTask("SWEEP_STALE_EVIDENCE"));
   return router;
 }

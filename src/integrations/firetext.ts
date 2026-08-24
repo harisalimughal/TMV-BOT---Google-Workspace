@@ -1,6 +1,6 @@
 import { env } from "../config/env";
-import { Job } from "../jobs/job.types";
-import { renderJobStartedMessage } from "../notifications/message";
+import { DriverProfile, Job } from "../jobs/job.types";
+import { renderMessageTemplate } from "../notifications/message";
 import { withRetry, withTimeout } from "../utils/retry";
 
 /**
@@ -53,9 +53,11 @@ async function sendSms(to: string, message: string): Promise<void> {
   }
 }
 
-export async function sendJobStartedSms(job: Job, template: string): Promise<void> {
+export async function sendJobStartedSms(
+  job: Job, template: string, driver: Pick<DriverProfile, "phone" | "vanRegistration">
+): Promise<void> {
   if (!env.firetextApiKey || !env.firetextSenderId) return;
   if (!job.customerPhone) return;
 
-  await sendSms(job.customerPhone, renderJobStartedMessage(template, job));
+  await sendSms(job.customerPhone, renderMessageTemplate(template, job, driver));
 }
