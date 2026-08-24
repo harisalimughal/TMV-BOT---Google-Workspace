@@ -24,6 +24,7 @@ import {
   Command,
   HelpCircle,
   Sliders,
+  MessageSquare,
   Bell
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -65,6 +66,7 @@ const NAV_CONFIG: NavSectionItem[] = [
   { id: "exceptions", label: "Exceptions", icon: AlertTriangle, hasBadge: true, desc: "Operational exceptions and quality control alerts" },
   { id: "activity", label: "Activity Log", icon: History, desc: "Chronological audit records directly from ActivityLog tab" },
   { id: "reports", label: "Reports", icon: FileSpreadsheet, desc: "Downloadable operational datasets and certified export files" },
+  { id: "messaging", label: "Messaging Content", icon: MessageSquare, desc: "Manage automated customer and driver communication templates" },
   { id: "settings", label: "Settings", icon: Settings, desc: "Read-only system rules, rates, caching invariants and database mapping" }
 ];
 

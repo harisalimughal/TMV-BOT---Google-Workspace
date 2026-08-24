@@ -11,6 +11,7 @@ import { ScenariosPage } from "./pages/ScenariosPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { MessagingPage } from "./pages/MessagingPage";
 
 export function App() {
   const [activeSection, setActiveSection] = useState<string>("overview");
@@ -85,6 +86,7 @@ export function App() {
       {activeSection === "exceptions" && <ExceptionsPage onOpenJob={handleOpenJob} />}
       {activeSection === "activity" && <ActivityPage />}
       {activeSection === "reports" && <ReportsPage />}
+      {activeSection === "messaging" && <MessagingPage />}
       {activeSection === "settings" && <SettingsPage />}
     </Layout>
   );
