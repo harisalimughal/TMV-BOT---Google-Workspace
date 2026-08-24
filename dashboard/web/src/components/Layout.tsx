@@ -54,6 +54,7 @@ const NAV_CONFIG: NavSectionItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, desc: "Executive KPI telemetry, revenue velocity and operational health" },
   { id: "jobs", label: "Jobs", icon: Truck, desc: "Operational moves joined across Bookings, Drivers, Workflow and Evidence" },
   { id: "finished", label: "Finished Jobs", icon: CheckSquare, desc: "Completed moves audit with verified evidence and sign-off records" },
+  { id: "notifications", label: "Notifications", icon: Bell, desc: "Automated communication audit across Email and SMS channels" },
   { type: "header", label: "Scenarios" },
   { id: "checkin", label: "Check In", icon: LogIn, desc: "Storage facility entry logs and client container check-ins" },
   { id: "checkout", label: "Check Out", icon: LogOut, desc: "Storage retrieval and client drop-off confirmation records" },

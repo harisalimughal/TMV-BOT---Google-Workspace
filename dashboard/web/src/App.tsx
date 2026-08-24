@@ -4,6 +4,7 @@ import { LoginPage } from "./components/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { JobsPage } from "./pages/JobsPage";
 import { FinishedJobsPage } from "./pages/FinishedJobsPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 import { DriversPage } from "./pages/DriversPage";
 import { ExceptionsPage } from "./pages/ExceptionsPage";
 import { ScenariosPage } from "./pages/ScenariosPage";
@@ -75,6 +76,7 @@ export function App() {
       {activeSection === "overview" && <OverviewPage onSelectSection={handleSelectSection} />}
       {activeSection === "jobs" && <JobsPage />}
       {activeSection === "finished" && <FinishedJobsPage />}
+      {activeSection === "notifications" && <NotificationsPage />}
       {activeSection === "checkin" && <ScenariosPage kind="checkin" />}
       {activeSection === "checkout" && <ScenariosPage kind="checkout" />}
       {activeSection === "parking" && <ScenariosPage kind="parking" />}
