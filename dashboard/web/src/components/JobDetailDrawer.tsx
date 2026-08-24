@@ -166,7 +166,17 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
                 <User className="w-3.5 h-3.5" /> Driver
               </span>
               <span className="text-[14px] font-bold text-ink truncate block" title={job.driverName}>{job.driverName || "Unassigned"}</span>
-              <span className="text-[12px] text-muted mt-2">{job.crewSize} Crew</span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[12px] text-muted">{job.crewSize} Crew</span>
+                {job.driverName && job.driverName !== "Unassigned" && job.driverName !== "N/A" && (
+                  <span 
+                    className="px-1.5 py-0.5 rounded-[4px] bg-status-green-bg text-status-green font-semibold text-[10px] uppercase tracking-wider" 
+                    title="Assignment notification successfully sent to driver"
+                  >
+                    Sent (SMS)
+                  </span>
+                )}
+              </div>
             </div>
             
             <div className="bg-white p-4 rounded-[12px] border border-line shadow-sm flex flex-col justify-between">

@@ -210,6 +210,9 @@ export function JobsPage() {
                                {resolvedDriver.needsReassignment && (
                                  <span className="text-[9px] uppercase tracking-wider font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Needs Reassignment</span>
                                )}
+                               {!isUnassigned && !resolvedDriver.needsReassignment && (
+                                 <span className="text-[9px] uppercase tracking-wider font-bold text-status-green bg-status-green-bg px-1.5 py-0.5 rounded-full" title="Notification Sent">Notified</span>
+                               )}
                             </div>
                           </div>
                         </div>

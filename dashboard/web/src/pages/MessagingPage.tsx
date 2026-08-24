@@ -37,7 +37,40 @@ const SEED_TEMPLATES = {
       content: "Hi {{client_name}}, your TMV driver {{driver_name}} has officially arrived and started the job clock at {{job_time}}."
     }
   ],
-  driver: [],
+  driver: [
+    {
+      id: "job_assigned_sms_chat",
+      title: "Job Assigned — SMS / Chat (short form)",
+      description: "Sent immediately when a driver is assigned to a job, via SMS or Chat",
+      channels: ["SMS", "Chat"],
+      defaultContent: "Hi {{driver_name}}, you've been assigned a new job: {{job_id}} for {{client_name}}. Pickup: {{pickup_address}} at {{job_time}} on {{job_date}}. Crew: {{crew_size}}. Vehicle: {{vehicle_registration}}. Reply to confirm.",
+      content: "Hi {{driver_name}}, you've been assigned a new job: {{job_id}} for {{client_name}}. Pickup: {{pickup_address}} at {{job_time}} on {{job_date}}. Crew: {{crew_size}}. Vehicle: {{vehicle_registration}}. Reply to confirm."
+    },
+    {
+      id: "job_assigned_email",
+      title: "Job Assigned — Email (fuller detail)",
+      description: "Sent immediately when a driver is assigned to a job, via Email",
+      channels: ["Email"],
+      defaultContent: "Hi {{driver_name}},\n\nYou've been assigned a new job.\n\nJob ID: {{job_id}}\nClient: {{client_name}}\nDate & Time: {{job_date}} at {{job_time}}\nPickup: {{pickup_address}}\nDrop-off: {{dropoff_address}}\nCrew size: {{crew_size}}\nVehicle: {{vehicle_registration}}\nPrice: {{job_price}}\n\nPlease confirm you've received this job in the app/Chat bot. If you have any questions, contact the office before the scheduled start time.\n\n— The Man Van Operations",
+      content: "Hi {{driver_name}},\n\nYou've been assigned a new job.\n\nJob ID: {{job_id}}\nClient: {{client_name}}\nDate & Time: {{job_date}} at {{job_time}}\nPickup: {{pickup_address}}\nDrop-off: {{dropoff_address}}\nCrew size: {{crew_size}}\nVehicle: {{vehicle_registration}}\nPrice: {{job_price}}\n\nPlease confirm you've received this job in the app/Chat bot. If you have any questions, contact the office before the scheduled start time.\n\n— The Man Van Operations"
+    },
+    {
+      id: "job_reassigned_removed",
+      title: "Job Reassigned / Removed — SMS",
+      description: "Sent to the previous driver if a job is reassigned or removed",
+      channels: ["SMS"],
+      defaultContent: "Hi {{driver_name}}, job {{job_id}} ({{client_name}}, {{job_date}} {{job_time}}) has been reassigned to another driver and removed from your schedule.",
+      content: "Hi {{driver_name}}, job {{job_id}} ({{client_name}}, {{job_date}} {{job_time}}) has been reassigned to another driver and removed from your schedule."
+    },
+    {
+      id: "job_assignment_reminder",
+      title: "Job Assignment Reminder — Next-Day Summary",
+      description: "Optional daily summary of tomorrow's assigned jobs",
+      channels: ["SMS", "Chat"],
+      defaultContent: "Hi {{driver_name}}, you have {{job_count}} job(s) scheduled for tomorrow ({{job_date}}). First job: {{job_time}} — {{pickup_address}}. Check the app for full details.",
+      content: "Hi {{driver_name}}, you have {{job_count}} job(s) scheduled for tomorrow ({{job_date}}). First job: {{job_time}} — {{pickup_address}}. Check the app for full details."
+    }
+  ],
   payment: [],
   evidence: [],
   legal: [],
@@ -46,11 +79,17 @@ const SEED_TEMPLATES = {
 
 const AVAILABLE_VARIABLES = [
   "{{driver_name}}",
-  "{{vehicle_registration}}",
-  "{{driver_phone}}",
+  "{{job_id}}",
   "{{client_name}}",
+  "{{job_date}}",
   "{{job_time}}",
   "{{pickup_address}}",
+  "{{dropoff_address}}",
+  "{{crew_size}}",
+  "{{vehicle_registration}}",
+  "{{job_price}}",
+  "{{job_count}}",
+  "{{driver_phone}}",
   "{{review_link}}"
 ];
 
