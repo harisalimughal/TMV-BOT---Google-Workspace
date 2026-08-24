@@ -59,6 +59,7 @@ export function OverviewPage({ onSelectSection }: Props) {
       <div className="p-8 bg-paper rounded-3xl text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <AlertTriangle className="w-6 h-6 text-status-red mx-auto mb-2" />
         <h3 className="text-[16px] font-semibold text-ink">Failed to load overview data</h3>
+        <p className="text-red-500 mt-4 text-xs font-mono max-w-lg mx-auto break-words">{error instanceof Error ? error.message : String(error)}</p>
       </div>
     );
   }
@@ -197,7 +198,7 @@ export function OverviewPage({ onSelectSection }: Props) {
               <button className="text-[13px] font-medium text-ink hover:underline">View all</button>
             </div>
             <div className="space-y-5">
-              {charts.jobsByDriver.filter((d: any) => d.name !== 'Unassigned' && d.name !== 'UN').slice(0, 5).map((d: any, i: number) => (
+              {charts.jobsByDriver.filter((d: any) => d.driverName !== 'Unassigned' && d.initials !== 'UN').slice(0, 5).map((d: any, i: number) => (
                 <div key={i} className="flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-bg text-ink flex items-center justify-center text-[12px] font-bold group-hover:bg-ink group-hover:text-white transition">

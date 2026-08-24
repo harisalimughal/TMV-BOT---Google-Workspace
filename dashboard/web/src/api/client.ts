@@ -26,7 +26,11 @@ export async function fetchSummary(from?: string, to?: string): Promise<SummaryR
   if (from) params.set("from", from);
   if (to) params.set("to", to);
   const res = await fetch(`/ops/api/summary?${params.toString()}`);
-  if (!res.ok) throw new Error("Failed to load summary");
+  if (!res.ok) {
+    const text = await res.text().catch(() => "no text");
+    console.error("fetchSummary failed:", res.status, text);
+    throw new Error("Failed to load summary");
+  }
   return res.json();
 }
 

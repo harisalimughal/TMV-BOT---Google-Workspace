@@ -180,6 +180,7 @@ export function summaryRoute(): Router {
         }
       });
     } catch (error) {
+      console.error("[summary.route] FATAL:", error);
       res.status(500).json({
         error: {
           code: "SUMMARY_FAILED",
