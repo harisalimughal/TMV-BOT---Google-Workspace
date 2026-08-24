@@ -8,6 +8,7 @@ import { NotificationsPage } from "./pages/NotificationsPage";
 import { DriversPage } from "./pages/DriversPage";
 import { ExceptionsPage } from "./pages/ExceptionsPage";
 import { ScenariosPage } from "./pages/ScenariosPage";
+import { ParkingLiabilityPage } from "./pages/ParkingLiabilityPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -81,7 +82,7 @@ export function App() {
       {activeSection === "notifications" && <NotificationsPage />}
       {activeSection === "checkin" && <ScenariosPage kind="checkin" />}
       {activeSection === "checkout" && <ScenariosPage kind="checkout" />}
-      {activeSection === "parking" && <ScenariosPage kind="parking" />}
+      {activeSection === "parking" && <ParkingLiabilityPage />}
       {activeSection === "liability" && <ScenariosPage kind="liability" />}
       {activeSection === "drivers" && <DriversPage />}
       {activeSection === "exceptions" && <ExceptionsPage onOpenJob={handleOpenJob} />}
