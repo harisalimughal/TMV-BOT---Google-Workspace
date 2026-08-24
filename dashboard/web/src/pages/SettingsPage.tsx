@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { DollarSign, Clock, Zap, Database, Plus } from "lucide-react";
+import { DollarSign, Clock, Zap, Database, Plus, ChevronRight } from "lucide-react";
+import { AccountSettings } from "../components/AccountSettings";
 
 export function SettingsPage() {
+  const [activeTab, setActiveTab] = useState("system");
   // --- Editable State for Operational Charge Rates ---
   const [rates, setRates] = useState({
     manVan: 45.00,
@@ -49,14 +51,33 @@ export function SettingsPage() {
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto py-2 pb-12">
       {/* Header Card */}
-      <div className="bg-white p-6 rounded-[20px] border border-line shadow-sm">
-        <h2 className="text-[20px] text-ink font-bold tracking-tight mb-1">Settings</h2>
-        <p className="text-[13px] font-normal text-muted">
-          Configure operational rates, timezone, and system behavior. Pricing changes apply to new jobs immediately.
-        </p>
+      <div className="bg-white p-6 rounded-[20px] border border-line shadow-sm flex flex-col gap-6">
+        <div>
+          <h2 className="text-[20px] text-ink font-bold tracking-tight mb-1">Settings</h2>
+          <p className="text-[13px] font-normal text-muted">
+            Configure operational rates, timezone, and system behavior. Pricing changes apply to new jobs immediately.
+          </p>
+        </div>
+        <div className="flex items-center gap-6 border-t border-line pt-4">
+          <button 
+            onClick={() => setActiveTab("system")}
+            className={`text-[14px] font-semibold transition ${activeTab === "system" ? "text-brand" : "text-muted hover:text-ink"}`}
+          >
+            System Configuration
+          </button>
+          <button 
+            onClick={() => setActiveTab("account")}
+            className={`text-[14px] font-semibold transition ${activeTab === "account" ? "text-brand" : "text-muted hover:text-ink"}`}
+          >
+            Account & Security
+          </button>
+        </div>
       </div>
 
-      {/* Grid of Settings Cards */}
+      {activeTab === 'account' ? (
+        <AccountSettings />
+      ) : (
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         
         {/* Card 1: Operational Charge Rates */}
@@ -273,6 +294,7 @@ export function SettingsPage() {
         </div>
 
       </div>
+          )}
     </div>
   );
 }

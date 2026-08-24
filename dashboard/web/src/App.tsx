@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Layout } from "./components/Layout";
-import { LoginPage } from "./components/LoginPage";
+import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { JobsPage } from "./pages/JobsPage";
 import { FinishedJobsPage } from "./pages/FinishedJobsPage";
@@ -71,7 +71,7 @@ export function App() {
 
   // If not logged in, render the state-of-the-art Login experience
   if (!authenticated) {
-    return <LoginPage onSuccess={() => setAuthenticated(true)} />;
+    return <LoginPage onLogin={() => setAuthenticated(true)} />;
   }
 
   return (
