@@ -35,7 +35,7 @@ export function OverviewPage({ onSelectSection }: Props) {
   const [to, setTo] = useState<string | undefined>();
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["summary", from, to],
     queryFn: () => fetchSummary(from, to)
   });
@@ -60,6 +60,9 @@ export function OverviewPage({ onSelectSection }: Props) {
         <AlertTriangle className="w-6 h-6 text-status-red mx-auto mb-2" />
         <h3 className="text-[16px] font-semibold text-ink">Failed to load overview data</h3>
         <p className="text-red-500 mt-4 text-xs font-mono max-w-lg mx-auto break-words">{error instanceof Error ? error.message : String(error)}</p>
+        <button onClick={() => refetch()} className="mt-6 px-4 py-2 bg-ink text-white text-[13px] font-semibold rounded-lg hover:bg-gray-800 transition">
+          Retry
+        </button>
       </div>
     );
   }

@@ -9,10 +9,16 @@ import { log } from "../../../src/utils/logger";
  * Uses the ZIP Central Directory for robust entry extraction.
  */
 export function loadExcelDataset(filePath?: string): SheetDataset | null {
-  const targetPath = filePath || path.resolve(process.cwd(), "TMV Bot Database.xlsx");
-  if (!fs.existsSync(targetPath)) {
-    return null;
-  }
+  const possiblePaths = [
+    filePath,
+    path.resolve(process.cwd(), "TMV Bot Database.xlsx"),
+    path.resolve(__dirname, "../../../../TMV Bot Database.xlsx"),
+    path.resolve(__dirname, "../../../TMV Bot Database.xlsx")
+  ].filter(Boolean) as string[];
+  
+  let targetPath = possiblePaths.find(p => fs.existsSync(p));
+  if (!targetPath) return null;
+  
 
   try {
     const buffer = fs.readFileSync(targetPath);

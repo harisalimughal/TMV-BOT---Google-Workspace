@@ -184,7 +184,7 @@ export function summaryRoute(): Router {
       res.status(500).json({
         error: {
           code: "SUMMARY_FAILED",
-          message: "Failed to load dashboard summary."
+          message: error instanceof Error ? error.message : "Failed to load dashboard summary."
         }
       });
     }
