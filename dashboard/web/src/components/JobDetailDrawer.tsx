@@ -26,6 +26,7 @@ import { JobStatusBadge, DelayBandBadge } from "./StatusBadge";
 import { EvidenceCompletenessPill } from "./EvidenceCompletenessPill";
 import { ThumbnailPreview } from "./ThumbnailPreview";
 import { PhotoModal } from "./PhotoModal";
+import { PaperDossierReport } from "./PaperDossierReport";
 import { formatLondonDateTime } from "../utils/date";
 
 interface Props {
@@ -52,7 +53,7 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
   };
 
   const handlePdfDownload = () => {
-    window.open(`/ops/api/jobs/${encodeURIComponent(job.jobId)}/report.pdf`, "_blank");
+    window.print();
   };
 
   // 10-Stage Lifecycle Audit Timeline
@@ -98,6 +99,9 @@ export function JobDetailDrawer({ job, isOpen, onClose }: Props) {
     <div className="fixed inset-0 z-50 overflow-hidden bg-ink/40 backdrop-blur-xs flex justify-end">
       {/* Backdrop click to close */}
       <div className="flex-1" onClick={onClose} />
+
+      {/* Printable Certified PDF */}
+      <PaperDossierReport job={job} />
 
       {/* Drawer Container */}
       <div className="w-full max-w-2xl bg-[#F7F7F7] border-l border-line shadow-2xl flex flex-col h-full overflow-hidden animate-slide-in-right">
