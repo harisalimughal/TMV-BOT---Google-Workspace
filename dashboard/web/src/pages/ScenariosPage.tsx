@@ -11,6 +11,10 @@ import {
   ChevronRight,
   Download
 } from "lucide-react";
+import { FolderActionDropdown } from "../components/FolderActionDropdown";
+import { PdfPreviewModal } from "../components/PdfPreviewModal";
+import { PaperDossierReport } from "../components/PaperDossierReport";
+import { NormalizedJob } from "../types";
 import { fetchScenarios } from "../api/client";
 import { PaperScenarioReport } from "../components/PaperScenarioReport";
 import { formatLondonDateTime } from "../utils/date";
@@ -74,6 +78,7 @@ export function ScenariosPage({ kind }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [previewJob, setPreviewJob] = useState<NormalizedJob | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -221,7 +226,8 @@ export function ScenariosPage({ kind }: Props) {
                   <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Client Name</th>
                   <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Pictures</th>
                   <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Sign here.</th>
-                  <th className="py-5 px-4 w-20"></th>
+                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Docs</th>
+                  <th className="py-5 px-4 w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

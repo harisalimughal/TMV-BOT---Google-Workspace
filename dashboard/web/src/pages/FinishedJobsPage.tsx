@@ -10,6 +10,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { PdfPreviewModal } from "../components/PdfPreviewModal";
+import { FolderActionDropdown } from "../components/FolderActionDropdown";
 import { PaperDossierReport } from "../components/PaperDossierReport";
 import { FileText } from "lucide-react";
 import { fetchJobs } from "../api/client";
@@ -95,7 +96,7 @@ export function FinishedJobsPage() {
                   <th className="py-4 px-6 font-semibold text-[12px] text-muted uppercase tracking-wider text-right">Total (£)</th>
                   <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Photos</th>
                   <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Signature</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Export</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Docs</th>
                   <th className="py-4 px-4 w-10"></th>
                 </tr>
               </thead>
