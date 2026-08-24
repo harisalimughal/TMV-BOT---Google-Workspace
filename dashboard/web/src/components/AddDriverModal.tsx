@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, AlertTriangle, ShieldAlert } from "lucide-react";
 import { getDrivers, addDriver, updateDriver, Driver } from "../utils/drivers";
 
 interface Props {
@@ -138,16 +138,30 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
               />
             </div>
 
-            <div className="col-span-2 mt-2">
-               <label className="flex items-center gap-3 cursor-pointer">
-                 <input 
-                   type="checkbox" 
-                   checked={active}
-                   onChange={(e) => setActive(e.target.checked)}
-                   className="w-5 h-5 text-brand rounded focus:ring-brand"
-                 />
-                 <span className="text-[14px] font-semibold text-ink">Set as Active</span>
-               </label>
+            <div className="col-span-2 mt-4 pt-4 border-t border-line">
+              <label className="block text-[12px] font-semibold text-muted uppercase tracking-wider mb-3">System Access & Status</label>
+              <div className={`p-4 rounded-[12px] border transition-colors ${active ? 'bg-status-green-bg border-status-green/20' : 'bg-[#FEF2F2] border-[#FECACA]'}`}>
+                 <label className="flex items-start gap-3 cursor-pointer">
+                   <div className="pt-0.5">
+                     <input 
+                       type="checkbox" 
+                       checked={active}
+                       onChange={(e) => setActive(e.target.checked)}
+                       className="w-5 h-5 text-brand rounded focus:ring-brand"
+                     />
+                   </div>
+                   <div>
+                     <span className={`text-[14px] font-bold block ${active ? 'text-status-green' : 'text-status-red'}`}>
+                       {active ? 'Active (Bot Access Enabled)' : 'Deactivated (Access Revoked)'}
+                     </span>
+                     <p className={`text-[13px] mt-1 ${active ? 'text-status-green/80' : 'text-status-red/80'}`}>
+                       {active 
+                         ? 'Driver can view assignments, execute bot commands, and receive client notifications.' 
+                         : 'Driver is immediately blocked from the TMV Google Chat Bot. Future assignments are stopped.'}
+                     </p>
+                   </div>
+                 </label>
+              </div>
             </div>
           </div>
         </div>
