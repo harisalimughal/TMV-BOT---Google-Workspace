@@ -92,7 +92,7 @@ export function ParkingLiabilityPage() {
             <ClipboardList className="w-5 h-5" />
           </div>
           <div className="flex items-center gap-3">
-            <h1 className="text-[20px] font-bold text-ink">Parking Liability</h1>
+            <h1 className="text-[18px] font-bold text-ink">Parking Liability</h1>
             <span className="px-2 py-0.5 rounded-md bg-status-green-bg text-status-green text-[11px] font-bold uppercase tracking-wider">Active</span>
           </div>
         </div>
@@ -103,13 +103,13 @@ export function ParkingLiabilityPage() {
             <span className="px-2 py-0.5 bg-surface border border-line rounded-full text-[12px] font-bold text-muted">0/4</span>
           </div>
           
-          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-semibold transition flex items-center gap-1.5 shadow-sm">
+          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
             <Eye className="w-4 h-4 text-muted" /> Preview
           </button>
-          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-semibold transition flex items-center gap-1.5 shadow-sm">
+          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
             <Edit3 className="w-4 h-4 text-muted" /> Edit Form
           </button>
-          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-semibold transition flex items-center gap-1.5 shadow-sm">
+          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
             <Settings className="w-4 h-4 text-muted" /> Settings
           </button>
           <button className="h-9 w-9 rounded-[10px] border border-line bg-white hover:bg-surface text-muted transition flex items-center justify-center shadow-sm">
@@ -138,10 +138,10 @@ export function ParkingLiabilityPage() {
         <div className="p-4 flex flex-wrap items-center justify-between gap-4 bg-[#FAFAFA] border-b border-line">
           <div className="flex items-center gap-3">
             <div className="flex items-center p-1 bg-surface border border-line rounded-xl">
-              <button onClick={() => setViewMode("table")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition ${viewMode === 'table' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
+              <button onClick={() => setViewMode("table")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'table' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
                 <TableIcon className="w-4 h-4" /> Table
               </button>
-              <button onClick={() => setViewMode("inbox")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition ${viewMode === 'inbox' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
+              <button onClick={() => setViewMode("inbox")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'inbox' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
                 <Inbox className="w-4 h-4" /> Inbox
               </button>
             </div>
@@ -212,13 +212,13 @@ export function ParkingLiabilityPage() {
                 <th className="py-4 px-4 w-12 text-center">
                   <input type="checkbox" className="rounded text-brand" />
                 </th>
-                <th className="py-4 px-2 w-12 text-center font-semibold text-[12px] text-muted uppercase tracking-wider">#</th>
-                <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Driver</th>
-                <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Date Submitted</th>
-                <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Address</th>
-                <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Full Client Name</th>
-                <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Parking Restriction Photos</th>
-                <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Signature</th>
+                <th className="py-4 px-2 w-12 text-center font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">#</th>
+                <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Driver</th>
+                <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Date Submitted</th>
+                <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Address</th>
+                <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Full Client Name</th>
+                <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Parking Restriction Photos</th>
+                <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Signature</th>
                 <th className="py-4 px-4 w-16"></th>
               </tr>
             </thead>
@@ -275,7 +275,7 @@ export function ParkingLiabilityPage() {
                       <td className="px-4 text-center">
                         <input type="checkbox" onClick={e => e.stopPropagation()} className="rounded text-brand" />
                       </td>
-                      <td className="px-2 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
+                      <td className="px-2 text-center font-mono text-[14px] font-bold text-muted tabular-nums">{rowNumber}</td>
                       
                       <td className="px-4">
                         <div className="flex items-center gap-3">
@@ -283,9 +283,9 @@ export function ParkingLiabilityPage() {
                             {resolvedDriver.code}
                           </div>
                           <div>
-                            <span className="font-semibold text-ink text-[13px] block">{resolvedDriver.name}</span>
+                            <span className="font-semibold text-brand text-[14px] block">{resolvedDriver.name}</span>
                             {resolvedDriver.needsReassignment && (
-                              <span className="text-[9px] uppercase tracking-wider font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-[4px] mt-0.5 block w-max">
+                              <span className="text-[11px] uppercase tracking-[0.02em] font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-[6px] mt-2 block w-max">
                                 Needs Reassignment
                               </span>
                             )}
@@ -293,7 +293,7 @@ export function ParkingLiabilityPage() {
                         </div>
                       </td>
 
-                      <td className="px-4 text-[13px] text-muted">{formattedTime}</td>
+                      <td className="px-4 text-[13px] font-normal text-muted tabular-nums whitespace-nowrap">{formattedTime}</td>
                       
                       <td className="px-4">
                         {invalidAddr ? (
@@ -301,11 +301,11 @@ export function ParkingLiabilityPage() {
                             <span className="px-2 py-0.5 rounded bg-surface border border-line text-[11px] font-semibold text-muted uppercase">Unverified</span>
                           </div>
                         ) : (
-                          <div className="text-[13px] text-ink truncate max-w-[200px]" title={rawAddress}>{rawAddress}</div>
+                          <div className="text-[14px] font-normal text-ink truncate max-w-[200px]" title={rawAddress}>{rawAddress === "Not recorded" ? <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span> : rawAddress}</div>
                         )}
                       </td>
                       
-                      <td className="px-4 text-[13px] font-medium text-ink">{clientName}</td>
+                      <td className="px-4 text-[14px] font-normal text-ink truncate max-w-[150px]">{clientName === "Not Recorded" ? <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span> : clientName}</td>
                       
                       <td className="px-4">
                         {photoCount > 0 ? (

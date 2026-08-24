@@ -335,7 +335,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
               <div className="text-brand">
                 <currentNav.icon className="w-6 h-6" />
               </div>
-              <h1 className="text-page-title text-ink tracking-tight">
+              <h1 className="text-[20px] font-bold text-ink tracking-tight">
                 {currentNav.label}
               </h1>
             </div>

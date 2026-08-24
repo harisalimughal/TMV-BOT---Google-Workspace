@@ -219,14 +219,14 @@ export function ScenariosPage({ kind }: Props) {
             <table className="w-full text-left text-[14px] border-collapse whitespace-nowrap">
               <thead>
                 <tr className="border-b border-line bg-white">
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider pl-6">Timestamp</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Job ID</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Driver</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider" title={config.refLabel}>{config.refLabel}</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Client Name</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Pictures</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Sign here.</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Docs</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] pl-6">Timestamp</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Job ID</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Driver</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]" title={config.refLabel}>{config.refLabel}</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Client Name</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Pictures</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Sign here.</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] text-center">Docs</th>
                   <th className="py-5 px-4 w-10"></th>
                 </tr>
               </thead>

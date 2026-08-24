@@ -87,16 +87,16 @@ export function FinishedJobsPage() {
             <table className="w-full text-left text-[14px] border-collapse whitespace-nowrap">
               <thead>
                 <tr className="border-b border-line bg-[#F7F7F7]/50">
-                  <th className="py-4 px-4 w-12 text-center font-semibold text-[12px] text-muted uppercase tracking-wider">#</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Driver</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Customer</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider min-w-[240px]">Pickup → Drop-off</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Started</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Finished</th>
-                  <th className="py-4 px-6 font-semibold text-[12px] text-muted uppercase tracking-wider text-right">Total (£)</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Photos</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Signature</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Docs</th>
+                  <th className="py-4 px-4 w-12 text-center font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">#</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Driver</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Customer</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] min-w-[240px]">Pickup → Drop-off</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Started</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">Finished</th>
+                  <th className="py-4 px-6 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] text-right">Total (£)</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] text-center">Photos</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] text-center">Signature</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] text-center">Docs</th>
                   <th className="py-4 px-4 w-10"></th>
                 </tr>
               </thead>
@@ -110,8 +110,8 @@ export function FinishedJobsPage() {
                   const startedTime = job.actualStart ? formatLondonDateTime(job.actualStart) : "—";
                   const finishedTime = job.actualFinish ? formatLondonDateTime(job.actualFinish) : "—";
                   
-                  const p = job.pickup || "Not recorded";
-                  const d = job.dropoff || "Not recorded";
+                  const p = job.pickup || <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span>;
+                  const d = job.dropoff || <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span>;
                   const routeSummary = `${p} → ${d}`;
                   
                   const photos = job.evidenceItems?.filter((e: any) => e.type === "IMAGE" && (e.thumbProxyUrl || e.driveUrl)) || [];
@@ -127,12 +127,12 @@ export function FinishedJobsPage() {
                           isExpanded ? "bg-surface/50" : "hover:bg-[#F9FAFB]"
                         } ${isTest ? "opacity-70" : ""} ${resolvedDriver.needsReassignment ? 'bg-[#FFFBEB]/50' : ''}`}
                       >
-                        <td className="px-4 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
+                        <td className="px-4 text-center font-mono text-[14px] font-bold text-muted tabular-nums">{rowNumber}</td>
 
                         <td className="px-4">
                           <div className="flex flex-col items-start justify-center leading-tight">
                             <button 
-                              className={`font-medium text-[14px] ${isUnassigned ? 'text-muted' : 'text-[#2563EB] hover:underline'}`}
+                              className={`font-semibold text-[14px] ${isUnassigned ? "text-muted" : "text-brand"}`}
                               onClick={(e) => e.stopPropagation()}
                             >
                               {resolvedDriver.name}
@@ -141,7 +141,7 @@ export function FinishedJobsPage() {
                               <span className="bg-line/50 px-1 py-[1px] mt-0.5 rounded-[3px] font-mono font-bold uppercase text-[9px] text-ink">{formatVanReg(resolvedDriver.vehicleReg)}</span>
                             )}
                             {resolvedDriver.needsReassignment && (
-                              <span className="text-[9px] uppercase tracking-wider font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 mt-0.5 rounded-full">Needs Reassignment</span>
+                              <span className="text-[11px] uppercase tracking-[0.02em] font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 mt-2 rounded-[6px]">Needs Reassignment</span>
                             )}
                           </div>
                         </td>
@@ -159,14 +159,14 @@ export function FinishedJobsPage() {
 
                         <td className="px-4">
                           <div className="flex items-center gap-2 text-[13px] text-muted" title={routeSummary}>
-                            <span className="truncate max-w-[160px] text-ink">{p}</span>
+                            <span className="truncate max-w-[160px] text-[14px] font-normal text-ink">{p}</span>
                             <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate max-w-[160px] text-ink">{d}</span>
+                            <span className="truncate max-w-[160px] text-[14px] font-normal text-ink">{d}</span>
                           </div>
                         </td>
 
-                        <td className="px-4 text-[13px] text-muted">{startedTime}</td>
-                        <td className="px-4 text-[13px] text-muted">{finishedTime}</td>
+                        <td className="px-4 text-[13px] font-normal text-muted tabular-nums whitespace-nowrap">{startedTime}</td>
+                        <td className="px-4 text-[13px] font-normal text-muted tabular-nums whitespace-nowrap">{finishedTime}</td>
 
                         <td className="px-6 text-right">
                           <div className="font-mono text-[15px] font-bold tabular-nums text-ink">

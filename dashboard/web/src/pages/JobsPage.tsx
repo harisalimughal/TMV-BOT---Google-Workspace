@@ -178,7 +178,7 @@ export function JobsPage() {
 
       {/* HEADER SECTION */}
       <div className="flex items-center justify-between px-2">
-        <h2 className="text-[20px] font-bold text-ink">Jobs Archive</h2>
+        <h2 className="text-[18px] font-bold text-ink">Jobs Archive</h2>
         <button 
           onClick={() => setIsAddModalOpen(true)}
           className="flex items-center gap-2 px-5 py-2.5 bg-brand text-white rounded-full font-semibold shadow-sm hover:bg-brand-dark transition"
@@ -225,7 +225,7 @@ export function JobsPage() {
               <button 
                 key={status}
                 onClick={() => { setStatusFilter(status); setPage(1); }}
-                className={`px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition ${statusFilter === status ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${statusFilter === status ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
               >
                 {status}
               </button>
@@ -244,7 +244,7 @@ export function JobsPage() {
           
           <div className="w-px h-6 bg-line mx-1" />
           
-          <span className="text-[13px] text-muted font-medium px-2 whitespace-nowrap min-w-[120px] text-right">
+          <span className="text-[13px] font-medium text-muted px-2 whitespace-nowrap min-w-[120px] text-right">
             {isLoading || isFetching ? "Updating..." : `${processedData.length} moves`}
           </span>
 
@@ -279,34 +279,34 @@ export function JobsPage() {
                       className="rounded text-brand cursor-pointer" 
                     />
                   </th>
-                  <th className="py-4 px-2 w-10 text-center font-mono text-[12px] font-semibold text-muted">#</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">
+                  <th className="py-4 px-2 w-10 text-center font-mono text-[12px] font-semibold text-muted uppercase tracking-[0.03em]">#</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em]">
                     Job ID & Driver
                   </th>
                   <th 
-                    className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] group cursor-pointer hover:text-ink transition select-none"
+                    className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em] group cursor-pointer hover:text-ink transition select-none"
                     onClick={() => handleSort("Timing")}
                   >
                     Timing <SortIcon column="Timing" />
                   </th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Customer</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Pickup</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Dropoff</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em]">Customer</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em]">Pickup</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em]">Dropoff</th>
                   <th 
-                    className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] group cursor-pointer hover:text-ink transition select-none"
+                    className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em] group cursor-pointer hover:text-ink transition select-none"
                     onClick={() => handleSort("Status")}
                   >
                     Status <SortIcon column="Status" />
                   </th>
                   <th 
-                    className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] group cursor-pointer hover:text-ink transition select-none"
+                    className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em] group cursor-pointer hover:text-ink transition select-none"
                     onClick={() => handleSort("Punctuality")}
                   >
                     Punctuality <SortIcon column="Punctuality" />
                   </th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-center">Photos</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em] text-center">Photos</th>
                   <th 
-                    className="py-4 px-6 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-right group cursor-pointer hover:text-ink transition select-none"
+                    className="py-4 px-6 font-semibold text-[12px] font-semibold text-muted uppercase tracking-[0.03em] uppercase tracking-[0.03em] text-right group cursor-pointer hover:text-ink transition select-none"
                     onClick={() => handleSort("Total")}
                   >
                     Total <SortIcon column="Total" />
@@ -367,7 +367,7 @@ export function JobsPage() {
                             className="rounded text-brand cursor-pointer" 
                           />
                         </td>
-                        <td className="px-2 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
+                        <td className="px-2 text-center font-mono text-[14px] font-bold text-muted tabular-nums">{rowNumber}</td>
                         
                         <td className="px-4">
                           <div className="flex items-center gap-3">
@@ -376,7 +376,7 @@ export function JobsPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-ink text-[14px] leading-tight truncate">
+                                <span className="font-semibold text-brand text-[14px] leading-tight truncate">
                                   {job.jobId}
                                 </span>
                                 {!isUnassigned && resolvedDriver.vehicleReg && (
@@ -385,11 +385,11 @@ export function JobsPage() {
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[13px] text-muted leading-tight mt-0.5 flex items-center gap-2">
+                              <div className="text-[13px] text-muted font-normal mt-2 flex flex-col items-start gap-2">
                                  <span className="truncate">{resolvedDriver.name}</span>
                                  {resolvedDriver.needsReassignment && (
                                    <div 
-                                     className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-[4px] shrink-0 hover:bg-amber-200 transition"
+                                     className="flex items-center gap-1.5 text-[11px] tracking-[0.02em] font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-[6px] shrink-0 hover:bg-amber-200 transition"
                                      onClick={(e) => { e.stopPropagation(); /* Mock Inline Assign */ }}
                                    >
                                      <AlertTriangle className="w-3 h-3" /> Reassign
@@ -400,20 +400,20 @@ export function JobsPage() {
                           </div>
                         </td>
 
-                        <td className="px-4 text-[13px] text-ink font-mono whitespace-nowrap">
-                          {formattedTime || <span className="text-muted/40">-</span>}
+                        <td className="px-4 text-[13px] font-normal text-muted tabular-nums whitespace-nowrap">
+                          {formattedTime || <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span>}
                         </td>
                         
-                        <td className="px-4 text-[13px] text-ink truncate max-w-[120px]">
-                          {job.customerName || <span className="text-muted/40">-</span>}
+                        <td className="px-4 text-[14px] font-normal text-ink truncate max-w-[120px]">
+                          {job.customerName || <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span>}
                         </td>
                         
-                        <td className="px-4 text-[13px] text-ink truncate max-w-[140px]" title={job.pickup}>
-                          {job.pickup || <span className="text-muted/40">-</span>}
+                        <td className="px-4 text-[14px] font-normal text-ink truncate max-w-[140px]" title={job.pickup}>
+                          {job.pickup || <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span>}
                         </td>
                         
-                        <td className="px-4 text-[13px] text-ink truncate max-w-[140px]" title={job.dropoff}>
-                          {job.dropoff || <span className="text-muted/40">-</span>}
+                        <td className="px-4 text-[14px] font-normal text-ink truncate max-w-[140px]" title={job.dropoff}>
+                          {job.dropoff || <span className="text-[14px] font-normal text-[#B0B0B0] italic">Not recorded</span>}
                         </td>
 
                         <td className="px-4 whitespace-nowrap">
@@ -422,7 +422,7 @@ export function JobsPage() {
 
                         <td className="px-4 whitespace-nowrap">
                           {isCancelled ? (
-                            <span className="text-muted/40 font-mono">-</span>
+                            <span className="text-[14px] font-normal text-[#B0B0B0] italic">-</span>
                           ) : (
                             <DelayBandBadge band={job.delayBand} minutes={job.delayMinutes} />
                           )}
@@ -435,13 +435,13 @@ export function JobsPage() {
                                 <Camera className="w-3 h-3 text-brand" /> {photoCount}
                               </div>
                             ) : (
-                              <span className="text-muted/40 font-semibold text-[13px]">-</span>
+                              <span className="text-[14px] font-normal text-[#B0B0B0] italic">-</span>
                             )}
                           </div>
                         </td>
 
                         <td className="px-6 text-right">
-                          <div className={`font-mono text-[14px] font-bold tabular-nums ${totalPounds === 0 ? "text-muted/40" : "text-ink"}`}>
+                          <div className={`font-mono text-[14px] font-bold tabular-nums ${totalPounds === 0 ? "text-[#B0B0B0] italic" : "text-ink"}`}>
                             {totalPounds === 0 ? "-" : `£${totalPounds.toLocaleString("en-GB", { minimumFractionDigits: 2 })}`}
                           </div>
                         </td>
@@ -477,7 +477,7 @@ export function JobsPage() {
                </div>
                
                <div className="flex items-center gap-4">
-                 <span className="text-[13px] text-muted font-medium">
+                 <span className="text-[13px] font-medium text-muted">
                    Page {page} of {totalPages || 1}
                  </span>
                  <div className="flex items-center gap-1">
