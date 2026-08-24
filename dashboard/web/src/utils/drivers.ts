@@ -31,13 +31,20 @@ export const getDrivers = (): Driver[] => {
     if (stored) return JSON.parse(stored);
   } catch (e) {}
   const combined = [...SEED_DRIVERS, ...TEST_DRIVERS];
-  localStorage.setItem("tmv_roster_v2_v2", JSON.stringify(combined));
+  localStorage.setItem("tmv_roster_v2", JSON.stringify(combined));
   return combined;
 };
 
 export const addDriver = (driver: Driver) => {
   const current = getDrivers();
   const next = [...current, driver];
+  localStorage.setItem("tmv_roster_v2", JSON.stringify(next));
+  window.dispatchEvent(new Event('roster_updated'));
+};
+
+export const updateDriver = (code: string, updated: Driver) => {
+  const current = getDrivers();
+  const next = current.map(d => d.code === code ? updated : d);
   localStorage.setItem("tmv_roster_v2", JSON.stringify(next));
   window.dispatchEvent(new Event('roster_updated'));
 };

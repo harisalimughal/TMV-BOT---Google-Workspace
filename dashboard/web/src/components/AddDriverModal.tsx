@@ -1,13 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { getDrivers, addDriver } from "../utils/drivers";
+import { getDrivers, addDriver, updateDriver, Driver } from "../utils/drivers";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  driverToEdit?: Driver | null;
 }
 
-export function AddDriverModal({ isOpen, onClose }: Props) {
+export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [vehicleReg, setVehicleReg] = useState("");
@@ -15,22 +16,64 @@ export function AddDriverModal({ isOpen, onClose }: Props) {
   const [phone, setPhone] = useState("");
   const [active, setActive] = useState(true);
 
+  // Sync state with driverToEdit when modal opens or driver changes
+  useEffect(() => {
+    if (driverToEdit) {
+      setName(driverToEdit.name);
+      setCode(driverToEdit.code);
+      setVehicleReg(driverToEdit.vehicleReg || "");
+      setEmail(driverToEdit.email || "");
+      setPhone(driverToEdit.phone || "");
+      setActive(driverToEdit.active !== false);
+    } else {
+      setName("");
+      setCode("");
+      setVehicleReg("");
+      setEmail("");
+      setPhone("");
+      setActive(true);
+    }
+  }, [driverToEdit, isOpen]);
+
   if (!isOpen) return null;
 
   const handleNameChange = (val: string) => {
     setName(val);
-    if (!code || code.length < 2) {
+    if (!driverToEdit && (!code || code.length < 2)) {
       setCode(val.substring(0, 2).toUpperCase());
     }
   };
 
-  const isCodeTaken = getDrivers().some(d => d.code === code.toUpperCase());
+  // Code is taken if it exists AND we aren't editing the driver that already owns this code
+  const isCodeTaken = getDrivers().some(d => 
+    d.code === code.toUpperCase() && (!driverToEdit || driverToEdit.code !== code.toUpperCase())
+  );
+
+  const handleSubmit = () => {
+    const payload = {
+      name,
+      code: code.toUpperCase(),
+      vehicleReg,
+      email,
+      phone,
+      active,
+      color: driverToEdit ? driverToEdit.color : "bg-blue-100 text-blue-700"
+    };
+
+    if (driverToEdit) {
+      updateDriver(driverToEdit.code, payload);
+    } else {
+      addDriver(payload);
+    }
+    
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[500px] flex flex-col overflow-hidden">
         <div className="px-6 py-5 border-b border-line flex items-center justify-between">
-          <h2 className="text-[18px] font-bold text-ink">Add New Driver</h2>
+          <h2 className="text-[18px] font-bold text-ink">{driverToEdit ? "Edit Driver" : "Add New Driver"}</h2>
           <button onClick={onClose} className="p-2 -mr-2 text-muted hover:text-ink hover:bg-surface rounded-full transition">
             <X className="w-5 h-5" />
           </button>
@@ -114,27 +157,11 @@ export function AddDriverModal({ isOpen, onClose }: Props) {
             Cancel
           </button>
           <button 
-            onClick={() => {
-              addDriver({ 
-                name, 
-                code, 
-                vehicleReg, 
-                email, 
-                phone, 
-                active, 
-                color: "bg-blue-100 text-blue-700" 
-              });
-              onClose();
-              setName("");
-              setCode("");
-              setVehicleReg("");
-              setEmail("");
-              setPhone("");
-            }} 
+            onClick={handleSubmit} 
             disabled={isCodeTaken || !name || !code} 
             className="px-6 py-2 rounded-[12px] bg-[#2563EB] disabled:bg-[#93C5FD] disabled:cursor-not-allowed hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition"
           >
-            Add Driver
+            {driverToEdit ? "Save Changes" : "Add Driver"}
           </button>
         </div>
       </div>
