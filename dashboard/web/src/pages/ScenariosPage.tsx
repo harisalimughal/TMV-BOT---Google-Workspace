@@ -5,20 +5,14 @@ import {
   Table as TableIcon,
   RefreshCw,
   FileText,
-  AlertCircle,
   Search,
   MoreHorizontal,
-  ChevronDown,
   Camera,
   ChevronRight,
-  ChevronLeft,
-  ArrowRight
+  Download
 } from "lucide-react";
 import { fetchScenarios } from "../api/client";
-import { ScenarioItem } from "../types";
 import { PaperScenarioReport } from "../components/PaperScenarioReport";
-import { ThumbnailPreview } from "../components/ThumbnailPreview";
-import { PhotoModal } from "../components/PhotoModal";
 import { formatLondonDateTime } from "../utils/date";
 import { DateRangePicker } from "../components/DateRangePicker";
 
@@ -29,14 +23,14 @@ interface Props {
 const mapDriver = (raw: string) => {
   if (!raw || raw === "N/A" || raw === "undefined") return { name: "Unassigned", initials: "UN" };
   const d = raw.toLowerCase();
-  if (d.includes("roman")) return { name: "Muhammad Roman", initials: "MR" };
-  if (d.includes("caio")) return { name: "Caio Gabriel", initials: "KA" };
-  if (d.includes("henrique")) return { name: "Henrique Driver", initials: "HE" };
-  if (d.includes("maico")) return { name: "Maico Lima", initials: "MK" };
-  if (d.includes("rafael") || d.includes("cruz")) return { name: "Rafael Cruz", initials: "RF" };
-  if (d.includes("tiago")) return { name: "Tiago Menagassi", initials: "TI" };
-  if (d.includes("wander") || d.includes("mendes")) return { name: "Wander Mendes", initials: "WD" };
-  if (d.includes("harris") || d.includes("ha")) return { name: "Harris", initials: "HA" };
+  if (d.includes("roman") || d === "mr") return { name: "Muhammad Roman", initials: "MR" };
+  if (d.includes("caio") || d === "ka") return { name: "Caio Gabriel", initials: "KA" };
+  if (d.includes("henrique") || d === "he") return { name: "Henrique Driver", initials: "HE" };
+  if (d.includes("maico") || d === "mk") return { name: "Maico Lima", initials: "MK" };
+  if (d.includes("rafael") || d.includes("cruz") || d === "rf") return { name: "Rafael Cruz", initials: "RF" };
+  if (d.includes("tiago") || d === "ti") return { name: "Tiago Menagassi", initials: "TI" };
+  if (d.includes("wander") || d.includes("mendes") || d === "wd") return { name: "Wander Mendes", initials: "WD" };
+  if (d.includes("harris") || d === "ha") return { name: "Harris", initials: "HA" };
   return { name: raw, initials: raw.substring(0, 2).toUpperCase() };
 };
 
@@ -56,6 +50,20 @@ const getAvatarColor = (initials: string) => {
   return colors[charCode % colors.length];
 };
 
+const titleCase = (str: string) => {
+  if (!str) return "—";
+  return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
+
+const isTestGibberish = (text: string) => {
+  if (!text || text === "—") return false;
+  const lower = text.toLowerCase();
+  if (lower.length < 5) return true;
+  if (/^[a-z,.]+$/.test(lower) && !lower.includes(" ")) return true;
+  if (lower.includes("test")) return true;
+  return false;
+};
+
 export function ScenariosPage({ kind }: Props) {
   const [page, setPage] = useState(1);
   const [from, setFrom] = useState<string | undefined>();
@@ -70,7 +78,6 @@ export function ScenariosPage({ kind }: Props) {
     retry: 1
   });
 
-  // Reset page when kind changes
   useEffect(() => {
     setPage(1);
     setExpandedId(null);
@@ -89,8 +96,9 @@ export function ScenariosPage({ kind }: Props) {
     const raw = item.rawRecord || item;
     const clientName = (item.clientName || raw["Client Name"] || raw["Client Full Name"] || "").toLowerCase();
     const driver = (item.driver || raw["Driver"] || "").toLowerCase();
+    const jobId = (item.jobId || raw["Job ID"] || "").toLowerCase();
     const ref = (item.containerNumber || raw["Container Number"] || item.damageCategories || item.address || raw["Address"] || "").toLowerCase();
-    return clientName.includes(q) || driver.includes(q) || ref.includes(q);
+    return clientName.includes(q) || driver.includes(q) || ref.includes(q) || jobId.includes(q);
   });
 
   return (
@@ -98,6 +106,14 @@ export function ScenariosPage({ kind }: Props) {
       {/* PAGE HEADER */}
       <div className="flex items-center justify-between px-2">
         <h1 className="text-[20px] font-bold text-ink">{config.title}</h1>
+        <div className="flex items-center gap-3">
+          <button className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
+            <Download className="w-4 h-4" /> Export PDF
+          </button>
+        </div>
       </div>
 
       {/* TOOLBAR */}
@@ -129,10 +145,10 @@ export function ScenariosPage({ kind }: Props) {
           <Search className="w-4 h-4 text-muted absolute left-3 top-2.5" />
           <input 
             type="text" 
-            placeholder="Search user or reference..." 
+            placeholder="Search reference, job, or user..." 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 rounded-[8px] border border-line bg-white text-[13px] outline-none focus:border-brand focus:ring-1 focus:ring-brand transition"
+            className="w-full h-9 pl-9 pr-3 rounded-full border border-line bg-surface text-[13px] outline-none focus:border-brand focus:ring-1 focus:ring-brand focus:bg-white transition"
           />
         </div>
 
@@ -182,36 +198,45 @@ export function ScenariosPage({ kind }: Props) {
             <table className="w-full text-left text-[14px] border-collapse whitespace-nowrap">
               <thead>
                 <tr className="border-b border-line bg-white">
-                  <th className="py-5 px-4 w-12 text-center font-normal">
-                    <input type="checkbox" className="rounded text-brand border-line-strong" />
-                  </th>
-                  <th className="py-5 px-4 w-12 text-left font-semibold text-[12px] text-muted uppercase tracking-wider">#</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">User</th>
-                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Date Submitted</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider pl-6">Timestamp</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Job ID</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Driver</th>
                   <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider" title={config.refLabel}>{config.refLabel}</th>
+                  <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Client Name</th>
                   <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Pictures</th>
                   <th className="py-5 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Sign here.</th>
                   <th className="py-5 px-4 w-20"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {filteredItems.map((item: any, index: number) => {
+                {filteredItems.map((item: any) => {
                   const isExpanded = expandedId === item.id;
                   const raw = item.rawRecord || item;
+                  
+                  // Driver mapping
                   const rawDriverStr = item.driver || raw["Driver"] || "N/A";
                   const { name: driverName, initials: driverInitials } = mapDriver(rawDriverStr);
                   
+                  // Job ID mapping
+                  const jobId = item.jobId || raw["Job ID"] || "—";
+
+                  // Timestamp formatting
                   const timestampStr = item.timestamp || raw["Timestamp"] || raw["Date"] || "";
                   const formattedTime = formatLondonDateTime(timestampStr);
-                  const rowNumber = (page - 1) * 25 + index + 1;
                   
-                  // Ref logic
+                  // Client Name capitalization
+                  const rawClient = item.clientName || raw["Client Name"] || raw["Client Full Name"] || "—";
+                  const formattedClientName = rawClient !== "—" ? titleCase(rawClient) : "—";
+                  
+                  // Reference (Address, Damage, Container)
                   let refText = "—";
                   if (kind === "checkin" || kind === "checkout") refText = item.containerNumber || raw["Container Number"] || "—";
                   if (kind === "parking") refText = item.address || raw["Address"] || "—";
                   if (kind === "liability") refText = item.damageCategories || "—";
+                  
+                  const isTestRef = isTestGibberish(refText);
 
-                  // Extract Photos reliably (avoid broken image states)
+                  // Extract Media
                   const photos = item.photos?.filter((p: any) => p.thumbUrl || p.fileUrl || p.driveUrl) || [];
                   const sigUrl = item.signature?.url || item.signatureUrl || raw["Signature Url"];
 
@@ -221,32 +246,48 @@ export function ScenariosPage({ kind }: Props) {
                         onClick={() => setExpandedId(isExpanded ? null : item.id)}
                         className={`h-[60px] group cursor-pointer transition select-none ${isExpanded ? "bg-surface/50" : "hover:bg-[#F9FAFB]"}`}
                       >
-                        <td className="px-4 text-center" onClick={e => e.stopPropagation()}>
-                          <input type="checkbox" className="rounded text-brand border-line-strong" />
+                        <td className="px-6 text-[13px] text-muted tabular-nums">
+                          {formattedTime}
                         </td>
-                        <td className="px-4 text-[13px] text-muted font-mono">{rowNumber}</td>
+
+                        <td className="px-4">
+                          {jobId !== "—" ? (
+                            <button className="font-medium text-[#2563EB] hover:underline text-[14px]" onClick={(e) => { e.stopPropagation(); }}>
+                              {jobId}
+                            </button>
+                          ) : (
+                            <span className="text-muted italic text-[13px]">Not recorded</span>
+                          )}
+                        </td>
                         
                         <td className="px-4">
                           <div className="flex items-center gap-2.5">
-                            <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center font-bold text-[11px] ${getAvatarColor(driverInitials)}`}>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] ${getAvatarColor(driverInitials)}`}>
                               {driverInitials}
                             </div>
-                            <span className="font-medium text-ink text-[14px]">{driverName}</span>
+                            <span className="font-medium text-ink text-[13px]">{driverName}</span>
                           </div>
-                        </td>
-
-                        <td className="px-4 text-[13px] text-muted tabular-nums">
-                          {formattedTime}
                         </td>
 
                         <td className="px-4 text-[14px]">
                           {refText === "—" ? (
                             <span className="text-muted italic text-[13px]">Not recorded</span>
                           ) : (
-                            <div className="inline-flex items-center gap-2 h-8 px-3 bg-surface border border-transparent rounded-[8px] font-mono tabular-nums text-ink">
-                              <span className="truncate max-w-[150px]" title={refText}>{refText}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`truncate max-w-[150px] ${isTestRef ? 'text-muted' : 'text-ink font-mono tabular-nums'}`} title={refText}>
+                                {refText}
+                              </span>
+                              {isTestRef && (
+                                <span className="px-1.5 py-0.5 rounded-[4px] bg-surface border border-line text-muted text-[10px] font-semibold uppercase tracking-wider" title="Test Record">
+                                  Unverified / Test Data
+                                </span>
+                              )}
                             </div>
                           )}
+                        </td>
+
+                        <td className="px-4 text-[13px] text-ink font-medium">
+                          {formattedClientName}
                         </td>
 
                         <td className="px-4">
@@ -254,12 +295,12 @@ export function ScenariosPage({ kind }: Props) {
                             {photos.length > 0 ? (
                               <div className="flex items-center">
                                 {photos.slice(0, 3).map((p: any, i: number) => (
-                                  <div key={i} className={`w-8 h-8 rounded-[8px] overflow-hidden border-2 border-white bg-surface ${i > 0 ? "-ml-3" : ""}`}>
+                                  <div key={i} className={`w-8 h-8 rounded-[8px] overflow-hidden border border-line bg-surface ${i > 0 ? "-ml-3 shadow-sm" : ""}`}>
                                     <img src={p.thumbUrl || p.fileUrl || p.driveUrl} alt="Evidence" className="w-full h-full object-cover" />
                                   </div>
                                 ))}
                                 {photos.length > 3 && (
-                                  <div className="w-8 h-8 rounded-[8px] border-2 border-white bg-surface flex items-center justify-center text-[11px] font-medium text-muted -ml-3 z-10">
+                                  <div className="w-8 h-8 rounded-[8px] border border-line bg-white flex items-center justify-center text-[11px] font-medium text-muted -ml-3 z-10 shadow-sm">
                                     +{photos.length - 3}
                                   </div>
                                 )}
@@ -275,7 +316,7 @@ export function ScenariosPage({ kind }: Props) {
                             <img
                               src={sigUrl}
                               alt="Signature"
-                              className="w-14 h-7 object-contain mx-4 border border-line bg-white rounded-[4px] p-0.5"
+                              className="w-14 h-7 object-contain mx-4 border border-line bg-white rounded-[4px] p-0.5 shadow-sm"
                             />
                           ) : (
                             <div className="w-14 h-7 rounded-[4px] border border-dashed border-line-strong mx-4 opacity-50" />
