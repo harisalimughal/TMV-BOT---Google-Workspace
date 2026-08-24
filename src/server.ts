@@ -15,6 +15,17 @@ import { drainInlineQueue, registerInlineDispatcher } from "./queue/queue.servic
 import { scenarioRouter } from "./chat/scenario.routes";
 import { signatureRouter } from "./chat/signature.routes";
 import { adminRouter } from "./admin/admin.routes";
+// Dashboard router mounted from the isolated dashboard/ directory, built separately
+// (see Dockerfile / package.json's dashboard:build). None of these paths exist until
+// that build has run, so this must never throw at import time -- an unbuilt dashboard
+// is a missing /ops feature, not a reason to take down the whole Chat bot.
+const dashboardRouter: (() => express.Router) | null = (() => {
+  try { return require("../dashboard/dist/dashboard/server/router").dashboardRouter; } catch {}
+  try { return require("../dashboard/server/router").dashboardRouter; } catch {}
+  try { return require("./dashboard/server/router").dashboardRouter; } catch {}
+  log.warn("dashboard router not found; /ops will 404 until `npm run dashboard:build` (or the Docker image build) has run");
+  return null;
+})();
 
 const app = express();
 app.disable("x-powered-by");
@@ -135,6 +146,8 @@ app.post("/internal/sync", async (req, res) => {
     }
   });
 });
+
+if (dashboardRouter) app.use("/ops", dashboardRouter());
 
 app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
   log.error("unhandled express error", error);

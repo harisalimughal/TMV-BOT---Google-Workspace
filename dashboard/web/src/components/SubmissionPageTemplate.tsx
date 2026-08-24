@@ -1,0 +1,249 @@
+import React from "react";
+import { 
+  Eye, Edit3, Settings, MoreHorizontal, 
+  Table as TableIcon, Inbox, Search, Filter, 
+  Download, RefreshCw, ChevronLeft, ChevronRight 
+} from "lucide-react";
+import { DateRangePicker } from "./DateRangePicker";
+
+interface Props {
+  title: string;
+  icon: React.ElementType;
+  status?: string;
+  statusColor?: "green" | "amber" | "gray";
+  
+  // Tabs
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  
+  // Toolbar
+  viewMode: "table" | "inbox";
+  onViewModeChange: (mode: "table" | "inbox") => void;
+  search: string;
+  onSearchChange: (s: string) => void;
+  searchPlaceholder?: string;
+  from?: string;
+  to?: string;
+  onDateChange: (f?: string, t?: string) => void;
+  groupBy: string;
+  onGroupByChange: (g: string) => void;
+  
+  // Data State
+  itemCount: number;
+  isFetching: boolean;
+  onRefresh: () => void;
+  
+  // Pagination
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  onPageChange: (p: number) => void;
+  
+  // Table Content
+  tableHeader: React.ReactNode;
+  tableBody: React.ReactNode;
+}
+
+export function SubmissionPageTemplate({
+  title, icon: Icon, status = "Published", statusColor = "green",
+  activeTab, onTabChange,
+  viewMode, onViewModeChange, search, onSearchChange, searchPlaceholder = "Search...",
+  from, to, onDateChange, groupBy, onGroupByChange,
+  itemCount, isFetching, onRefresh,
+  page, pageSize, totalItems, onPageChange,
+  tableHeader, tableBody
+}: Props) {
+  
+  const totalPages = Math.ceil(totalItems / pageSize);
+  
+  const statusColors = {
+    green: "bg-status-green-bg text-status-green",
+    amber: "bg-amber-100 text-amber-700",
+    gray: "bg-surface text-muted"
+  };
+
+  return (
+    <div className="max-w-[1440px] mx-auto space-y-6 pb-12">
+      
+      {/* STANDARD PAGE HEADER */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center shadow-sm">
+            <Icon className="w-5 h-5" />
+          </div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[18px] font-bold text-ink">{title}</h1>
+            <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider ${statusColors[statusColor]}`}>
+              {status}
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mr-4">
+            <span className="text-[12px] font-semibold text-muted">Progress</span>
+            <span className="px-2 py-0.5 bg-surface border border-line rounded-full text-[12px] font-bold text-muted">0/4</span>
+          </div>
+          
+          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
+            <Eye className="w-4 h-4 text-muted" /> Preview
+          </button>
+          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
+            <Edit3 className="w-4 h-4 text-muted" /> Edit Form
+          </button>
+          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
+            <Settings className="w-4 h-4 text-muted" /> Settings
+          </button>
+          <button className="h-9 w-9 rounded-[10px] border border-line bg-white hover:bg-surface text-muted transition flex items-center justify-center shadow-sm">
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* MAIN CARD CONTAINER */}
+      <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgb(0,0,0,0.04)] border border-line overflow-hidden flex flex-col">
+        
+        {/* STANDARD TAB NAVIGATION */}
+        <div className="flex items-center px-6 border-b border-line">
+          {["Submissions", "Users", "Summary", "Activity"].map(tab => (
+            <button
+              key={tab}
+              onClick={() => onTabChange(tab)}
+              className={`px-4 py-4 text-[13px] font-semibold border-b-[3px] transition-colors ${
+                activeTab === tab 
+                  ? 'border-brand text-ink' 
+                  : 'border-transparent text-muted hover:text-ink hover:border-line'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* STANDARD TOOLBAR */}
+        <div className="p-4 flex flex-col gap-4 bg-[#FAFAFA] border-b border-line">
+          
+          {/* Row 1: Core Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center p-1 bg-surface border border-line rounded-xl">
+                <button onClick={() => onViewModeChange("table")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'table' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
+                  <TableIcon className="w-4 h-4" /> Table
+                </button>
+                <button onClick={() => onViewModeChange("inbox")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'inbox' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
+                  <Inbox className="w-4 h-4" /> Inbox
+                </button>
+              </div>
+
+              <div className="w-px h-6 bg-line mx-1" />
+
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                <input 
+                  type="text" 
+                  placeholder={searchPlaceholder}
+                  value={search}
+                  onChange={e => onSearchChange(e.target.value)}
+                  className="w-full pl-9 pr-4 h-9 rounded-full bg-surface border border-line text-[13px] text-ink focus:border-brand outline-none transition"
+                />
+              </div>
+              
+              <button className="w-9 h-9 flex items-center justify-center bg-surface border border-line rounded-full text-muted hover:text-ink transition">
+                <Filter className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <DateRangePicker from={from} to={to} onChange={(f, t) => onDateChange(f, t)} />
+              
+              <div className="w-px h-6 bg-line mx-1" />
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-medium text-muted">Group by</span>
+                <select 
+                  value={groupBy}
+                  onChange={e => onGroupByChange(e.target.value)}
+                  className="h-9 px-3 rounded-[10px] bg-surface border border-line text-[13px] font-medium text-ink outline-none focus:border-brand"
+                >
+                  <option value="None">None</option>
+                  <option value="Driver">Driver</option>
+                  <option value="Date">Date</option>
+                  <option value="Status">Status</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          {/* Row 2: Secondary Controls */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-[13px] font-medium text-muted">
+                {itemCount} record{itemCount !== 1 ? 's' : ''}
+              </span>
+              <button 
+                onClick={onRefresh}
+                className="w-8 h-8 rounded-full border border-line bg-surface hover:bg-white text-muted hover:text-ink transition flex items-center justify-center shadow-sm"
+                title="Refresh Data"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-brand' : ''}`} />
+              </button>
+            </div>
+            
+            {/* Standardized Export Controls (Icon+Text Pair) */}
+            <div className="flex items-center bg-surface border border-line rounded-[10px] overflow-hidden">
+              <button className="px-3 h-9 text-[12px] font-medium text-ink hover:bg-white transition border-r border-line flex items-center gap-1.5">
+                <Download className="w-3.5 h-3.5 text-muted" /> CSV
+              </button>
+              <button className="px-3 h-9 text-[12px] font-medium text-ink hover:bg-white transition flex items-center gap-1.5">
+                PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* STANDARD TABLE */}
+        <div className="overflow-x-auto min-h-[400px]">
+          <table className="w-full text-left text-[14px] border-collapse">
+            <thead className="bg-white border-b border-line">
+              <tr>
+                <th className="py-4 px-4 w-12 text-center">
+                  <input type="checkbox" className="rounded text-brand" />
+                </th>
+                <th className="py-4 px-2 w-12 text-center font-semibold text-[12px] text-muted uppercase tracking-[0.03em]">#</th>
+                {tableHeader}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {tableBody}
+            </tbody>
+          </table>
+        </div>
+
+        {/* STANDARD PAGINATION */}
+        {totalItems > 0 && (
+          <div className="px-6 py-4 border-t border-line bg-[#FAFAFA] flex items-center justify-between">
+            <span className="text-[13px] font-medium text-muted">
+              Showing {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalItems)} of {totalItems} records
+            </span>
+            <div className="flex items-center gap-2">
+              <button 
+                disabled={page === 1}
+                onClick={() => onPageChange(Math.max(1, page - 1))}
+                className="px-4 h-8 rounded-[8px] border border-line bg-white hover:bg-surface disabled:opacity-50 text-[12px] font-medium text-ink transition"
+              >
+                Prev
+              </button>
+              <button 
+                disabled={page >= totalPages}
+                onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                className="px-4 h-8 rounded-[8px] border border-line bg-white hover:bg-surface disabled:opacity-50 text-[12px] font-medium text-ink transition"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
