@@ -27,73 +27,7 @@ import { DateRangePicker } from "../components/DateRangePicker";
 import { PhotoModal } from "../components/PhotoModal";
 import { formatLondonDateTime } from "../utils/date";
 
-// Simple modal for adding a job
-function AddJobModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-[24px] shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="p-6 border-b border-line flex items-center justify-between">
-          <h2 className="text-[20px] font-bold text-ink">Add New Job</h2>
-          <button onClick={onClose} className="p-2 text-muted hover:text-ink hover:bg-surface rounded-full transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="p-6 overflow-y-auto flex-1 space-y-4">
-          <div>
-            <label className="block text-[13px] font-semibold text-ink mb-1.5">Customer Name</label>
-            <input type="text" className="w-full h-11 px-4 rounded-xl border border-line bg-surface focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition text-[14px]" placeholder="e.g. John Doe" />
-          </div>
-          <div>
-            <label className="block text-[13px] font-semibold text-ink mb-1.5">Pickup Address</label>
-            <input type="text" className="w-full h-11 px-4 rounded-xl border border-line bg-surface focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition text-[14px]" placeholder="Start location" />
-          </div>
-          <div>
-            <label className="block text-[13px] font-semibold text-ink mb-1.5">Dropoff Address</label>
-            <input type="text" className="w-full h-11 px-4 rounded-xl border border-line bg-surface focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition text-[14px]" placeholder="End location" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[13px] font-semibold text-ink mb-1.5">Scheduled Time</label>
-              <input type="datetime-local" className="w-full h-11 px-4 rounded-xl border border-line bg-surface focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition text-[14px]" />
-            </div>
-            <div>
-              <label className="block text-[13px] font-semibold text-ink mb-1.5">Crew Size</label>
-              <select className="w-full h-11 px-4 rounded-xl border border-line bg-surface focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition text-[14px]">
-                <option>1 Crew</option>
-                <option>2 Crew</option>
-                <option>3 Crew</option>
-                <option>4 Crew</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[13px] font-semibold text-ink mb-1.5">Driver Assignment</label>
-              <select className="w-full h-11 px-4 rounded-xl border border-line bg-surface focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition text-[14px]">
-                <option>Unassigned</option>
-                <option>Muhammad Roman</option>
-                <option>Wander Mendes</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[13px] font-semibold text-ink mb-1.5">Base Price (£)</label>
-              <input type="number" className="w-full h-11 px-4 rounded-xl border border-line bg-surface focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition text-[14px]" placeholder="0.00" />
-            </div>
-          </div>
-        </div>
-        <div className="p-6 border-t border-line flex items-center justify-end gap-3 bg-[#FAFAFA]">
-          <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-semibold text-muted hover:text-ink hover:bg-surface transition text-[14px]">
-            Cancel
-          </button>
-          <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-semibold bg-black text-white hover:bg-black/80 shadow-sm transition text-[14px]">
-            Save Job
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { AddJobModal } from "../components/AddJobModal";
 
 export function JobsPage() {
   const [page, setPage] = useState(1);
