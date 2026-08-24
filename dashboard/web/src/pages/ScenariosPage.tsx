@@ -15,6 +15,9 @@ import { fetchScenarios } from "../api/client";
 import { PaperScenarioReport } from "../components/PaperScenarioReport";
 import { formatLondonDateTime } from "../utils/date";
 import { DateRangePicker } from "../components/DateRangePicker";
+import { LiabilityConfigModal } from "../components/LiabilityConfigModal";
+import { LiabilityMobileForm } from "../components/LiabilityMobileForm";
+import { Settings2, Smartphone } from "lucide-react";
 
 interface Props {
   kind: "checkin" | "checkout" | "parking" | "liability";
@@ -71,6 +74,8 @@ export function ScenariosPage({ kind }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["scenarios", kind, page, from, to],
@@ -107,6 +112,17 @@ export function ScenariosPage({ kind }: Props) {
       <div className="flex items-center justify-between px-2">
         <h1 className="text-[20px] font-bold text-ink">{config.title}</h1>
         <div className="flex items-center gap-3">
+          {kind === "liability" && (
+            <>
+              <button onClick={() => setIsConfigOpen(true)} className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-brand" /> Manage Categories
+              </button>
+              <button onClick={() => setIsMobileOpen(true)} className="h-10 px-4 rounded-[12px] bg-[#2563EB] hover:bg-blue-700 text-white text-[13px] font-medium shadow-sm transition flex items-center gap-2">
+                <Smartphone className="w-4 h-4" /> Preview Mobile Form
+              </button>
+              <div className="w-[1px] h-6 bg-line mx-1" />
+            </>
+          )}
           <button className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
             <Download className="w-4 h-4" /> Export CSV
           </button>
@@ -274,13 +290,30 @@ export function ScenariosPage({ kind }: Props) {
                             <span className="text-muted italic text-[13px]">Not recorded</span>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span className={`truncate max-w-[150px] ${isTestRef ? 'text-muted' : 'text-ink font-mono tabular-nums'}`} title={refText}>
-                                {refText}
-                              </span>
-                              {isTestRef && (
-                                <span className="px-1.5 py-0.5 rounded-[4px] bg-surface border border-line text-muted text-[10px] font-semibold uppercase tracking-wider" title="Test Record">
-                                  Unverified / Test Data
-                                </span>
+                              {kind === "liability" ? (
+                                <div className="flex flex-wrap items-center gap-1.5 max-w-[280px]">
+                                  {refText.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 3).map((cat, i) => (
+                                    <span key={i} className="px-2 py-1 rounded-md bg-surface border border-line text-ink text-[11px] font-medium whitespace-nowrap truncate max-w-[120px]" title={cat}>
+                                      {cat}
+                                    </span>
+                                  ))}
+                                  {refText.split(",").filter(Boolean).length > 3 && (
+                                    <span className="px-2 py-1 rounded-md bg-white border border-line text-muted text-[11px] font-medium whitespace-nowrap shadow-sm cursor-help" title={refText}>
+                                      +{refText.split(",").filter(Boolean).length - 3} more
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
+                                  <span className={`truncate max-w-[150px] ${isTestRef ? 'text-muted' : 'text-ink font-mono tabular-nums'}`} title={refText}>
+                                    {refText}
+                                  </span>
+                                  {isTestRef && (
+                                    <span className="px-1.5 py-0.5 rounded-[4px] bg-surface border border-line text-muted text-[10px] font-semibold uppercase tracking-wider" title="Test Record">
+                                      Unverified / Test Data
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </div>
                           )}
@@ -393,6 +426,8 @@ export function ScenariosPage({ kind }: Props) {
          </div>
       )}
 
+          {kind === "liability" && <LiabilityConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />}
+      {kind === "liability" && <LiabilityMobileForm isOpen={isMobileOpen} onClose={() => setIsMobileOpen(false)} />}
     </div>
   );
 }
