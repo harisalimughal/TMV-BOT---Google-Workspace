@@ -18,75 +18,69 @@ const SEED_DRIVERS: Driver[] = [
   { name: "Rafael", code: "RF", vehicleReg: "YC68 VJZ", email: "Rafael.cruz.rh7@gmail.com", phone: "07479025903", active: true, color: "bg-cyan-100 text-cyan-700" }
 ];
 
-
-const TEST_DRIVERS: Driver[] = [
-  { name: "John Test (Removable)", code: "JT", vehicleReg: "TS24 AAA", email: "john.test@example.com", phone: "07700900001", active: true, color: "bg-slate-100 text-slate-700" },
-  { name: "Sarah Test (Removable)", code: "ST", vehicleReg: "TS24 BBB", email: "sarah.test@example.com", phone: "07700900002", active: true, color: "bg-slate-100 text-slate-700" },
-  { name: "Mike Test (Removable)", code: "MT", vehicleReg: "TS24 CCC", email: "mike.test@example.com", phone: "07700900003", active: true, color: "bg-slate-100 text-slate-700" }
-];
-
 export const getDrivers = (): Driver[] => {
   try {
-    const stored = localStorage.getItem("tmv_roster_v2");
+    const stored = localStorage.getItem("tmv_roster_v3");
     if (stored) return JSON.parse(stored);
   } catch (e) {}
-  const combined = [...SEED_DRIVERS, ...TEST_DRIVERS];
-  localStorage.setItem("tmv_roster_v2", JSON.stringify(combined));
-  return combined;
+  localStorage.setItem("tmv_roster_v3", JSON.stringify(SEED_DRIVERS));
+  return SEED_DRIVERS;
 };
 
 export const addDriver = (driver: Driver) => {
   const current = getDrivers();
   const next = [...current, driver];
-  localStorage.setItem("tmv_roster_v2", JSON.stringify(next));
+  localStorage.setItem("tmv_roster_v3", JSON.stringify(next));
   window.dispatchEvent(new Event('roster_updated'));
 };
 
 export const updateDriver = (code: string, updated: Driver) => {
   const current = getDrivers();
   const next = current.map(d => d.code === code ? updated : d);
-  localStorage.setItem("tmv_roster_v2", JSON.stringify(next));
+  localStorage.setItem("tmv_roster_v3", JSON.stringify(next));
   window.dispatchEvent(new Event('roster_updated'));
 };
 
 export const removeDriver = (code: string) => {
   const current = getDrivers();
   const next = current.filter(d => d.code !== code);
-  localStorage.setItem("tmv_roster_v2", JSON.stringify(next));
+  localStorage.setItem("tmv_roster_v3", JSON.stringify(next));
   window.dispatchEvent(new Event('roster_updated'));
 };
 
-// Aliased for components that haven't migrated to the hook yet, though ideally they use getDrivers()
-export const ACTIVE_DRIVERS = [...SEED_DRIVERS, ...TEST_DRIVERS];
+export const ACTIVE_DRIVERS = SEED_DRIVERS;
 
 export const getAvatarColor = (code: string) => {
   if (code === "UN") return "bg-surface border border-line text-muted";
   const driver = getDrivers().find(d => d.code === code);
   if (driver) return driver.color;
-  return "bg-gray-100 text-gray-700";
+  return "bg-amber-100 text-amber-700"; // Legacy drivers highlight amber
 };
 
 export const resolveDriver = (raw: string | undefined | null) => {
   if (!raw || raw === "N/A" || raw === "undefined" || raw === "Unassigned") {
-    return { name: "Unassigned", code: "UN", needsReassignment: false };
+    return { name: "Unassigned", code: "UN", needsReassignment: false, color: "bg-surface border border-line text-muted" };
   }
   const d = String(raw).toLowerCase().trim();
   
   const roster = getDrivers();
   
-  // Try exact map to new driver roster first by code or name
   for (const driver of roster) {
     if (d === driver.code.toLowerCase() || d.includes(driver.name.toLowerCase())) {
       return { name: driver.name, code: driver.code, vehicleReg: driver.vehicleReg, needsReassignment: false, color: driver.color };
     }
   }
 
-  // Legacy fallback
+  // Legacy fallback -> strictly needs reassignment
+  const originalStr = String(raw).trim();
+  let pseudoCode = originalStr.substring(0, 2).toUpperCase();
+  if (pseudoCode.length < 2) pseudoCode = "?";
+
   return {
-    name: String(raw),
-    code: String(raw).substring(0, 2).toUpperCase(),
+    name: originalStr,
+    code: pseudoCode,
     needsReassignment: true,
-    color: "bg-gray-100 text-gray-700"
+    color: "bg-amber-100 text-amber-700"
   };
 };
 

@@ -197,7 +197,7 @@ export function OverviewPage({ onSelectSection }: Props) {
               <button className="text-[13px] font-medium text-ink hover:underline">View all</button>
             </div>
             <div className="space-y-5">
-              {charts.jobsByDriver.slice(0, 5).map((d: any, i: number) => (
+              {charts.jobsByDriver.filter((d: any) => d.name !== 'Unassigned' && d.name !== 'UN').slice(0, 5).map((d: any, i: number) => (
                 <div key={i} className="flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-bg text-ink flex items-center justify-center text-[12px] font-bold group-hover:bg-ink group-hover:text-white transition">

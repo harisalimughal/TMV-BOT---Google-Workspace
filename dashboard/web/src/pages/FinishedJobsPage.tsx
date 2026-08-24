@@ -227,19 +227,7 @@ export function FinishedJobsPage() {
                         </td>
                       </tr>
 
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={11} className="p-0 border-b border-line bg-[#FAFAFA]">
-                            <div className="p-6 text-[13px] text-muted flex items-center gap-2">
-                               {/* Drawer handles the deep dive on the active Jobs page, keeping Finished jobs expanded view simple for now */}
-                               <AlertTriangle className="w-4 h-4 text-amber-500" />
-                               <span className="font-medium text-ink">Job Details Panel</span>
-                               <span className="mx-2 text-line-strong">|</span>
-                               <span>Full historical record for {job.jobId}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+                      
                     </React.Fragment>
                   );
                 })}
