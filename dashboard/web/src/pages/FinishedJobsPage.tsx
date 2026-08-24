@@ -1,26 +1,18 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Download,
-  FileText,
-  Table as TableIcon,
-  LayoutGrid,
-  User,
-  MapPin,
+  FolderOpen,
   Camera,
-  X
+  AlertTriangle,
+  ArrowRight
 } from "lucide-react";
 import { fetchJobs } from "../api/client";
-import { NormalizedJob } from "../types";
-import { PaperJobReport } from "../components/PaperJobReport";
+import { NormalizedJob, toPounds } from "../types";
 import { DateRangePicker } from "../components/DateRangePicker";
-import { PhotoModal } from "../components/PhotoModal";
-import { ThumbnailPreview } from "../components/ThumbnailPreview";
 import { formatLondonDateTime } from "../utils/date";
-import { toPounds } from "../types";
 
 export function FinishedJobsPage() {
   const [page, setPage] = useState(1);
@@ -28,162 +20,150 @@ export function FinishedJobsPage() {
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
-  const [activePhoto, setActivePhoto] = useState<{ title: string; url: string; driveUrl?: string } | null>(null);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["finished_jobs", page, pageSize, from, to],
+    queryKey: ["jobs", "COMPLETED", page, pageSize, from, to],
     queryFn: () => fetchJobs({ status: "COMPLETED", page, pageSize, from, to })
   });
 
+  const isTestOrIncomplete = (job: NormalizedJob) => {
+    const cust = (job.customerName || "").toLowerCase();
+    const p = (job.pickup || "").toLowerCase();
+    const d = (job.dropoff || "").toLowerCase();
+    
+    if (cust.includes("test") || cust === "hh" || cust === "number test") return true;
+    if (p.length < 5 || d.length < 5) return true;
+    if (!p.includes(" ") || !d.includes(" ")) return true; // Single word route
+    
+    return false;
+  };
+
   return (
-    <div className="max-w-[1440px] mx-auto space-y-6">
-      {/* HEADER */}
+    <div className="space-y-6 max-w-[1440px] mx-auto">
+      {/* PAGE HEADER */}
       <div className="flex items-center justify-between px-2">
+        <h1 className="text-[20px] font-bold text-ink">Finished Jobs</h1>
+        
         <div className="flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-brand" />
-          <h2 className="text-[20px] font-bold text-ink">Finished Jobs</h2>
+          <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
+          <div className="w-px h-6 bg-line mx-2" />
+          <button
+            onClick={() => { window.location.href = "/ops/api/jobs/export.csv?status=COMPLETED"; }}
+            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button
+            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" /> Export PDF
+          </button>
         </div>
       </div>
 
-      {/* TOP BAR */}
-      <div className="flex flex-wrap items-center justify-between gap-4 px-2">
-        <div className="flex flex-wrap items-center gap-6">
-          {/* Segmented Control */}
-          <div className="flex items-center p-1.5 bg-white rounded-[16px] shadow-sm border border-transparent">
-            
-            <div className="flex items-center gap-1 bg-surface p-1 rounded-[12px]">
-              <button
-                onClick={() => setViewMode("table")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${
-                  viewMode === "table" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"
-                }`}
-              >
-                <TableIcon className="w-4 h-4" /> Table
-              </button>
-              <button
-                onClick={() => setViewMode("cards")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${
-                  viewMode === "cards" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" /> Cards
-              </button>
-            </div>
-            
-            <div className="w-px h-6 bg-line mx-3" />
-            
-            <div className="flex items-center gap-2">
-              <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
-            </div>
-
-          </div>
-
-          <span className="text-[13px] text-muted">
-            {isLoading ? "Loading..." : `${data?.pagination?.total || 0} finished jobs`}
-          </span>
+      {isLoading && (
+        <div className="h-64 bg-white rounded-[24px] border border-line animate-pulse flex items-center justify-center">
+          <span className="text-muted font-medium">Loading records...</span>
         </div>
+      )}
 
-        <button
-          onClick={() => { window.location.href = "/ops/api/jobs/export.csv?status=COMPLETED"; }}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-white border border-transparent hover:bg-surface text-ink-2 shadow-sm transition"
-          title="Export CSV"
-        >
-          <Download className="w-4 h-4" />
-        </button>
-      </div>
+      {error && (
+        <div className="p-8 text-center text-status-red bg-status-red-bg rounded-[24px] border border-status-red/20 shadow-sm">
+          Failed to load finished jobs.
+        </div>
+      )}
 
       {/* Main Table View */}
-      {viewMode === "table" && (
-        <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[14px] border-collapse">
+      {!isLoading && !error && (
+        <div className="bg-white rounded-[20px] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-line overflow-hidden">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-[14px] border-collapse whitespace-nowrap">
               <thead>
-                <tr className="border-b border-line">
-                  <th className="py-4 px-4 w-10 text-center">
-                    <input type="checkbox" className="rounded text-brand" />
-                  </th>
-                  <th className="py-4 px-2 w-10 text-center font-mono text-[12px] font-semibold text-muted">#</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Job & Driver</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Completed</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em]">Customer</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] w-1/4">Route</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-center">Evidence</th>
-                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-center">Signature</th>
-                  <th className="py-4 px-6 font-semibold text-[12px] text-muted uppercase tracking-[0.05em] text-right">Total Billed</th>
+                <tr className="border-b border-line bg-[#F7F7F7]/50">
+                  <th className="py-4 px-4 w-12 text-center font-semibold text-[12px] text-muted uppercase tracking-wider">#</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Driver</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Customer</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider min-w-[240px]">Pickup → Drop-off</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Started</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider">Finished</th>
+                  <th className="py-4 px-6 font-semibold text-[12px] text-muted uppercase tracking-wider text-right">Total (£)</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Photos</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Signature</th>
+                  <th className="py-4 px-4 font-semibold text-[12px] text-muted uppercase tracking-wider text-center">Folder</th>
                   <th className="py-4 px-4 w-10"></th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-line">
-                {!isLoading && data?.items.map((job: NormalizedJob, index: number) => {
+                {data?.items.map((job: NormalizedJob, index: number) => {
                   const isExpanded = expandedJobId === job.jobId;
                   const totalPounds = toPounds(job.totalCharges);
                   const rowNumber = (page - 1) * pageSize + index + 1;
-                  const formattedTime = formatLondonDateTime(job.actualFinish || job.bookedFinish);
-                  const routeSummary = job.pickup && job.dropoff ? `${job.pickup} -> ${job.dropoff}` : "Not recorded";
-                  const photos = job.evidenceItems?.filter((e: any) => e.type === "IMAGE" && (e.thumbProxyUrl || e.driveUrl)) || [];
                   
-                  const driverInit = job.driverInitials || "UN";
-                  const driverColor = driverInit === "UN" ? "bg-amber-100 text-amber-700" : "bg-brand-soft text-brand";
-                  const unassignedHint = driverInit === "UN" ? "bg-red-50" : "";
+                  const startedTime = job.actualStart ? formatLondonDateTime(job.actualStart) : "—";
+                  const finishedTime = job.actualFinish ? formatLondonDateTime(job.actualFinish) : "—";
+                  
+                  const p = job.pickup || "Not recorded";
+                  const d = job.dropoff || "Not recorded";
+                  const routeSummary = `${p} → ${d}`;
+                  
+                  const photos = job.evidenceItems?.filter((e: any) => e.type === "IMAGE" && (e.thumbProxyUrl || e.driveUrl)) || [];
+                  const isTest = isTestOrIncomplete(job);
 
                   return (
                     <React.Fragment key={job.jobId}>
                       <tr
                         onClick={() => setExpandedJobId(isExpanded ? null : job.jobId)}
                         className={`h-[64px] group cursor-pointer transition select-none ${
-                          isExpanded ? "bg-surface/50" : "hover:bg-surface/30"
-                        } ${unassignedHint}`}
+                          isExpanded ? "bg-surface/50" : "hover:bg-[#F9FAFB]"
+                        } ${isTest ? "opacity-70" : ""}`}
                       >
-                        <td className="px-4 text-center" onClick={e => e.stopPropagation()}>
-                          <input type="checkbox" className="rounded text-brand" />
-                        </td>
-                        <td className="px-2 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
+                        <td className="px-4 text-center font-mono text-[12px] text-muted">{rowNumber}</td>
 
                         <td className="px-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] ${driverColor}`}>
-                              {driverInit}
-                            </div>
-                            <div>
-                              <div className="font-medium text-brand text-[14px] leading-tight hover:underline">
-                                {job.jobId}
-                              </div>
-                              <div className="text-[13px] text-muted leading-tight mt-0.5">{job.driverName || "Unassigned"}</div>
-                            </div>
-                          </div>
+                          <button 
+                            className="font-medium text-[#2563EB] hover:underline text-[14px]"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {job.driverName || "Unassigned"}
+                          </button>
                         </td>
 
-                        <td className="px-4 text-[14px] text-ink">{formattedTime}</td>
-
-                        <td className="px-4">
-                          <div className="flex items-center gap-2 text-[14px] text-ink">
-                            <User className="w-4 h-4 text-muted shrink-0" />
-                            <span className="truncate max-w-[150px]">{job.customerName || "Not recorded"}</span>
+                        <td className="px-4 text-[14px] text-ink">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate max-w-[150px]">{job.customerName || "—"}</span>
+                            {isTest && (
+                              <span className="px-1.5 py-0.5 rounded-[4px] bg-surface border border-line text-muted text-[10px] font-semibold uppercase tracking-wider" title="Test or Incomplete Record">
+                                Test
+                              </span>
+                            )}
                           </div>
                         </td>
 
                         <td className="px-4">
-                          <div className="flex items-center gap-2 text-[14px] text-ink" title={routeSummary}>
-                            <MapPin className="w-4 h-4 text-muted shrink-0" />
-                            <span className="truncate w-[200px] block">{routeSummary || "Not recorded"}</span>
+                          <div className="flex items-center gap-2 text-[13px] text-muted" title={routeSummary}>
+                            <span className="truncate max-w-[160px] text-ink">{p}</span>
+                            <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate max-w-[160px] text-ink">{d}</span>
+                          </div>
+                        </td>
+
+                        <td className="px-4 text-[13px] text-muted">{startedTime}</td>
+                        <td className="px-4 text-[13px] text-muted">{finishedTime}</td>
+
+                        <td className="px-6 text-right">
+                          <div className="font-mono text-[15px] font-bold tabular-nums text-ink">
+                            {totalPounds.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </td>
 
                         <td className="px-4 text-center">
                           <div className="flex items-center justify-center">
-                            {photos && photos.length > 0 ? (
+                            {photos.length > 0 ? (
                               <div className="flex items-center">
                                 {photos.slice(0, 3).map((p, i) => (
                                   <div key={i} className={`w-8 h-8 rounded-lg overflow-hidden border-2 border-white bg-surface ${i > 0 ? "-ml-3" : ""}`}>
-                                    {(p.thumbProxyUrl || p.driveUrl) ? (
-                                      <img src={(p.thumbProxyUrl || p.driveUrl)} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center bg-surface text-muted">
-                                        <Camera className="w-3 h-3" />
-                                      </div>
-                                    )}
+                                    <img src={(p.thumbProxyUrl || p.driveUrl)} alt="" className="w-full h-full object-cover" />
                                   </div>
                                 ))}
                                 {photos.length > 3 && (
@@ -193,7 +173,7 @@ export function FinishedJobsPage() {
                                 )}
                               </div>
                             ) : (
-                              <span className="text-muted text-[13px]">-</span>
+                              <Camera className="w-4 h-4 text-muted mx-auto opacity-50" />
                             )}
                           </div>
                         </td>
@@ -203,17 +183,24 @@ export function FinishedJobsPage() {
                             <img
                               src={job.signatureUrl}
                               alt="Sig"
-                              className="w-16 h-8 object-contain mx-auto border border-line bg-surface rounded-lg p-0.5"
+                              className="w-12 h-6 object-contain mx-auto border border-line bg-white rounded-[4px] p-0.5"
                             />
                           ) : (
-                            <div className="w-12 h-6 rounded-full border border-dashed border-line-strong mx-auto" />
+                            <div className="w-12 h-6 rounded-[4px] border border-dashed border-line-strong mx-auto" />
                           )}
                         </td>
-
-                        <td className="px-6 text-right">
-                          <div className={`font-mono text-[14px] font-bold tabular-nums ${totalPounds === 0 ? "text-muted font-medium" : "text-ink"}`}>
-                            £{totalPounds.toLocaleString("en-GB", { minimumFractionDigits: 2 })}
-                          </div>
+                        
+                        <td className="px-4 text-center">
+                          <button 
+                            className="p-1.5 rounded-md text-muted hover:text-[#2563EB] hover:bg-[#2563EB]/10 transition inline-flex items-center justify-center"
+                            title="Open Evidence Folder"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (job.driveFolderUrl) window.open(job.driveFolderUrl, "_blank");
+                            }}
+                          >
+                            <FolderOpen className="w-4 h-4" />
+                          </button>
                         </td>
 
                         <td className="px-4 text-center">
@@ -225,9 +212,13 @@ export function FinishedJobsPage() {
 
                       {isExpanded && (
                         <tr>
-                          <td colSpan={10} className="p-0 border-b border-line bg-surface/10">
-                            <div className="p-6">
-                              <PaperJobReport job={job} />
+                          <td colSpan={11} className="p-0 border-b border-line bg-[#FAFAFA]">
+                            <div className="p-6 text-[13px] text-muted flex items-center gap-2">
+                               {/* Drawer handles the deep dive on the active Jobs page, keeping Finished jobs expanded view simple for now */}
+                               <AlertTriangle className="w-4 h-4 text-amber-500" />
+                               <span className="font-medium text-ink">Job Details Panel</span>
+                               <span className="mx-2 text-line-strong">|</span>
+                               <span>Full historical record for {job.jobId}</span>
                             </div>
                           </td>
                         </tr>
@@ -240,27 +231,16 @@ export function FinishedJobsPage() {
           </div>
         </div>
       )}
-
-      {/* Cards View (Left intact for brevity, normally we'd style it too) */}
-      {viewMode === "cards" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {data?.items.map((job: NormalizedJob) => (
-             <div key={job.jobId} className="bg-white p-6 rounded-[24px] shadow-sm border border-line">
-               <h3 className="font-bold text-brand mb-2">{job.jobId}</h3>
-               <p className="text-sm text-ink mb-4">{job.customerName}</p>
-             </div>
-          ))}
-        </div>
-      )}
-
-      {activePhoto && (
-        <PhotoModal
-          isOpen={!!activePhoto}
-          onClose={() => setActivePhoto(null)}
-          title={activePhoto.title}
-          photoUrl={activePhoto.url}
-          driveUrl={activePhoto.driveUrl}
-        />
+      
+      {/* Pagination (simple) */}
+      {!isLoading && !error && data?.pagination && (
+         <div className="flex items-center justify-between px-2 text-[13px] text-muted">
+           <span>Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, data.pagination.total)} of {data.pagination.total}</span>
+           <div className="flex gap-2">
+             <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink">Previous</button>
+             <button disabled={page * pageSize >= data.pagination.total} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink">Next</button>
+           </div>
+         </div>
       )}
     </div>
   );
