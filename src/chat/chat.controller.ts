@@ -4,7 +4,7 @@ import {
   jobCard, mainMenuCard, noJobsCard, photoAckCard, renderScenarioStep, tomorrowJobsCard, updateResponse, workflowCard
 } from "./cards";
 import { parseCommand } from "./commands";
-import { getActiveJobForDriver, getNextJobForDriver, getTomorrowJobsForDriver } from "../jobs/jobs.service";
+import { getActiveJobForDriver, getNextJobForDriver, getTomorrowJobsForDriver, resolveDriver } from "../jobs/jobs.service";
 import {
   CUSTOMER_CONFIRMATION_TEXT, EvidenceFailedError, EvidencePendingError, handleAction, handlePhotoStep,
   reopenPhotoStep, retryFailedEvidence
@@ -23,7 +23,7 @@ import {
 } from "./scenario.engine";
 import {
   commitWrites, getDriverByInitials, getJob, getScenarioProgress, getSetting, listScenarioProgressForJob,
-  pendingSignatureWrite, scenarioProgressWrite
+  pendingSignatureWrite, scenarioProgressWrite, driverSpaceWrite, getDriverSpace
 } from "../google/sheets";
 import { JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE, renderMessageTemplate } from "../notifications/message";
 import { Job } from "../jobs/job.types";
@@ -32,6 +32,7 @@ export interface GoogleChatEvent {
   type?: string;
   eventTime?: string;
   user?: { name?: string; email?: string; displayName?: string };
+  space?: { name?: string; type?: string; singleUserBotDm?: boolean };
   message?: {
     name?: string;
     text?: string;
@@ -208,6 +209,15 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
 
     switch (event.type) {
       case "ADDED_TO_SPACE": {
+        const spaceName = event.space?.name;
+        if (spaceName && identifier(event)) {
+          const driver = await resolveDriver(identifier(event)).catch(() => null);
+          if (driver) {
+            await commitWrites([driverSpaceWrite(driver.initials, spaceName)]).catch(err =>
+              log.warn("failed to record driver space name", { driver: driver.initials, error: String(err) })
+            );
+          }
+        }
         const { job } = await getNextJobForDriver(identifier(event));
         return createResponse(mainMenuCard(job));
       }
@@ -338,8 +348,8 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
           // Read-only lookup: no active/next job is required, unlike withActiveJob()'s
           // other menu actions -- a driver with nothing left today should still be able
           // to see what's coming tomorrow.
-          const { jobs } = await getTomorrowJobsForDriver(identifier(event));
-          return updateResponse(tomorrowJobsCard(jobs));
+          const { jobs, unassignedCount } = await getTomorrowJobsForDriver(identifier(event));
+          return updateResponse(tomorrowJobsCard(jobs, unassignedCount));
         }
 
         if (fn === "SCENARIO_CHECK_AGAIN") {

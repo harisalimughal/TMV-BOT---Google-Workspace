@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { commitWrites, getSetting, settingWrite } from "../../../src/google/sheets";
 import { CUSTOMER_CONFIRMATION_TEXT } from "../../../src/workflow/workflow.engine";
-import { JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../../../src/notifications/message";
+import { JOB_STARTED_MESSAGE_TEMPLATE, JOB_COMPLETION_EMAIL_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../../../src/notifications/message";
 import { log } from "../../../src/utils/logger";
 
 /**
@@ -28,6 +28,18 @@ const EDITABLE_SETTINGS: Record<string, { settingsKey: string; label: string; de
     label: "Customer Review Request Email",
     description: "Previewed and sent by email only, if the driver opts in on the \"Do you want to take a review from the client?\" step near the end of the job. Placeholders: {customerName}, {companyName}, {pickup}, {dropoff}.",
     fallback: REVIEW_REQUEST_EMAIL_TEMPLATE
+  },
+  jobCompletionEmail: {
+    settingsKey: "JOB_COMPLETION_EMAIL_TEXT",
+    label: "Job Completion Email",
+    description: "Sent automatically when the driver marks a job complete. Placeholders: {customerName}, {companyName}, {pickup}, {dropoff}, {job_time}, {job_date}, {driver_name}.",
+    fallback: JOB_COMPLETION_EMAIL_TEMPLATE
+  },
+  clientNotificationOffsetMinutes: {
+    settingsKey: "CLIENT_NOTIFICATION_OFFSET_MINUTES",
+    label: "Client Notification — Minutes Before Job",
+    description: "How many minutes before the job start time to send the automatic client reminder. Set to 0 to disable. Default: 60.",
+    fallback: "60"
   }
 };
 

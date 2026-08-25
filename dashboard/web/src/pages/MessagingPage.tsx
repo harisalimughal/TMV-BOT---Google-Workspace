@@ -11,19 +11,27 @@ const MOCK_DATA: Record<string, string> = {
   "{pickup}": "142 Battersea Park Road, London",
   "{dropoff}": "45 Depot Road, London",
   "{driverPhone}": "07455 123456",
-  "{vanRegistration}": "LV24 MVO"
+  "{vanRegistration}": "LV24 MVO",
+  "{driver_name}": "James Dean",
+  "{job_time}": "9:00 AM",
+  "{job_date}": "Monday 25 Aug",
+  "{booking_date}": "Monday 25 Aug"
 };
 
 const VARIABLES_BY_KEY: Record<string, string[]> = {
   confirmationText: [],
-  jobStartedMessage: ["{customerName}", "{companyName}", "{pickup}", "{dropoff}", "{driverPhone}", "{vanRegistration}"],
-  reviewRequestEmail: ["{customerName}", "{companyName}", "{pickup}", "{dropoff}"]
+  jobStartedMessage: ["{customerName}", "{companyName}", "{pickup}", "{dropoff}", "{driverPhone}", "{vanRegistration}", "{driver_name}", "{job_time}", "{job_date}"],
+  reviewRequestEmail: ["{customerName}", "{companyName}", "{pickup}", "{dropoff}", "{job_date}"],
+  jobCompletionEmail: ["{customerName}", "{companyName}", "{pickup}", "{dropoff}", "{driver_name}", "{job_time}", "{job_date}"],
+  clientNotificationOffsetMinutes: []
 };
 
 const CHANNELS_BY_KEY: Record<string, string[]> = {
   confirmationText: ["Signature pad"],
   jobStartedMessage: ["SMS", "Email"],
-  reviewRequestEmail: ["Email"]
+  reviewRequestEmail: ["Email"],
+  jobCompletionEmail: ["Email"],
+  clientNotificationOffsetMinutes: ["Auto-scheduler"]
 };
 
 function renderPreview(content: string): string {

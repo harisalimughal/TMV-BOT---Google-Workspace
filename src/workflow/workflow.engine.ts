@@ -17,9 +17,9 @@ import {
 } from "./validation.engine";
 import { log, setContext } from "../utils/logger";
 import { equalPence, formatPounds, fromPounds } from "../utils/money";
-import { sendJobStartedEmail, sendReviewRequestEmail } from "../google/gmail";
+import { sendJobCompletionEmail, sendJobStartedEmail, sendReviewRequestEmail } from "../google/gmail";
 import { sendJobStartedSms } from "../integrations/firetext";
-import { JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../notifications/message";
+import { JOB_COMPLETION_EMAIL_TEMPLATE, JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../notifications/message";
 
 export const CUSTOMER_CONFIRMATION_TEXT =
   "By signing below, you confirm that you have inspected the van, that it is empty, that all items have been delivered, and that no items have been left behind. You also confirm that the removal service has been completed to your satisfaction.";
@@ -238,18 +238,49 @@ export async function handleAction(
 
     case "SUBMIT_OVERTIME": {
       assertState(job.currentState, WorkflowState.WAITING_OVERTIME);
-      const minutes = validateMinutes(input.overtime_minutes?.[0] ?? "");
-      job.overtimeMinutes = minutes;
-      const chargeableMinutes = Math.max(0, minutes - env.overtimeGraceMinutes);
+      const driverMinutes = validateMinutes(input.overtime_minutes?.[0] ?? "");
+
+      // Overtime reconciliation (Req 10): cross-check the driver's entered overtime
+      // against actual server-recorded timestamps. If the server elapsed time implies
+      // MORE overtime than the driver entered, use the server figure to prevent
+      // under-reporting. A discrepancy >= 15 min is logged for admin review.
+      let reconciledMinutes = driverMinutes;
+      const reconciliationExtras: SheetWrite[] = [];
+      if (job.actualStart && job.bookedMinutes > 0) {
+        const elapsedNowMinutes = Math.round(
+          (Date.now() - new Date(job.actualStart).getTime()) / 60_000
+        );
+        const serverOvertimeEstimate = Math.max(0, elapsedNowMinutes - job.bookedMinutes);
+        const discrepancy = serverOvertimeEstimate - driverMinutes;
+        if (discrepancy > 0) {
+          // Server says the job has run longer than the driver reported — use the
+          // server figure to ensure the customer is correctly charged.
+          reconciledMinutes = serverOvertimeEstimate;
+          reconciliationExtras.push(activityWrite({
+            jobId, driver: actor, action: "OVERTIME_RECONCILED",
+            detail: `Driver entered ${driverMinutes} min; server timestamps indicate ${serverOvertimeEstimate} min elapsed — using server estimate.`
+          }));
+        } else if (Math.abs(discrepancy) >= 15) {
+          // Driver entered more than server estimate — log for transparency but trust driver.
+          reconciliationExtras.push(activityWrite({
+            jobId, driver: actor, action: "OVERTIME_NOTE",
+            detail: `Driver entered ${driverMinutes} min; server timestamps indicate ~${serverOvertimeEstimate} min elapsed.`
+          }));
+        }
+      }
+
+      job.overtimeMinutes = reconciledMinutes;
+      const chargeableMinutes = Math.max(0, reconciledMinutes - env.overtimeGraceMinutes);
       job.overtimeCharge =
         chargeableMinutes === 0 ? 0 : Math.ceil(chargeableMinutes / 30) * env.overtimeRatePer30Minutes;
       const from = job.currentState;
       job.currentState = WorkflowState.WAITING_TOTAL_CHARGES;
-      return saveJob(job, driver, action, from, `${minutes} minutes`, [
+      return saveJob(job, driver, action, from, `${reconciledMinutes} minutes`, [
         driverFlowWrite({
           jobId, driver: actor, field: "Over Time Charges",
-          value: `${minutes} min / ${formatPounds(job.overtimeCharge)}`, state: job.currentState
-        })
+          value: `${reconciledMinutes} min / ${formatPounds(job.overtimeCharge)}`, state: job.currentState
+        }),
+        ...reconciliationExtras
       ]);
     }
 
@@ -400,6 +431,14 @@ export async function handleAction(
     case "COMPLETE_JOB": {
       assertState(job.currentState, WorkflowState.READY_TO_COMPLETE);
       await assertCompletionGate(jobId, job);
+      // Best-effort: send job completion email to the customer. Failure here must never
+      // block the driver completing the job — the completion is the critical part.
+      if (job.customerEmail) {
+        const completionTemplate = await getSetting("JOB_COMPLETION_EMAIL_TEXT", JOB_COMPLETION_EMAIL_TEMPLATE);
+        sendJobCompletionEmail(job, completionTemplate).catch(err =>
+          log.warn("job completion email failed (non-fatal)", { job_id: jobId, error: String(err) })
+        );
+      }
       return completeJob(jobId, identifier);
     }
 

@@ -47,7 +47,7 @@ async function sendPlainTextEmail(to: string, subject: string, body: string): Pr
 }
 
 export async function sendJobStartedEmail(
-  job: Job, template: string, driver: Pick<DriverProfile, "phone" | "vanRegistration">
+  job: Job, template: string, driver: Pick<DriverProfile, "phone" | "vanRegistration" | "fullName">
 ): Promise<void> {
   if (!job.customerEmail) return;
   // Subject is email-only (SMS has no equivalent concept), so it stays fixed rather
@@ -60,5 +60,11 @@ export async function sendJobStartedEmail(
 export async function sendReviewRequestEmail(job: Job, template: string): Promise<void> {
   if (!job.customerEmail) return;
   const subject = "We'd love your feedback";
+  await sendPlainTextEmail(job.customerEmail, subject, renderMessageTemplate(template, job));
+}
+
+export async function sendJobCompletionEmail(job: Job, template: string): Promise<void> {
+  if (!job.customerEmail) return;
+  const subject = `Your ${env.notificationFromName} move is complete — thank you!`;
   await sendPlainTextEmail(job.customerEmail, subject, renderMessageTemplate(template, job));
 }
