@@ -213,6 +213,9 @@ async function readRanges(ranges: string[], ttlMs: number): Promise<string[][][]
   const missing = ranges.filter(range => {
     const hit = valueCache.get(range);
     if (!hit) return true;
+    // If the cache was updated locally in the last 5 seconds, trust it
+    // to avoid eventual-consistency lag from the Google Sheets API replica.
+    if (now - hit.at < 5000) return false;
     // ttlMs === 0 means "always refetch". `now - hit.at > 0` was false whenever the
     // cached read landed in the same millisecond, so a deliberate cache-bypassing read
     // — the one the job lock relies on to make the double-tap guard exclusive — could
@@ -278,6 +281,14 @@ export async function getSetting(key: string, fallback: string, ttlMs = env.driv
   const row = await findObject(SHEETS.SETTINGS, "Key", key, ttlMs);
   const value = row?.["Value"]?.trim();
   return value || fallback;
+}
+
+export function getSettingSync(key: string, fallback: string): string {
+  const cached = valueCache.get(fullRange(SHEETS.SETTINGS));
+  if (!cached) return fallback;
+  const objects = rowsToObjects(cached.values);
+  const row = objects.find(o => o["Key"] === key);
+  return row?.["Value"]?.trim() || fallback;
 }
 
 export function settingWrite(key: string, value: string, notes = ""): SheetWrite {
@@ -592,6 +603,7 @@ function patchCachedRow(sheetName: string, rowNumber: number, headers: string[],
   const rowIndex = rowNumber - 1;
   if (rowIndex >= cached.values.length) return;
   cached.values[rowIndex] = headers.map(h => displayValue(data[h]));
+  cached.at = Date.now();
 }
 
 export async function appendObject(sheetName: string, data: Record<string, unknown>): Promise<void> {

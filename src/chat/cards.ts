@@ -8,6 +8,7 @@ import { signatureLinkFor } from "./signature.link";
 import { ScenarioFieldSpec, ScenarioKey, ScenarioSpec } from "./scenario.spec";
 import { scenarioLinkFor } from "./scenario.link";
 import type { ScenarioStepView } from "./scenario.engine";
+import { getSettingSync } from "../google/sheets";
 
 export type ChatResponse = Record<string, unknown>;
 
@@ -434,9 +435,21 @@ export function workflowCard(
     case WorkflowState.WAITING_OVERTIME:
       return card(id, "4. Over Time Charges ?", "Extra time charges ?", [
         { textInput: { name: "overtime_minutes", label: "Overtime minutes", hintText: "Example: 30", type: "SINGLE_LINE" } },
-        { textParagraph: { text: `Configured charging rule: ${formatPounds(env.overtimeRatePer30Minutes)} per 30 minutes, rounded up, after ${env.overtimeGraceMinutes} minute grace.` } },
+        {
+          selectionInput: {
+            name: "overtime_crew_size",
+            label: "Crew Size",
+            type: "RADIO_BUTTON",
+            items: [
+              { text: "1 man", value: "1", selected: job.crewSize === 1 },
+              { text: "2 men", value: "2", selected: job.crewSize === 2 || !job.crewSize || job.crewSize === 0 },
+              { text: "3 men", value: "3", selected: job.crewSize === 3 }
+            ]
+          }
+        },
+        { textParagraph: { text: `Configured charging rule: £${getSettingSync("OVERTIME_RATE_PER_30", "55")} per 30 minutes, rounded up, after ${getSettingSync("OVERTIME_GRACE_MINS", "0")} minute grace.` } },
         { buttonList: { buttons: [
-          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_OVERTIME", job.jobId, ["overtime_minutes"]) } },
+          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_OVERTIME", job.jobId, ["overtime_minutes", "overtime_crew_size"]) } },
           backButton(job.jobId)
         ] } }
       ]);
