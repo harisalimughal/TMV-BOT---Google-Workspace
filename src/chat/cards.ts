@@ -291,14 +291,6 @@ export function jobCard(job: Job): ChatResponse {
   return card(`job-${job.jobId}`, `Job ${job.jobId}`, active ? "Active job" : "Next unfinished job", widgets);
 }
 
-export function jobAssignmentPushMessage(job: Job): ChatResponse {
-  const cardData = jobCard(job);
-  return {
-    text: `You have been assigned to Job ${job.jobId}!`,
-    cardsV2: cardData.cardsV2
-  };
-}
-
 export function noJobsCard(): ChatResponse {
   return card("tmv-no-jobs", "No unfinished jobs", "You're up to date", [
     { textParagraph: { text: "No eligible unfinished jobs were found for you today." } },
