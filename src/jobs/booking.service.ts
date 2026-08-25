@@ -4,6 +4,10 @@ import { DateTime } from "luxon";
 import { env } from "../config/env";
 import { listCalendarEvents } from "../google/calendar";
 import { exceptionWrite, commitWrites, jobToBookingRow, jobWrite, listJobs, SheetWrite, getDriverSpace, getSetting } from "../google/sheets";
+import { createChatMessage } from "../google/chat";
+import { jobAssignmentPushMessage } from "../chat/cards";
+import { enqueue } from "../queue/queue.service";
+import { Job, JobStatus, ParsedCalendarBooking } from "./job.types";
 import { WorkflowState } from "../workflow/workflow.states";
 import { log } from "../utils/logger";
 
@@ -229,6 +233,35 @@ function reconcileDisappeared(existing: Job, reason: string): SheetWrite[] {
 }
 
 async function scheduleNotification(job: Job): Promise<void> {
+  if (!job.customerEmail && !job.customerPhone) return;
+
+  const offsetStr = await getSetting("CLIENT_NOTIFICATION_OFFSET_MINUTES", "60");
+  const offsetMinutes = Math.max(0, parseInt(offsetStr, 10) || 60);
+  if (offsetMinutes === 0) return;
+
+  const startDt = DateTime.fromISO(job.bookedStart).setZone(env.timezone);
+  const delaySeconds = Math.max(
+    0,
+    Math.round((startDt.toMillis() - Date.now()) / 1000) - offsetMinutes * 60
+  );
+
+  // Dedupe ID includes bookedStart and initials so rescheduling or reassigning schedules a fresh task
+  const dedupeId = `client-notif-${job.jobId}-${startDt.toMillis()}-${job.driverInitials || "unassigned"}`;
+  
+  await enqueue(
+    { type: "SEND_CLIENT_NOTIFICATION", jobId: job.jobId },
+    { delaySeconds, dedupeId }
+  );
+  
+  log.info("client notification scheduled", {
+    job_id: job.jobId,
+    delay_seconds: delaySeconds,
+    offset_minutes: offsetMinutes,
+    dedupe_id: dedupeId
+  });
+}
+
+/**
  * Syncs yesterday through the day after tomorrow.
  *
  * A today-only window meant an edit to tomorrow's booking never landed until the
