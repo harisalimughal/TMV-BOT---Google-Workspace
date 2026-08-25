@@ -16,14 +16,14 @@ export const JOB_STARTED_MESSAGE_TEMPLATE =
 /**
  * The customer review-request email, sent only if the driver opts in on the "Do you
  * want to take a review from the client?" step near the end of the job (see
- * workflow.engine.ts's SEND_REVIEW_EMAIL). Drafted as a sensible default -- the whole
- * point of it living in Settings is that an admin can rewrite it (e.g. to add a real
- * review-site link) without a deploy.
+ * workflow.engine.ts's SEND_REVIEW_EMAIL).
  */
 export const REVIEW_REQUEST_EMAIL_TEMPLATE =
-  "Hi {customerName}, thank you for choosing {companyName} for your move today. We'd " +
-  "really appreciate it if you could take a moment to leave us a review — it helps us " +
-  "keep improving and helps other customers find us. Thank you again for your business!";
+  "Hi {NAME},\n\n" +
+  "Your driver mentioned how smoothly everything went and asked us to say a big THANK YOU for being so kind and easy to work with! 😊\n\n" +
+  "If you have a moment, we’d really appreciate it if you could leave us a quick 5-star ⭐⭐⭐⭐⭐ review. Your review will be featured on The Man Van website and helps our drivers build their reputation and get more work — so it genuinely means a lot to us.\n\n" +
+  "Thanks again for choosing The Man Van and for making the move such a pleasure! 🤗\n\n" +
+  "Review us here 👉 https://g.page/Themanvan/review?gm";
 
 /**
  * Sent automatically when a job is marked COMPLETED (see workflow.engine.ts's
@@ -65,6 +65,7 @@ export function renderMessageTemplate(
 
   return template
     .replace(/\{customerName\}/g, job.customerName || "there")
+    .replace(/\{NAME\}/g, job.customerName || "there")
     .replace(/\{companyName\}/g, env.notificationFromName)
     .replace(/\{pickup\}/g, job.pickup || "")
     .replace(/\{dropoff\}/g, job.dropoff || "")

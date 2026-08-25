@@ -195,8 +195,31 @@ dist/assets/index-wcLnVlxV.js   706.81 kB │ gzip: 191.96 kB
 ✓ built in 5.49s
 ```
 
-### 4. Git Working Tree Status
-```
-git status --porcelain
-(Clean - 0 uncommitted changes)
-```
+### 4. Wave 1-4 Features & Late Updates
+
+The following updates were added and verified:
+- **Wave 1 — Templates & Settings**:
+  - Registered dynamic placeholders in `renderMessageTemplate` (`{driver_name}`, `{job_time}`, `{job_date}`).
+  - Built automatic job completion email (`sendJobCompletionEmail`) triggered on `COMPLETE_JOB`.
+  - Added cache invalidation on driver deactivation.
+- **Wave 2 — Unassigned Jobs & Spaces**:
+  - Implemented proactive push notifications (`createChatMessage`) when admins assign drivers.
+  - Added `unassignedCount` warning to `tomorrowJobsCard`.
+- **Wave 3 — Pricing Backend**:
+  - Created `/ops/api/pricing` Settings sheet read/write endpoints.
+  - Integrated React Pricing dashboard to dynamically save rates to the Settings sheet.
+  - Dynamically resolved crew/packing rates and grace periods in `workflow.engine.ts`.
+- **Wave 4 — Timed Client Notifications**:
+  - Scheduled client notifications (`SEND_CLIENT_NOTIFICATION`) offset in advance using Cloud Tasks queue.
+- **Overtime Crew Size Selection**:
+  - Driver can now select **1 man**, **2 men**, or **3 men** crew sizes directly on the Google Chat overtime card. Overtime charges are computed dynamically using the selected crew size rate.
+- **Timing Status Column**:
+  - Added a **Timing** badge column in the **Finished Jobs** dashboard table comparing `actualFinish` and `bookedFinish` times (🔵 **EARLY**, 🟢 **ON TIME**, 🟠 **SLIGHT DELAY**, 🔴 **LATE**).
+- **Strong Consistency Cache**:
+  - Implemented 5-second local cache trust window in `sheets.ts` to solve eventual-consistency replica lag from Google Sheets API, guaranteeing smooth driver transitions.
+
+### 5. Verification Results
+
+All tests pass and both the frontend and backend build 100% cleanly:
+- **Frontend Build (`dashboard/web`)**: Compiled cleanly with zero errors (`tsc && vite build`).
+- **Backend/Bot Build (`TMV-Chat-bot`)**: Compiled cleanly with zero errors (`npm run build`).
