@@ -6,7 +6,7 @@
  * in the queue through a config change or a retry still operates on current state.
  */
 
-export type TaskType = "PROCESS_JOB_IMAGE" | "SWEEP_STALE_EVIDENCE";
+export type TaskType = "PROCESS_JOB_IMAGE" | "SWEEP_STALE_EVIDENCE" | "SEND_CLIENT_NOTIFICATION";
 
 export interface ProcessJobImageTask {
   type: "PROCESS_JOB_IMAGE";
@@ -18,12 +18,18 @@ export interface SweepStaleEvidenceTask {
   type: "SWEEP_STALE_EVIDENCE";
 }
 
-export type QueueTask = ProcessJobImageTask | SweepStaleEvidenceTask;
+export interface SendClientNotificationTask {
+  type: "SEND_CLIENT_NOTIFICATION";
+  jobId: string;
+}
+
+export type QueueTask = ProcessJobImageTask | SweepStaleEvidenceTask | SendClientNotificationTask;
 
 /** Worker HTTP paths. Cloud Tasks targets these directly. */
 export const TASK_ROUTES: Record<TaskType, string> = {
   PROCESS_JOB_IMAGE: "/internal/tasks/process-image",
-  SWEEP_STALE_EVIDENCE: "/internal/tasks/sweep-evidence"
+  SWEEP_STALE_EVIDENCE: "/internal/tasks/sweep-evidence",
+  SEND_CLIENT_NOTIFICATION: "/internal/tasks/send-client-notification"
 };
 
 /**
@@ -40,6 +46,8 @@ export function taskDedupeId(task: QueueTask): string {
     case "SWEEP_STALE_EVIDENCE":
       // Time-bucketed: the sweep is meant to recur, so it must not dedupe forever.
       return `sweep-${Math.floor(Date.now() / 60_000)}`;
+    case "SEND_CLIENT_NOTIFICATION":
+      return `client-notif-${task.jobId}`;
     default:
       return `task-${Date.now()}`;
   }
@@ -47,7 +55,7 @@ export function taskDedupeId(task: QueueTask): string {
 
 export function isQueueTask(value: unknown): value is QueueTask {
   const type = (value as { type?: unknown })?.type;
-  return type === "PROCESS_JOB_IMAGE" || type === "SWEEP_STALE_EVIDENCE";
+  return type === "PROCESS_JOB_IMAGE" || type === "SWEEP_STALE_EVIDENCE" || type === "SEND_CLIENT_NOTIFICATION";
 }
 
 /**

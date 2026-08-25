@@ -35,3 +35,24 @@ export async function updateChatCard(messageName: string, message: Record<string
     })
   );
 }
+
+/**
+ * Proactively creates a new message in a Chat space (e.g. to push a job assignment
+ * notification to a driver). Requires the CHAT_BOT scope and that the bot has
+ * already been added to the space.
+ *
+ * `spaceName` is the "spaces/XXXXXXXX" identifier stored in the DriverSpaces sheet
+ * when the driver first adds the bot (ADDED_TO_SPACE event).
+ */
+export async function createChatMessage(
+  spaceName: string,
+  message: Record<string, unknown>
+): Promise<void> {
+  const chat = await client();
+  await withRetry("chat.spaces.messages.create", () =>
+    chat.spaces.messages.create({
+      parent: spaceName,
+      requestBody: message
+    })
+  );
+}

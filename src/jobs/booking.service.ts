@@ -3,7 +3,10 @@ import { calendar_v3 } from "googleapis";
 import { DateTime } from "luxon";
 import { env } from "../config/env";
 import { listCalendarEvents } from "../google/calendar";
-import { exceptionWrite, commitWrites, jobToBookingRow, jobWrite, listJobs, SheetWrite } from "../google/sheets";
+import { exceptionWrite, commitWrites, jobToBookingRow, jobWrite, listJobs, SheetWrite, getDriverSpace, getSetting } from "../google/sheets";
+import { createChatMessage } from "../google/chat";
+import { jobAssignmentPushMessage } from "../chat/cards";
+import { enqueue } from "../queue/queue.service";
 import { Job, JobStatus, ParsedCalendarBooking } from "./job.types";
 import { WorkflowState } from "../workflow/workflow.states";
 import { log } from "../utils/logger";
@@ -163,7 +166,7 @@ export async function syncBookingsForDate(date = DateTime.now().setZone(env.time
   const synced: Job[] = [];
   const writes: SheetWrite[] = [];
   const seenEventIds = new Set<string>();
-
+  const newAssignments: Job[] = [];
   for (const event of events) {
     if (event.id) seenEventIds.add(event.id);
 
@@ -178,7 +181,7 @@ export async function syncBookingsForDate(date = DateTime.now().setZone(env.time
     const existing = existingByEvent.get(parsed.calendarEventId);
     const job = toJob(parsed, existing);
     synced.push(job);
-    // Steady state is "nothing changed since the last sync", so most runs write nothing.
+
     if (!isUnchanged(job, existing)) writes.push(jobWrite(job));
   }
 
@@ -194,7 +197,7 @@ export async function syncBookingsForDate(date = DateTime.now().setZone(env.time
 
   // One batched write for the whole day instead of one round trip per booking.
   await commitWrites(writes);
-  log.debug("booking sync", { events: events.length, jobs: synced.length, written: writes.length });
+
   return synced;
 }
 
@@ -227,6 +230,35 @@ function reconcileDisappeared(existing: Job, reason: string): SheetWrite[] {
     }),
     exceptionWrite({ jobId: existing.jobId, type: "BOOKING_CANCELLED", detail: reason })
   ];
+}
+
+async function scheduleNotification(job: Job): Promise<void> {
+  if (!job.customerEmail && !job.customerPhone) return;
+
+  const offsetStr = await getSetting("CLIENT_NOTIFICATION_OFFSET_MINUTES", "60");
+  const offsetMinutes = Math.max(0, parseInt(offsetStr, 10) || 60);
+  if (offsetMinutes === 0) return;
+
+  const startDt = DateTime.fromISO(job.bookedStart).setZone(env.timezone);
+  const delaySeconds = Math.max(
+    0,
+    Math.round((startDt.toMillis() - Date.now()) / 1000) - offsetMinutes * 60
+  );
+
+  // Dedupe ID includes bookedStart and initials so rescheduling or reassigning schedules a fresh task
+  const dedupeId = `client-notif-${job.jobId}-${startDt.toMillis()}-${job.driverInitials || "unassigned"}`;
+  
+  await enqueue(
+    { type: "SEND_CLIENT_NOTIFICATION", jobId: job.jobId },
+    { delaySeconds, dedupeId }
+  );
+  
+  log.info("client notification scheduled", {
+    job_id: job.jobId,
+    delay_seconds: delaySeconds,
+    offset_minutes: offsetMinutes,
+    dedupe_id: dedupeId
+  });
 }
 
 /**

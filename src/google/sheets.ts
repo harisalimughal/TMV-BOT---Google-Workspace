@@ -28,7 +28,8 @@ export const SHEETS = {
   PARKING_LIABILITY: "ParkingLiability",
   LIABILITY_REPORT: "LiabilityReport",
   PENDING_SIGNATURES: "PendingSignatures",
-  SCENARIO_PROGRESS: "ScenarioProgress"
+  SCENARIO_PROGRESS: "ScenarioProgress",
+  DRIVER_SPACES: "DriverSpaces"
 } as const;
 
 const BOOKING_HEADERS = [
@@ -89,7 +90,8 @@ export const SCHEMA: Record<string, string[]> = {
   // One row per (job, scenario) currently being filled in via Chat cards — see
   // chat/scenario.engine.ts. "Key" is "<jobId>::<scenario>", the upsert key, since a
   // driver could in principle be partway through more than one scenario on the same job.
-  [SHEETS.SCENARIO_PROGRESS]: ["Key", "Job ID", "Scenario", "Step", "Fields JSON", "Message Name", "Started", "Updated"]
+  [SHEETS.SCENARIO_PROGRESS]: ["Key", "Job ID", "Scenario", "Step", "Fields JSON", "Message Name", "Started", "Updated"],
+  [SHEETS.DRIVER_SPACES]: ["Driver Initials", "Space Name", "Updated"]
 };
 
 // ---------------------------------------------------------------------------
@@ -1232,4 +1234,27 @@ export async function readEvidenceSummary(jobId: string): Promise<EvidenceProgre
   }
 
   return { completed, pending, failed, hasSignature: signatureRows.some(row => row["Job ID"] === jobId) };
+}
+
+// ---------------------------------------------------------------------------
+// Driver Chat spaces — persists the DM space name per driver so the bot can
+// proactively push messages (e.g. job assignment notifications).
+// ---------------------------------------------------------------------------
+
+export function driverSpaceWrite(driverInitials: string, spaceName: string): SheetWrite {
+  return {
+    sheet: SHEETS.DRIVER_SPACES,
+    key: { column: "Driver Initials", value: driverInitials },
+    data: {
+      "Driver Initials": driverInitials,
+      "Space Name": spaceName,
+      "Updated": new Date().toISOString()
+    }
+  };
+}
+
+/** Returns the stored Chat space name for a driver, or empty string if not yet seen. */
+export async function getDriverSpace(driverInitials: string): Promise<string> {
+  const row = await findObject(SHEETS.DRIVER_SPACES, "Driver Initials", driverInitials, 0);
+  return row?.["Space Name"]?.trim() ?? "";
 }

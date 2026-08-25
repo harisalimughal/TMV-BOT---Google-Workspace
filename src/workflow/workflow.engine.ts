@@ -270,9 +270,38 @@ export async function handleAction(
       }
 
       job.overtimeMinutes = reconciledMinutes;
-      const chargeableMinutes = Math.max(0, reconciledMinutes - env.overtimeGraceMinutes);
+      
+      const otGraceStr = await getSetting("OVERTIME_GRACE_MINS", String(env.overtimeGraceMinutes));
+      const otGrace = parseInt(otGraceStr, 10) || 0;
+
+      let rateKey = "CREW_RATE_2_MAN";
+      let rateFallback = 55;
+      if (job.crewSize === 1) {
+        rateKey = "CREW_RATE_1_MAN";
+        rateFallback = 45;
+      } else if (job.crewSize === 3) {
+        rateKey = "CREW_RATE_3_MAN";
+        rateFallback = 65;
+      }
+
+      const isPackingService = job.extraCharges.includes(ExtraChargeType.PACKING);
+      const defaultRateStr = isPackingService
+        ? await getSetting("PACKING_RATE", "95")
+        : await getSetting(rateKey, String(rateFallback));
+      const defaultRate = parseFloat(defaultRateStr) || rateFallback;
+
+      const otRateStr = await getSetting("OVERTIME_RATE_PER_30", "");
+      const otRate = otRateStr ? (parseFloat(otRateStr) || defaultRate) : defaultRate;
+
+      const unitStr = isPackingService
+        ? await getSetting("PACKING_BILLING_UNIT", "Per hour")
+        : await getSetting("CREW_BILLING_UNIT", "Per 30 minutes");
+      const unitMins = unitStr.toLowerCase().includes("hour") ? 60 : 30;
+
+      const chargeableMinutes = Math.max(0, reconciledMinutes - otGrace);
       job.overtimeCharge =
-        chargeableMinutes === 0 ? 0 : Math.ceil(chargeableMinutes / 30) * env.overtimeRatePer30Minutes;
+        chargeableMinutes === 0 ? 0 : Math.ceil(chargeableMinutes / unitMins) * otRate;
+      
       const from = job.currentState;
       job.currentState = WorkflowState.WAITING_TOTAL_CHARGES;
       return saveJob(job, driver, action, from, `${reconciledMinutes} minutes`, [

@@ -136,16 +136,25 @@ function isDueTomorrow(iso: string): boolean {
  * "unassigned is up for grabs" rule for today) -- a booking nobody has claimed yet
  * isn't "the driver's job" a day out, so it's left off this list.
  */
-export async function getTomorrowJobsForDriver(identifier: string): Promise<{ jobs: Job[]; driver: DriverProfile }> {
+export async function getTomorrowJobsForDriver(identifier: string): Promise<{
+  jobs: Job[];
+  driver: DriverProfile;
+  unassignedCount: number;
+}> {
   const [driver, jobs] = await Promise.all([resolveDriver(identifier), listJobs(0)]);
 
-  const tomorrow = jobs
+  const tomorrowAll = jobs
     .filter(j => isDueTomorrow(j.bookedStart))
-    .filter(j => j.status !== JobStatus.CANCELLED)
+    .filter(j => j.status !== JobStatus.CANCELLED);
+
+  const tomorrow = tomorrowAll
     .filter(j => j.driverInitials === driver.initials)
     .sort((a, b) => a.bookedStart.localeCompare(b.bookedStart));
 
-  return { jobs: tomorrow, driver };
+  // Count jobs tomorrow that exist but have no driver assigned
+  const unassignedCount = tomorrowAll.filter(j => !j.driverInitials).length;
+
+  return { jobs: tomorrow, driver, unassignedCount };
 }
 
 export interface JobLookupOptions {

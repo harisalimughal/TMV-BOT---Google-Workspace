@@ -17,6 +17,7 @@ export enum ExtraChargeType {
   CONGESTION = "London Congestion charge",
   TUNNEL = "Tunnel Charges",
   EXTRA_TIME = "Extra time / Charges",
+  PACKING = "Packing Service",
   NONE = "No Extras Time"
 }
 

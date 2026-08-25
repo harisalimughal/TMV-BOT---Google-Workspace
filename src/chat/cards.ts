@@ -291,6 +291,14 @@ export function jobCard(job: Job): ChatResponse {
   return card(`job-${job.jobId}`, `Job ${job.jobId}`, active ? "Active job" : "Next unfinished job", widgets);
 }
 
+export function jobAssignmentPushMessage(job: Job): ChatResponse {
+  const cardData = jobCard(job);
+  return {
+    text: `You have been assigned to Job ${job.jobId}!`,
+    cardsV2: cardData.cardsV2
+  };
+}
+
 export function noJobsCard(): ChatResponse {
   return card("tmv-no-jobs", "No unfinished jobs", "You're up to date", [
     { textParagraph: { text: "No eligible unfinished jobs were found for you today." } },
@@ -306,12 +314,15 @@ export function noJobsCard(): ChatResponse {
  * filter). Deliberately separate from jobCard()/workflowCard(): nothing here is
  * actionable (no Start Job button) since these jobs aren't due yet.
  */
-export function tomorrowJobsCard(jobs: Job[]): ChatResponse {
+export function tomorrowJobsCard(jobs: Job[], unassignedCount = 0): ChatResponse {
   const tomorrowLabel = DateTime.now().setZone(env.timezone).plus({ days: 1 }).toFormat("cccc dd LLL");
 
   if (!jobs.length) {
+    const text = unassignedCount > 0
+      ? "You don't currently have a job assigned for tomorrow. Your schedule may be updated by the admin."
+      : "No jobs are scheduled for you tomorrow yet.";
     return card("tmv-tomorrow-jobs", "Tomorrow's Jobs", tomorrowLabel, [
-      { textParagraph: { text: "No jobs are scheduled for you tomorrow yet." } },
+      { textParagraph: { text } },
       { buttonList: { buttons: [menuButton("Main Menu", "MAIN_MENU", "", true)] } }
     ]);
   }
