@@ -223,6 +223,15 @@ export interface LiveFleetVehicle {
   lastUpdate: string;
   driverInitials: string | null;
   driverName: string | null;
+  odometerMiles: number | null;
+  ignitionOn: boolean | null;
+  batteryVoltage: number | null;
+  gpsSignalLevel: number | null;
+  gsmSignalLevel: number | null;
+  crashDetected: boolean;
+  jammingDetected: boolean;
+  ecoDrivingEvent: string | null;
+  ecoDrivingScore: number | null;
 }
 
 export async function fetchLiveFleet(): Promise<{ vehicles: LiveFleetVehicle[]; fetchedAt: string }> {

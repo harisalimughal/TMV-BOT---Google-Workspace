@@ -15,6 +15,26 @@ export interface LiveFleetVehicle {
   lastUpdate: string;
   driverInitials: string | null;
   driverName: string | null;
+  /** Cumulative mileage, converted from the device's reported km. */
+  odometerMiles: number | null;
+  ignitionOn: boolean | null;
+  batteryVoltage: number | null;
+  /** Small integer scale (device-reported, not standardised) -- higher is better. */
+  gpsSignalLevel: number | null;
+  gsmSignalLevel: number | null;
+  crashDetected: boolean;
+  /** GPS jamming: someone actively blocking this device's signal -- an anti-theft
+   * indicator, not a connectivity glitch. */
+  jammingDetected: boolean;
+  /** Last harsh-driving event type reported, e.g. "hbrake" / "hcorner". */
+  ecoDrivingEvent: string | null;
+  ecoDrivingScore: number | null;
+}
+
+function toNumber(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** GPSLive plate numbers and our own Van Registration column are typed freely
@@ -72,6 +92,7 @@ async function getLiveFleet(): Promise<LiveFleetVehicle[]> {
     const trailingInitials = parseTrailingInitials(device.name || "");
     const byInitials = trailingInitials ? driversByInitials.get(trailingInitials) : undefined;
     const matched = byPlate || byInitials || null;
+    const params = device.params || {};
 
     return {
       imei: device.imei,
@@ -82,7 +103,16 @@ async function getLiveFleet(): Promise<LiveFleetVehicle[]> {
       speedMph: Math.round((device.speed || 0) * 0.621371), // GPSLive reports km/h
       lastUpdate: device.dtTracker,
       driverInitials: matched?.initials ?? null,
-      driverName: matched?.fullName ?? null
+      driverName: matched?.fullName ?? null,
+      odometerMiles: device.odometer != null ? Math.round(device.odometer * 0.621371) : null,
+      ignitionOn: params.acc === undefined ? null : params.acc === "1",
+      batteryVoltage: toNumber(params.batv),
+      gpsSignalLevel: toNumber(params.gpslev),
+      gsmSignalLevel: toNumber(params.gsmlev),
+      crashDetected: params.crash === "1",
+      jammingDetected: params.jamming === "1",
+      ecoDrivingEvent: params.ecodriving || null,
+      ecoDrivingScore: toNumber(params.ecodrivingvalue)
     };
   });
 

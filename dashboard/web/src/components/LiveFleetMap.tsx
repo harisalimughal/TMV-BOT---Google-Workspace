@@ -16,7 +16,13 @@ import {
   Activity,
   Compass,
   RotateCcw,
-  WifiOff
+  WifiOff,
+  AlertTriangle,
+  ShieldAlert,
+  Zap,
+  BatteryMedium,
+  Signal,
+  Gauge
 } from "lucide-react";
 import { NormalizedJob } from "../types";
 import { fetchLiveFleet } from "../api/client";
@@ -39,6 +45,15 @@ interface FleetVehicle {
   isStale: boolean;
   isMoving: boolean;
   currentJob: NormalizedJob | null;
+  odometerMiles: number | null;
+  ignitionOn: boolean | null;
+  batteryVoltage: number | null;
+  gpsSignalLevel: number | null;
+  gsmSignalLevel: number | null;
+  crashDetected: boolean;
+  jammingDetected: boolean;
+  ecoDrivingEvent: string | null;
+  ecoDrivingScore: number | null;
 }
 
 type FilterId = "ALL" | "MOVING" | "IDLE" | "OFFLINE";
@@ -106,7 +121,16 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
         lastUpdate: v.lastUpdate,
         isStale,
         isMoving: !isStale && v.speedMph > 2,
-        currentJob
+        currentJob,
+        odometerMiles: v.odometerMiles,
+        ignitionOn: v.ignitionOn,
+        batteryVoltage: v.batteryVoltage,
+        gpsSignalLevel: v.gpsSignalLevel,
+        gsmSignalLevel: v.gsmSignalLevel,
+        crashDetected: v.crashDetected,
+        jammingDetected: v.jammingDetected,
+        ecoDrivingEvent: v.ecoDrivingEvent,
+        ecoDrivingScore: v.ecoDrivingScore
       };
     });
   }, [fleetData, jobs]);
@@ -417,6 +441,75 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
                   <span className="text-[10px] text-muted block mt-0.5 font-mono">{activeSelected.lastUpdate} UTC</span>
                 </div>
               </div>
+
+              {/* Crash / GPS jamming are security-critical -- surface them above
+                  everything else, not buried in the regular health grid. */}
+              {(activeSelected.crashDetected || activeSelected.jammingDetected) && (
+                <div className="p-2.5 bg-status-red-bg border border-status-red/30 rounded space-y-1">
+                  {activeSelected.crashDetected && (
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-status-red">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Crash detected
+                    </div>
+                  )}
+                  {activeSelected.jammingDetected && (
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-status-red">
+                      <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> GPS jamming detected -- possible tampering
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Vehicle health & safety -- straight from the device's own sensors
+                  (Teltonika hardware, per the "protocol" field GPSLive reports). */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="p-3 bg-surface rounded border border-line flex items-center gap-2">
+                  <Zap className={`w-4 h-4 shrink-0 ${activeSelected.ignitionOn ? "text-status-green" : "text-muted"}`} />
+                  <div>
+                    <span className="text-[11px] text-muted block">Ignition</span>
+                    <span className="font-semibold text-ink text-xs">
+                      {activeSelected.ignitionOn === null ? "—" : activeSelected.ignitionOn ? "On" : "Off"}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-surface rounded border border-line flex items-center gap-2">
+                  <BatteryMedium className="w-4 h-4 shrink-0 text-muted" />
+                  <div>
+                    <span className="text-[11px] text-muted block">Battery</span>
+                    <span className="font-semibold text-ink text-xs">
+                      {activeSelected.batteryVoltage === null ? "—" : `${activeSelected.batteryVoltage}V`}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-surface rounded border border-line flex items-center gap-2">
+                  <Signal className="w-4 h-4 shrink-0 text-muted" />
+                  <div>
+                    <span className="text-[11px] text-muted block">GPS / GSM Signal</span>
+                    <span className="font-semibold text-ink text-xs">
+                      {activeSelected.gpsSignalLevel ?? "—"} / {activeSelected.gsmSignalLevel ?? "—"}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-surface rounded border border-line flex items-center gap-2">
+                  <Gauge className="w-4 h-4 shrink-0 text-muted" />
+                  <div>
+                    <span className="text-[11px] text-muted block">Odometer</span>
+                    <span className="font-semibold text-ink text-xs">
+                      {activeSelected.odometerMiles === null ? "—" : `${activeSelected.odometerMiles.toLocaleString()} mi`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {activeSelected.ecoDrivingEvent && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded flex items-center justify-between text-[11px]">
+                  <span className="text-amber-700 font-medium">
+                    Last driving event: {activeSelected.ecoDrivingEvent === "hbrake" ? "harsh braking" : activeSelected.ecoDrivingEvent === "hcorner" ? "harsh cornering" : activeSelected.ecoDrivingEvent}
+                  </span>
+                  {activeSelected.ecoDrivingScore !== null && (
+                    <span className="font-mono font-bold text-amber-700">{activeSelected.ecoDrivingScore}</span>
+                  )}
+                </div>
+              )}
 
               {/* Current job, if this driver has one IN_PROGRESS right now -- real data
                   cross-referenced from the Sheets-backed jobs list, not fabricated. */}
