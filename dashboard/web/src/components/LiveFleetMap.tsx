@@ -129,7 +129,7 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
       osm: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
     };
 
-    L.tileLayer(tileUrls[mapTheme], { maxZoom: 19, subdomains: "abcd" }).addTo(map);
+    L.tileLayer(tileUrls[mapTheme], { maxZoom: 19, subdomains: "abc" }).addTo(map);
 
     const ulez = L.circle([51.5074, -0.1278], {
       radius: 9500,
@@ -161,7 +161,7 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
     mapInstanceRef.current.eachLayer(layer => {
       if (layer instanceof L.TileLayer) mapInstanceRef.current?.removeLayer(layer);
     });
-    L.tileLayer(tileUrls[mapTheme], { maxZoom: 19, subdomains: "abcd" }).addTo(mapInstanceRef.current);
+    L.tileLayer(tileUrls[mapTheme], { maxZoom: 19, subdomains: "abc" }).addTo(mapInstanceRef.current);
   }, [mapTheme]);
 
   // Toggle ULEZ
