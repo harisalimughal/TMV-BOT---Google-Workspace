@@ -90,10 +90,10 @@ export function GenerateReportModal({ isOpen, onClose, initialFrom, initialTo }:
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[600px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        
+      <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+
         {/* Header */}
-        <div className="px-6 py-5 border-b border-line flex items-center justify-between bg-[#FAFAFA]">
+        <div className="px-6 py-5 border-b border-line flex items-center justify-between bg-[#FAFAFA] shrink-0">
           <h2 className="text-[18px] font-bold text-ink flex items-center gap-2">
             <FileText className="w-5 h-5 text-brand" /> Generate Report
           </h2>
@@ -107,7 +107,7 @@ export function GenerateReportModal({ isOpen, onClose, initialFrom, initialTo }:
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">
            {status === "success" ? (
              <div className="py-12 flex flex-col items-center justify-center text-center">
                <div className="w-16 h-16 bg-status-green-bg text-status-green rounded-full flex items-center justify-center mb-4">
@@ -214,7 +214,7 @@ export function GenerateReportModal({ isOpen, onClose, initialFrom, initialTo }:
 
         {/* Footer */}
         {status !== "success" && status !== "generating" && (
-          <div className="px-6 py-4 border-t border-line bg-[#FAFAFA] flex items-center justify-end gap-3">
+          <div className="px-6 py-4 border-t border-line bg-[#FAFAFA] flex items-center justify-end gap-3 shrink-0">
             <button 
               onClick={onClose}
               className="px-4 py-2 rounded-[12px] text-[13px] font-semibold text-muted hover:text-ink hover:bg-surface transition"

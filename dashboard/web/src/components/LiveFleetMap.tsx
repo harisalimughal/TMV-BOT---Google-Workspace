@@ -68,7 +68,11 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterId>("ALL");
-  const [mapTheme, setMapTheme] = useState<"voyager" | "light" | "osm">("voyager");
+  // CartoDB's voyager/light tiles now require a signed-up API key for anonymous use
+  // (their basemaps.cartocdn.com free tier was retired) -- osm needs no key and just
+  // works, so it's the default. voyager/light stay selectable for whenever a CARTO key
+  // gets added, rather than deleting the option outright.
+  const [mapTheme, setMapTheme] = useState<"osm" | "voyager" | "light">("osm");
   const [showUlez, setShowUlez] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
@@ -307,9 +311,9 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
             className="shrink-0 h-8 px-2 bg-surface border border-line rounded text-xs text-ink font-medium"
             title="Switch Map Tile Theme"
           >
-            <option value="voyager">Navigation (Voyager)</option>
-            <option value="light">Clean Positron</option>
             <option value="osm">OpenStreetMap</option>
+            <option value="voyager">Navigation (Voyager) -- needs CARTO API key</option>
+            <option value="light">Clean Positron -- needs CARTO API key</option>
           </select>
 
           <button
