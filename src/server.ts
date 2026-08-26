@@ -19,7 +19,7 @@ import { adminRouter } from "./admin/admin.routes";
 // (see Dockerfile / package.json's dashboard:build). None of these paths exist until
 // that build has run, so this must never throw at import time -- an unbuilt dashboard
 // is a missing /ops feature, not a reason to take down the whole Chat bot.
-const dashboardRouter: (() => express.Router) | null = (() => {
+const dashboardRouter: ((options?: { serveAppShell?: boolean }) => express.Router) | null = (() => {
   try { return require("../dashboard/dist/dashboard/server/router").dashboardRouter; } catch {}
   try { return require("../dashboard/server/router").dashboardRouter; } catch {}
   try { return require("./dashboard/server/router").dashboardRouter; } catch {}
@@ -149,14 +149,15 @@ app.post("/internal/sync", async (req, res) => {
   });
 });
 
-// Mounted at both paths: /admin is now the primary URL (replacing the classic panel
-// above), and /ops stays mounted too since the SPA's own fetch() calls are hardcoded
-// to absolute /ops/api/... paths throughout dashboard/web/src/api/client.ts -- those
-// must keep resolving regardless of which URL actually loaded the page.
+// /admin is the only public entry point (serves the login page / SPA shell for any
+// unmatched path). /ops stays mounted too, but API-only: the SPA's own fetch() calls
+// and its built asset URLs (Vite's base is "/ops/") are hardcoded to absolute
+// /ops/api/... and /ops/... paths throughout dashboard/web/src -- those must keep
+// resolving regardless of which URL actually loaded the page. /ops itself must not
+// double as a second public login screen, so it gets no SPA-shell fallback.
 if (dashboardRouter) {
-  const opsRouter = dashboardRouter();
-  app.use("/admin", opsRouter);
-  app.use("/ops", opsRouter);
+  app.use("/admin", dashboardRouter({ serveAppShell: true }));
+  app.use("/ops", dashboardRouter({ serveAppShell: false }));
 }
 
 app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {

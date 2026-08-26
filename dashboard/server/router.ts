@@ -16,7 +16,8 @@ import { scenariosRoute } from "./routes/scenarios.route";
 import { settingsRoute } from "./routes/settings.route";
 import { summaryRoute } from "./routes/summary.route";
 
-export function dashboardRouter(): Router {
+export function dashboardRouter(options: { serveAppShell?: boolean } = {}): Router {
+  const { serveAppShell = true } = options;
   const router = Router();
 
   // Authentication & Rate Limiting guard for all /ops routes
@@ -84,16 +85,21 @@ export function dashboardRouter(): Router {
   const finalDistPath = fs.existsSync(distPath) ? distPath : fallbackDistPath;
 
   if (fs.existsSync(finalDistPath)) {
-    router.use(express.static(finalDistPath));
-    router.get("*", (_req, res) => {
-      const indexHtml = path.join(finalDistPath, "index.html");
-      if (fs.existsSync(indexHtml)) {
-        res.sendFile(indexHtml);
-      } else {
-        res.status(200).send(defaultOpsShell());
-      }
-    });
-  } else {
+    // index: false when not the app shell entry point, so a bare request to this
+    // mount's root doesn't fall back to serving index.html (serve-static's default
+    // directory-index behavior) -- only explicitly-named files (assets, images) resolve.
+    router.use(express.static(finalDistPath, serveAppShell ? {} : { index: false }));
+    if (serveAppShell) {
+      router.get("*", (_req, res) => {
+        const indexHtml = path.join(finalDistPath, "index.html");
+        if (fs.existsSync(indexHtml)) {
+          res.sendFile(indexHtml);
+        } else {
+          res.status(200).send(defaultOpsShell());
+        }
+      });
+    }
+  } else if (serveAppShell) {
     router.get("*", (_req, res) => {
       res.status(200).send(defaultOpsShell());
     });
