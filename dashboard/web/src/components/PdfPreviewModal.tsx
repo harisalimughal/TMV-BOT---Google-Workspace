@@ -54,6 +54,18 @@ export function PdfPreviewModal({ job, isOpen, onClose, onDownload }: Props) {
            <PaperDossierReport job={job} isPreview={true} />
          </div>
       </div>
+
+      {/* Hidden print-only renderer: window.print() while this modal is open would
+          otherwise capture the modal's own fixed/scrollable chrome, which browsers
+          can't paginate across multiple print pages -- only whatever fits the current
+          viewport gets printed, silently truncating everything else. This mirrors
+          SubmissionDetailDrawer.tsx's working pattern: index.css's @media print rule
+          hides body * by default and only re-shows .print-content, so this is the only
+          thing that ends up on the printed/saved-as-PDF page, laid out via
+          PaperDossierReport's own isPreview=false print-page/@page CSS. */}
+      <div className="hidden print:block print-content fixed inset-0 z-[99999] bg-white overflow-visible">
+        <PaperDossierReport job={job} isPreview={false} />
+      </div>
     </div>
   );
 }

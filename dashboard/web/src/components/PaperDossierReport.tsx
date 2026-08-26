@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { NormalizedJob } from "../types";
 import { formatLondonDateTime } from "../utils/date";
 
@@ -51,23 +51,28 @@ export function PaperDossierReport({ job, isPreview = false }: Props) {
     </div>
   );
 
-  const PhotoSection = ({ title, src }: { title: string, src: string | null }) => (
-    <div className="flex-1 flex flex-col mb-8 min-h-0">
-      <h2 className="text-[14px] font-semibold text-[#1F2937] mb-3">{title}</h2>
-      <div className="flex-1 w-full bg-[#F3F4F6] rounded-[12px] border border-[#E5E7EB] shadow-sm overflow-hidden flex items-center justify-center p-2">
-         {src ? (
-           <img 
-             src={src} 
-             alt={title}
-             className="max-w-full max-h-[100%] rounded-[8px] object-contain shadow-[0_2px_8px_rgba(0,0,0,0.08)] bg-white"
-             onError={(e) => { e.currentTarget.style.display = 'none'; }}
-           />
-         ) : (
-           <div className="text-muted text-[14px] font-semibold italic">Not captured</div>
-         )}
+  const PhotoSection = ({ title, src }: { title: string, src: string | null }) => {
+    const [failed, setFailed] = useState(false);
+    return (
+      <div className="flex-1 flex flex-col mb-8 min-h-0">
+        <h2 className="text-[14px] font-semibold text-[#1F2937] mb-3">{title}</h2>
+        <div className="flex-1 w-full bg-[#F3F4F6] rounded-[12px] border border-[#E5E7EB] shadow-sm overflow-hidden flex items-center justify-center p-2">
+           {src && !failed ? (
+             <img
+               src={src}
+               alt={title}
+               className="max-w-full max-h-[100%] rounded-[8px] object-contain shadow-[0_2px_8px_rgba(0,0,0,0.08)] bg-white"
+               onError={() => setFailed(true)}
+             />
+           ) : (
+             <div className="text-muted text-[14px] font-semibold italic">
+               {src && failed ? "Photo failed to load" : "Not captured"}
+             </div>
+           )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Common wrapper for each page
   const Page = ({ page, totalPages, children }: { page: number, totalPages: number, children: React.ReactNode }) => (
@@ -117,7 +122,9 @@ export function PaperDossierReport({ job, isPreview = false }: Props) {
 
       {photoPages.map((p, index) => {
         const pageNum = index + 1;
-        const src = p.fileId ? (p.driveUrl || p.thumbProxyUrl || `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(p.fileId)}`) : null;
+        // thumbProxyUrl first: it's our own authenticated proxy that returns raw image
+        // bytes. driveUrl is a Google Drive "view" page, not embeddable as an <img> src.
+        const src = p.fileId ? (p.thumbProxyUrl || `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(p.fileId)}`) : null;
         
         return (
           <Page key={index} page={pageNum} totalPages={totalPages}>
