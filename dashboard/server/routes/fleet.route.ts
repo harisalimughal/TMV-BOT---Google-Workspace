@@ -76,15 +76,24 @@ async function getLiveFleet(): Promise<LiveFleetVehicle[]> {
     })
   ]);
 
+  // Plate is the authoritative signal once a driver has one on file -- it identifies an
+  // actual physical vehicle, whereas trailing-initials parsing is a fragile fallback
+  // (free-text device names, no guaranteed convention). A driver with BOTH a
+  // (mismatched) plate and initials that happen to match a different device's name
+  // would otherwise match two vehicles at once. So initials-matching is only offered
+  // for drivers who have no van registration on file to match by instead.
   const driversByPlate = new Map<string, { initials: string; fullName: string }>();
   const driversByInitials = new Map<string, { initials: string; fullName: string }>();
   for (const d of dataset?.drivers ?? []) {
     const initials = String(d[DRIVERS_MAP.initials] || "").trim().toUpperCase();
     if (!initials) continue;
     const fullName = String(d["Full Name"] || initials);
-    driversByInitials.set(initials, { initials, fullName });
     const plate = String(d[DRIVERS_MAP.vanRegistration] || "").trim();
-    if (plate) driversByPlate.set(normalizePlate(plate), { initials, fullName });
+    if (plate) {
+      driversByPlate.set(normalizePlate(plate), { initials, fullName });
+    } else {
+      driversByInitials.set(initials, { initials, fullName });
+    }
   }
 
   const vehicles: LiveFleetVehicle[] = devices.map((device: GpsLiveDevice) => {

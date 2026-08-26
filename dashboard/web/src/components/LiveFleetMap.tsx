@@ -286,6 +286,7 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
 
   const movingCount = vehicles.filter(v => v.isMoving).length;
   const offlineCount = vehicles.filter(v => v.isStale).length;
+  const idleCount = vehicles.filter(v => !v.isStale && !v.isMoving).length;
 
   return (
     <div
@@ -312,8 +313,8 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
             {(
               [
                 { id: "ALL", label: `All (${vehicles.length})` },
-                { id: "MOVING", label: "Moving" },
-                { id: "IDLE", label: "Idle" },
+                { id: "MOVING", label: `Moving (${movingCount})` },
+                { id: "IDLE", label: `Idle (${idleCount})` },
                 { id: "OFFLINE", label: `Offline (${offlineCount})` }
               ] as const
             ).map(tab => (
