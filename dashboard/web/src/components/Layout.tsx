@@ -148,7 +148,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
             {!collapsed && (
               <div className="flex items-center overflow-hidden">
                 <img
-                  src="/tmv-new-logo.png"
+                  src={`${import.meta.env.BASE_URL}tmv-new-logo.png`}
                   alt="The Man Van"
                   className="h-14 w-auto object-contain flex-shrink-0"
                 />
@@ -156,7 +156,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
             )}
             {collapsed && (
               <img
-                src="/tmv-new-logo.png"
+                src={`${import.meta.env.BASE_URL}tmv-new-logo.png`}
                 alt="TMV"
                 className="w-8 h-8 rounded-lg object-contain bg-surface border border-line p-0.5 mx-auto shadow-2xs"
                 title="The Man Van Operations"

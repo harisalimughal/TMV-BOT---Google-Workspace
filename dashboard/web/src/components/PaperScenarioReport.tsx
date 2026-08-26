@@ -80,7 +80,7 @@ export function PaperScenarioReport({ item, kind }: Props) {
         <div className="flex items-center justify-between pb-4 border-b border-line mb-6">
           <h1 className="text-[20px] font-bold text-[#1A1A1A]">{title}</h1>
           <div className="flex flex-col items-end">
-            <img src="/tmv-new-logo.png" alt="The Man Van" className="w-24 object-contain" />
+            <img src={`${import.meta.env.BASE_URL}tmv-new-logo.png`} alt="The Man Van" className="w-24 object-contain" />
             <span className="text-[10px] font-bold text-[#1A1A1A] tracking-wider mt-1">020 3773 9113</span>
           </div>
         </div>
