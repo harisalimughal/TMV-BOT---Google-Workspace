@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
+import { LiveFleetPage } from "./pages/LiveFleetPage";
 import { JobsPage } from "./pages/JobsPage";
 import { FinishedJobsPage } from "./pages/FinishedJobsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
@@ -77,6 +78,7 @@ export function App() {
   return (
     <Layout activeSection={activeSection} onSelectSection={handleSelectSection} onLogout={handleLogout}>
       {activeSection === "overview" && <OverviewPage onSelectSection={handleSelectSection} />}
+      {activeSection === "livefleet" && <LiveFleetPage onSelectSection={handleSelectSection} />}
       {activeSection === "jobs" && <JobsPage />}
       {activeSection === "finished" && <FinishedJobsPage />}
       {activeSection === "notifications" && <NotificationsPage />}

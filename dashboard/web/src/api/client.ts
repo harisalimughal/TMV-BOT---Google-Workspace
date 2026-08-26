@@ -209,3 +209,24 @@ export async function fetchNotifications(): Promise<{ rows: NotificationRow[] }>
   if (!res.ok) throw new Error("Failed to load notifications");
   return res.json();
 }
+
+/** One van's last-known GPS position, from GPSLive (see dashboard/server/routes/fleet.route.ts).
+ *  driverInitials/driverName are null when the plate/initials couldn't be matched to a
+ *  row in the Drivers sheet -- still a real position, just an unidentified vehicle. */
+export interface LiveFleetVehicle {
+  imei: string;
+  name: string;
+  plateNumber: string;
+  lat: number;
+  lng: number;
+  speedMph: number;
+  lastUpdate: string;
+  driverInitials: string | null;
+  driverName: string | null;
+}
+
+export async function fetchLiveFleet(): Promise<{ vehicles: LiveFleetVehicle[]; fetchedAt: string }> {
+  const res = await fetch("/ops/api/fleet/live");
+  if (!res.ok) throw new Error("Failed to load live fleet positions");
+  return res.json();
+}

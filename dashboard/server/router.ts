@@ -9,6 +9,7 @@ import { activityRoute } from "./routes/activity.route";
 import { driversRoute } from "./routes/drivers.route";
 import { exceptionsRoute } from "./routes/exceptions.route";
 import { financeRoute } from "./routes/finance.route";
+import { fleetRoute } from "./routes/fleet.route";
 import { jobsRoute } from "./routes/jobs.route";
 import { notificationsRoute } from "./routes/notifications.route";
 import { photosRoute } from "./routes/photos.route";
@@ -53,6 +54,7 @@ export function dashboardRouter(options: { serveAppShell?: boolean } = {}): Rout
   api.use("/drivers", driversRoute());
   api.use("/finance", financeRoute());
   api.use("/exceptions", exceptionsRoute());
+  api.use("/fleet", fleetRoute());
   api.use("/scenarios", scenariosRoute());
   api.use("/activity", activityRoute());
   api.use("/settings", settingsRoute());

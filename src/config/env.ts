@@ -132,7 +132,16 @@ export const env = {
    */
   signatureLinkSecret: process.env.TMV_SIGNATURE_LINK_SECRET?.trim() || "",
   /** Shared password for the /admin panel. Required in production. */
-  adminPassword: process.env.TMV_ADMIN_PASSWORD?.trim() || ""
+  adminPassword: process.env.TMV_ADMIN_PASSWORD?.trim() || "",
+
+  /**
+   * Bearer token for the GPSLive fleet-tracking API (api.gpslive.app), generated from
+   * GPSLive's own Settings > API section -- not a Google credential. Used by the /ops
+   * Live Fleet map to show real van positions. Blank = the dashboard falls back to
+   * showing no live positions rather than failing to boot.
+   */
+  gpsApiKey: process.env.GPS_API?.trim() || "",
+  gpsTimeoutMs: numberEnv("TMV_GPS_TIMEOUT_MS", 5_000)
 };
 
 function originOf(url: string): string {
