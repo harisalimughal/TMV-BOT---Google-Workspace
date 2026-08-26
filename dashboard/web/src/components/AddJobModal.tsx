@@ -164,7 +164,7 @@ export function AddJobModal({ isOpen, onClose }: Props) {
                 />
                 {isInvalid("customerName") && <p className="text-[11px] text-status-red mt-1.5">Customer name is required</p>}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] font-medium text-ink mb-1.5">Customer email</label>
                   <input 
@@ -233,7 +233,7 @@ export function AddJobModal({ isOpen, onClose }: Props) {
             <h3 className="text-[12px] font-semibold uppercase text-muted tracking-wider flex items-center gap-1.5 mb-4">
               <ClipboardList className="w-3.5 h-3.5" /> Job Details
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[13px] font-medium text-ink mb-1.5">
                   Crew size <span className="text-status-red">*</span>
@@ -290,7 +290,7 @@ export function AddJobModal({ isOpen, onClose }: Props) {
               <Clock className="w-3.5 h-3.5" /> Schedule
             </h3>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] font-medium text-ink mb-1.5">
                     Start <span className="text-status-red">*</span>

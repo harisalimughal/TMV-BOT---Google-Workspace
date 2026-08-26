@@ -48,22 +48,22 @@ export function FinishedJobsPage() {
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto">
       {/* PAGE HEADER */}
-      <div className="flex items-center justify-between px-2">
+      <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-3 px-2">
         <h1 className="text-[20px] font-bold text-ink">Finished Jobs</h1>
-        
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
-          <div className="w-px h-6 bg-line mx-2" />
+          <div className="hidden sm:block w-px h-6 bg-line mx-2 shrink-0" />
           <button
             onClick={() => { window.location.href = "/ops/api/jobs/export.csv?status=COMPLETED"; }}
-            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
+            className="shrink-0 whitespace-nowrap h-10 px-2.5 sm:px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
           >
-            <Download className="w-4 h-4" /> Export CSV
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export </span>CSV
           </button>
           <button
-            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
+            className="shrink-0 whitespace-nowrap h-10 px-2.5 sm:px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
           >
-            <Download className="w-4 h-4" /> Export PDF
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export </span>PDF
           </button>
         </div>
       </div>
@@ -244,9 +244,9 @@ export function FinishedJobsPage() {
       
       {/* Pagination (simple) */}
       {!isLoading && !error && data?.pagination && (
-         <div className="flex items-center justify-between px-2 text-[13px] text-muted">
+         <div className="flex flex-wrap items-center justify-between gap-2 px-2 text-[13px] text-muted">
            <span>Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, data.pagination.total)} of {data.pagination.total}</span>
-           <div className="flex gap-2">
+           <div className="flex gap-2 shrink-0">
              <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink">Previous</button>
              <button disabled={page * pageSize >= data.pagination.total} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink">Next</button>
            </div>

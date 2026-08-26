@@ -93,7 +93,7 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
         </div>
 
         <div className="p-6 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-[12px] font-semibold text-muted uppercase tracking-wider mb-1.5">Full Name <span className="text-status-red">*</span></label>
               <input 

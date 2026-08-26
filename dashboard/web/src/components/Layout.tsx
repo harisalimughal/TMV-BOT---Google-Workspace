@@ -25,7 +25,9 @@ import {
   HelpCircle,
   Sliders,
   MessageSquare,
-  Bell
+  Bell,
+  Menu,
+  X
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchExceptions, triggerDatasetRefresh } from "../api/client";
@@ -53,6 +55,7 @@ interface NavSectionItem {
 const NAV_CONFIG: NavSectionItem[] = [
   { type: "header", label: "Operations" },
   { id: "overview", label: "Overview", icon: LayoutDashboard, desc: "Executive KPI telemetry, revenue velocity and operational health" },
+  { id: "livefleet", label: "Live Fleet", icon: Navigation, isLive: true, desc: "Real-time GPS vehicle positions and driver telemetry" },
   { id: "jobs", label: "Jobs", icon: Truck, desc: "Operational moves joined across Bookings, Drivers, Workflow and Evidence" },
   { id: "finished", label: "Finished Jobs", icon: CheckSquare, desc: "Completed moves audit with verified evidence and sign-off records" },
   { id: "notifications", label: "Notifications", icon: Bell, desc: "Automated communication audit across Email and SMS channels" },
@@ -73,6 +76,19 @@ const NAV_CONFIG: NavSectionItem[] = [
 
 export function Layout({ activeSection, onSelectSection, onLogout, children }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Collapsing to icon-only is a desktop affordance; below md the drawer always renders
+  // fully expanded regardless of the desktop `collapsed` preference.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+  const effectiveCollapsed = collapsed && !isMobile;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(formatLondonTimeOnly(new Date().toISOString()));
@@ -136,38 +152,55 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
 
   return (
     <div className="flex min-h-screen bg-bg text-ink selection:bg-brand-soft selection:text-brand font-sans antialiased">
-      {/* 1. HIGH-TICKET SIDEBAR */}
+      {/* Mobile nav backdrop -- tap to close the drawer */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* 1. HIGH-TICKET SIDEBAR -- off-canvas drawer below md, sticky column at md+ */}
       <aside
-          className={`bg-bg text-ink flex flex-col justify-between transition-all duration-300 z-30 sticky top-0 h-screen ${
-          collapsed ? "w-16" : "w-[260px]"
-        }`}
+          className={`bg-bg text-ink flex flex-col justify-between transition-all duration-300 z-40 fixed inset-y-0 left-0 h-screen md:sticky md:top-0 md:z-30 w-[260px] ${
+            collapsed ? "md:w-16" : "md:w-[260px]"
+          } ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
         <div className="flex flex-col min-h-0">
           {/* Brand Header */}
           <div className="pt-6 pb-4 px-6 flex items-center justify-between bg-transparent">
-            {!collapsed && (
-              <div className="flex items-center overflow-hidden">
-                <img
-                  src={`${import.meta.env.BASE_URL}tmv-new-logo.png`}
-                  alt="The Man Van"
-                  className="h-14 w-auto object-contain flex-shrink-0"
-                />
-              </div>
-            )}
+            {/* Full logo: always shown on mobile (collapsing is a desktop-only concept),
+                hidden at md+ only when collapsed */}
+            <div className={`flex items-center overflow-hidden ${collapsed ? "md:hidden" : ""}`}>
+              <img
+                src={`${import.meta.env.BASE_URL}tmv-new-logo.png`}
+                alt="The Man Van"
+                className="h-14 w-auto object-contain flex-shrink-0"
+              />
+            </div>
             {collapsed && (
               <img
                 src={`${import.meta.env.BASE_URL}tmv-new-logo.png`}
                 alt="TMV"
-                className="w-8 h-8 rounded-lg object-contain bg-surface border border-line p-0.5 mx-auto shadow-2xs"
+                className="hidden md:block w-8 h-8 rounded-lg object-contain bg-surface border border-line p-0.5 mx-auto shadow-2xs"
                 title="The Man Van Operations"
               />
             )}
+            {/* Desktop collapse toggle */}
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="p-1 rounded hover:bg-surface text-muted hover:text-ink transition"
+              className="hidden md:block p-1 rounded hover:bg-surface text-muted hover:text-ink transition"
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
+            {/* Mobile close button */}
+            <button
+              onClick={() => setMobileNavOpen(false)}
+              className="md:hidden p-1 rounded hover:bg-surface text-muted hover:text-ink transition"
+              title="Close menu"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -175,7 +208,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
           <nav className="px-4 pb-4 space-y-1 overflow-y-auto flex-1">
             {NAV_CONFIG.map((item, idx) => {
               if (item.type === "header") {
-                if (collapsed) return <div key={idx} className="my-4 border-t border-line" />;
+                if (effectiveCollapsed) return <div key={idx} className="my-4 border-t border-line" />;
                 return (
                   <div key={idx} className="pt-6 pb-2 px-3 text-[12px] font-semibold text-muted uppercase tracking-[0.1em]">
                       {item.label}
@@ -189,13 +222,16 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
               return (
                 <button
                   key={item.id}
-                  onClick={() => onSelectSection(item.id!)}
+                  onClick={() => {
+                    onSelectSection(item.id!);
+                    setMobileNavOpen(false);
+                  }}
                   className={`w-full h-11 flex items-center gap-3 px-4 rounded-xl text-[14px] font-medium transition group ${
                       isActive
                         ? "text-ink font-semibold bg-white shadow-sm"
                         : "text-muted hover:bg-white/50 hover:text-ink"
                     }`}
-                  title={collapsed ? item.label : undefined}
+                  title={effectiveCollapsed ? item.label : undefined}
                 >
 
                   <Icon
@@ -204,10 +240,10 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                     }`}
                   />
 
-                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  {!effectiveCollapsed && <span className="truncate">{item.label}</span>}
 
                   {/* Live Beacon Pill */}
-                  {!collapsed && item.isLive && (
+                  {!effectiveCollapsed && item.isLive && (
                     <span className="ml-auto flex items-center gap-1 px-1.5 py-0.2 rounded-pill bg-status-green-bg text-status-green text-[9px] font-mono font-bold">
                       <span className="w-1.5 h-1.5 rounded-full bg-status-green animate-ping" />
                       LIVE
@@ -215,16 +251,16 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
                   )}
 
                   {/* Exception Badge */}
-                  {!collapsed && item.hasBadge && exceptionsBadgeLabel && (
+                  {!effectiveCollapsed && item.hasBadge && exceptionsBadgeLabel && (
                     <span className="ml-auto flex items-center justify-center px-1.5 min-w-[20px] h-5 rounded-full bg-status-red text-white text-[11px] font-bold">
                       {exceptionsBadgeLabel}
                     </span>
                   )}
 
-                  {collapsed && item.isLive && (
+                  {effectiveCollapsed && item.isLive && (
                     <span className="w-2 h-2 rounded-full bg-status-green absolute right-2 ring-2 ring-paper" />
                   )}
-                  {collapsed && item.hasBadge && exceptionsBadgeLabel && (
+                  {effectiveCollapsed && item.hasBadge && exceptionsBadgeLabel && (
                     <span className="w-2 h-2 rounded-full bg-status-red absolute right-2 ring-2 ring-paper" />
                   )}
                 </button>
@@ -235,7 +271,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
 
         {/* Bottom context block */}
         <div className="p-3 border-t border-line bg-paper flex items-center justify-between text-xs text-ink-2">
-          {!collapsed ? (
+          {!effectiveCollapsed ? (
             <>
               <div className="flex items-center gap-2 overflow-hidden">
                 <div className="w-6 h-6 rounded-full bg-surface border border-line flex items-center justify-center font-mono font-bold text-[10px] text-ink">
@@ -273,9 +309,16 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* 2. TOP GLOBAL HEADER */}
-        <header className="h-[56px] bg-paper border-b border-line px-6 flex items-center justify-between sticky top-0 z-20">
-          {/* Left: Global Search */}
-          <div className="flex items-center gap-4">
+        <header className="h-[56px] bg-paper border-b border-line px-4 md:px-6 flex items-center justify-between sticky top-0 z-20">
+          {/* Left: Mobile menu trigger + Global Search */}
+          <div className="flex items-center gap-4 min-w-0">
+            <button
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden w-9 h-9 -ml-1 shrink-0 rounded-full hover:bg-surface flex items-center justify-center text-muted hover:text-ink transition"
+              title="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <div className="relative hidden md:block w-[320px]">
               <Search className="w-4 h-4 text-muted absolute left-4 top-3 pointer-events-none" />
               <input
@@ -293,6 +336,14 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setPaletteOpen(true)}
+                className="md:hidden w-9 h-9 rounded-full hover:bg-surface flex items-center justify-center text-muted hover:text-ink transition"
+                title="Search"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+
+              <button
                 onClick={() => refreshMutation.mutate()}
                 disabled={refreshMutation.isPending}
                 className="w-9 h-9 rounded-full hover:bg-surface flex items-center justify-center text-muted hover:text-ink transition"
@@ -303,7 +354,7 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
 
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="w-9 h-9 rounded-full hover:bg-surface flex items-center justify-center text-muted hover:text-ink transition"
+                className="hidden md:flex w-9 h-9 rounded-full hover:bg-surface items-center justify-center text-muted hover:text-ink transition"
                 title="Keyboard shortcuts (?)"
               >
                 <Command className="w-4 h-4" />
@@ -330,22 +381,22 @@ export function Layout({ activeSection, onSelectSection, onLogout, children }: P
         {/* 3. PAGE HEADER & CONTENT */}
         <div className="flex-1 overflow-y-auto flex flex-col">
           {/* Section Header */}
-          <div className="bg-paper border-b border-line px-8 py-5 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="text-brand">
-                <currentNav.icon className="w-6 h-6" />
+          <div className="bg-paper border-b border-line px-4 md:px-8 py-4 md:py-5 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="text-brand shrink-0">
+                <currentNav.icon className="w-5 h-5 md:w-6 md:h-6" />
               </div>
-              <h1 className="text-[20px] font-bold text-ink tracking-tight">
+              <h1 className="text-[17px] md:text-[20px] font-bold text-ink tracking-tight truncate">
                 {currentNav.label}
               </h1>
             </div>
-            
+
             {/* Contextual actions could go here (e.g. Settings, Permissions) */}
             <div className="flex items-center gap-3"></div>
           </div>
-          
+
           {/* Page Content */}
-          <main className="flex-1 p-8">{children}</main>
+          <main className="flex-1 p-4 md:p-8">{children}</main>
         </div>
       </div>
 

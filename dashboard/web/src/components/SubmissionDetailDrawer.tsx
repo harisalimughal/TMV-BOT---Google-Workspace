@@ -47,7 +47,7 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
   const formattedTime = job.actualFinish ? formatLondonDateTime(job.actualFinish) : (job.bookedStart ? formatLondonDateTime(job.bookedStart) : 'Unknown Time');
 
   const SidebarLeft = () => (
-    <div className="w-[300px] flex-shrink-0 border-r border-line bg-white flex flex-col p-6 overflow-y-auto custom-scrollbar relative z-10">
+    <div className="w-full lg:w-[300px] lg:flex-shrink-0 border-b lg:border-b-0 lg:border-r border-line bg-white flex flex-col p-6 overflow-y-auto custom-scrollbar relative z-10">
       <h3 className="text-[14px] font-bold text-ink mb-6">Manager fields</h3>
       <div className="space-y-6">
         <div className="bg-[#F8F9FA] border border-line rounded-[16px] p-4 relative shadow-sm">
@@ -68,7 +68,7 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
   );
 
   const SidebarRight = () => (
-    <div className="w-[300px] flex-shrink-0 border-l border-line bg-white flex flex-col p-6 overflow-y-auto custom-scrollbar relative z-10">
+    <div className="w-full lg:w-[300px] lg:flex-shrink-0 border-t lg:border-t-0 lg:border-l border-line bg-white flex flex-col p-6 overflow-y-auto custom-scrollbar relative z-10">
       <div className="flex items-center gap-6 border-b border-line pb-3 mb-6">
         <button onClick={() => setActiveTab("Activity")} className={`text-[13px] font-bold pb-3 -mb-3 transition ${activeTab === 'Activity' ? 'text-brand border-b-2 border-brand' : 'text-muted hover:text-ink'}`}>Activity</button>
         <button onClick={() => setActiveTab("Comments")} className={`text-[13px] font-bold pb-3 -mb-3 transition ${activeTab === 'Comments' ? 'text-brand border-b-2 border-brand' : 'text-muted hover:text-ink'}`}>Comments</button>
@@ -97,10 +97,10 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
   const photos = job.evidenceItems?.filter(e => !!e.fileId) || [];
 
   const FormAnswersView = () => (
-    <div className="max-w-2xl mx-auto space-y-6 w-full py-8 px-6">
-      <div className="bg-white rounded-[20px] p-6 shadow-sm border border-line">
+    <div className="max-w-2xl mx-auto space-y-6 w-full py-6 sm:py-8 px-4 sm:px-6">
+      <div className="bg-white rounded-[20px] p-4 sm:p-6 shadow-sm border border-line">
          <label className="text-[13px] font-semibold text-muted block mb-2">Customer & Details</label>
-         <div className="grid grid-cols-2 gap-4">
+         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
            <div>
              <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Customer Name</span>
              <div className="text-[14px] font-medium text-ink mt-1">{job.customerName || "N/A"}</div>
@@ -109,21 +109,21 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
              <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Confirmed By</span>
              <div className="text-[14px] font-medium text-ink mt-1">{job.clientConfirmedName || "N/A"}</div>
            </div>
-           <div className="col-span-2">
+           <div className="sm:col-span-2">
              <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Pickup</span>
              <div className="text-[14px] font-medium text-ink mt-1">{job.pickup || "N/A"}</div>
            </div>
-           <div className="col-span-2">
+           <div className="sm:col-span-2">
              <span className="text-[11px] uppercase text-muted font-semibold tracking-wider">Dropoff</span>
              <div className="text-[14px] font-medium text-ink mt-1">{job.dropoff || "N/A"}</div>
            </div>
          </div>
       </div>
-      
-      <div className="bg-white rounded-[20px] p-6 shadow-sm border border-line">
+
+      <div className="bg-white rounded-[20px] p-4 sm:p-6 shadow-sm border border-line">
          <label className="text-[13px] font-semibold text-muted block mb-4">Evidence that the items have been loaded.</label>
          {photos.length > 0 ? (
-           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
              {photos.map((p, i) => (
                <a 
                  key={i} 
@@ -148,7 +148,7 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
          )}
       </div>
 
-      <div className="bg-white rounded-[20px] p-6 shadow-sm border border-line">
+      <div className="bg-white rounded-[20px] p-4 sm:p-6 shadow-sm border border-line">
          <label className="text-[13px] font-semibold text-muted block mb-4">Client Signature</label>
          {job.signatureUrl ? (
             <div className="border border-line rounded-xl p-4 bg-surface max-w-sm flex justify-center">
@@ -178,46 +178,46 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
       <div className={`bg-[#F5F5F5] shadow-2xl flex flex-col h-full overflow-hidden transition-all duration-300 ml-auto ${isFullscreen ? 'w-full' : 'w-full max-w-[1200px]'}`}>
         
         {/* TOP HEADER */}
-        <div className="h-[72px] bg-white border-b border-line shadow-sm px-6 flex items-center justify-between shrink-0 relative z-20">
-          <div className="flex items-center gap-4">
-             <div className="w-10 h-10 rounded-full bg-brand-soft text-brand border border-brand/20 flex items-center justify-center font-bold text-[14px]">
+        <div className="min-h-[72px] bg-white border-b border-line shadow-sm px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 relative z-20">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+             <div className="w-10 h-10 shrink-0 rounded-full bg-brand-soft text-brand border border-brand/20 flex items-center justify-center font-bold text-[14px]">
                {job.driverInitials || "UN"}
              </div>
-             <div>
-               <h2 className="text-[15px] font-bold text-ink leading-tight">{job.driverName || "Unknown"}</h2>
-               <div className="text-[12px] text-muted mt-0.5">{formattedTime}, Job ID: {job.jobId}</div>
+             <div className="min-w-0">
+               <h2 className="text-[15px] font-bold text-ink leading-tight truncate">{job.driverName || "Unknown"}</h2>
+               <div className="text-[12px] text-muted mt-0.5 truncate">{formattedTime}, Job ID: {job.jobId}</div>
              </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
              {onNavigate && (
-               <div className="flex items-center gap-1 mr-4 bg-surface rounded-xl border border-line p-1">
+               <div className="flex items-center gap-1 sm:mr-4 bg-surface rounded-xl border border-line p-1">
                  <button onClick={() => onNavigate('prev')} disabled={!hasPrev} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-white disabled:opacity-30 transition"><ChevronLeft className="w-4 h-4" /></button>
                  <button onClick={() => onNavigate('next')} disabled={!hasNext} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-white disabled:opacity-30 transition"><ChevronRight className="w-4 h-4" /></button>
                </div>
              )}
-             <button 
+             <button
                onClick={() => setIsPreviewing(!isPreviewing)}
-               className={`h-10 px-4 rounded-xl border font-bold text-[13px] transition flex items-center gap-2 shadow-sm ${isPreviewing ? 'bg-surface border-line text-ink' : 'border-line bg-white hover:bg-surface text-ink'}`}
+               className={`h-10 px-2.5 sm:px-4 rounded-xl border font-bold text-[13px] transition flex items-center gap-2 shadow-sm ${isPreviewing ? 'bg-surface border-line text-ink' : 'border-line bg-white hover:bg-surface text-ink'}`}
              >
-               <Eye className="w-4 h-4 text-muted" /> {isPreviewing ? "Back to Form" : "Preview PDF"}
+               <Eye className="w-4 h-4 text-muted" /> <span className="hidden sm:inline">{isPreviewing ? "Back to Form" : "Preview PDF"}</span>
              </button>
-             <button 
+             <button
                onClick={handleDownload}
                disabled={isGeneratingPdf}
-               className="h-10 px-4 rounded-xl border border-transparent bg-brand hover:bg-brand-dark text-white font-bold text-[13px] transition flex items-center gap-2 shadow-sm disabled:opacity-70"
+               className="h-10 px-2.5 sm:px-4 rounded-xl border border-transparent bg-brand hover:bg-brand-dark text-white font-bold text-[13px] transition flex items-center gap-2 shadow-sm disabled:opacity-70"
              >
                {isGeneratingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-               <span>Download PDF</span>
+               <span className="hidden sm:inline">Download PDF</span>
              </button>
-             <div className="w-px h-6 bg-line mx-2" />
+             <div className="hidden sm:block w-px h-6 bg-line mx-2" />
              <button onClick={onClose} className="p-2 -mr-2 rounded-full text-muted hover:text-ink hover:bg-surface transition">
                <X className="w-5 h-5" />
              </button>
           </div>
         </div>
 
-        {/* BODY */}
-        <div className="flex-1 flex overflow-hidden">
+        {/* BODY -- stacked columns below lg, side-by-side panels at lg+ */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
           
           {/* Manager Sidebar */}
           {(!isPreviewing || !isFullscreen) && <SidebarLeft />}

@@ -66,35 +66,35 @@ export function SubmissionPageTemplate({
     <div className="max-w-[1440px] mx-auto space-y-6 pb-12">
       
       {/* STANDARD PAGE HEADER */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 px-2">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-10 h-10 shrink-0 rounded-xl bg-brand text-white flex items-center justify-center shadow-sm">
             <Icon className="w-5 h-5" />
           </div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-[18px] font-bold text-ink">{title}</h1>
-            <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider ${statusColors[statusColor]}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-[18px] font-bold text-ink truncate">{title}</h1>
+            <span className={`shrink-0 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider ${statusColors[statusColor]}`}>
               {status}
             </span>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 mr-4">
-            <span className="text-[12px] font-semibold text-muted">Progress</span>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 sm:mr-2">
+            <span className="hidden sm:inline text-[12px] font-semibold text-muted">Progress</span>
             <span className="px-2 py-0.5 bg-surface border border-line rounded-full text-[12px] font-bold text-muted">0/4</span>
           </div>
-          
-          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
-            <Eye className="w-4 h-4 text-muted" /> Preview
+
+          <button className="shrink-0 whitespace-nowrap h-9 px-2.5 sm:px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
+            <Eye className="w-4 h-4 text-muted" /> <span className="hidden sm:inline">Preview</span>
           </button>
-          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
-            <Edit3 className="w-4 h-4 text-muted" /> Edit Form
+          <button className="shrink-0 whitespace-nowrap h-9 px-2.5 sm:px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
+            <Edit3 className="w-4 h-4 text-muted" /> <span className="hidden sm:inline">Edit Form</span>
           </button>
-          <button className="h-9 px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
-            <Settings className="w-4 h-4 text-muted" /> Settings
+          <button className="shrink-0 whitespace-nowrap h-9 px-2.5 sm:px-3 rounded-[10px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium transition flex items-center gap-1.5 shadow-sm">
+            <Settings className="w-4 h-4 text-muted" /> <span className="hidden sm:inline">Settings</span>
           </button>
-          <button className="h-9 w-9 rounded-[10px] border border-line bg-white hover:bg-surface text-muted transition flex items-center justify-center shadow-sm">
+          <button className="shrink-0 h-9 w-9 rounded-[10px] border border-line bg-white hover:bg-surface text-muted transition flex items-center justify-center shadow-sm">
             <MoreHorizontal className="w-4 h-4" />
           </button>
         </div>
@@ -103,15 +103,15 @@ export function SubmissionPageTemplate({
       {/* MAIN CARD CONTAINER */}
       <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgb(0,0,0,0.04)] border border-line overflow-hidden flex flex-col">
         
-        {/* STANDARD TAB NAVIGATION */}
-        <div className="flex items-center px-6 border-b border-line">
+        {/* STANDARD TAB NAVIGATION -- horizontal scroll fallback so tabs never wrap/compress */}
+        <div className="flex items-center px-4 sm:px-6 border-b border-line overflow-x-auto custom-scrollbar">
           {["Submissions", "Users", "Summary", "Activity"].map(tab => (
             <button
               key={tab}
               onClick={() => onTabChange(tab)}
-              className={`px-4 py-4 text-[13px] font-semibold border-b-[3px] transition-colors ${
-                activeTab === tab 
-                  ? 'border-brand text-ink' 
+              className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-4 text-[13px] font-semibold border-b-[3px] transition-colors ${
+                activeTab === tab
+                  ? 'border-brand text-ink'
                   : 'border-transparent text-muted hover:text-ink hover:border-line'
               }`}
             >
@@ -122,79 +122,73 @@ export function SubmissionPageTemplate({
 
         {/* STANDARD TOOLBAR */}
         <div className="p-4 flex flex-col gap-4 bg-[#FAFAFA] border-b border-line">
-          
+
           {/* Row 1: Core Controls */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center p-1 bg-surface border border-line rounded-xl">
-                <button onClick={() => onViewModeChange("table")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'table' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
-                  <TableIcon className="w-4 h-4" /> Table
-                </button>
-                <button onClick={() => onViewModeChange("inbox")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'inbox' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
-                  <Inbox className="w-4 h-4" /> Inbox
-                </button>
-              </div>
-
-              <div className="w-px h-6 bg-line mx-1" />
-
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                <input 
-                  type="text" 
-                  placeholder={searchPlaceholder}
-                  value={search}
-                  onChange={e => onSearchChange(e.target.value)}
-                  className="w-full pl-9 pr-4 h-9 rounded-full bg-surface border border-line text-[13px] text-ink focus:border-brand outline-none transition"
-                />
-              </div>
-              
-              <button className="w-9 h-9 flex items-center justify-center bg-surface border border-line rounded-full text-muted hover:text-ink transition">
-                <Filter className="w-4 h-4" />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1 p-1 bg-surface border border-line rounded-xl shrink-0">
+              <button onClick={() => onViewModeChange("table")} className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'table' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
+                <TableIcon className="w-4 h-4" /> Table
+              </button>
+              <button onClick={() => onViewModeChange("inbox")} className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${viewMode === 'inbox' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}>
+                <Inbox className="w-4 h-4" /> Inbox
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <DateRangePicker from={from} to={to} onChange={(f, t) => onDateChange(f, t)} />
-              
-              <div className="w-px h-6 bg-line mx-1" />
-              
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-medium text-muted">Group by</span>
-                <select 
-                  value={groupBy}
-                  onChange={e => onGroupByChange(e.target.value)}
-                  className="h-9 px-3 rounded-[10px] bg-surface border border-line text-[13px] font-medium text-ink outline-none focus:border-brand"
-                >
-                  <option value="None">None</option>
-                  <option value="Driver">Driver</option>
-                  <option value="Date">Date</option>
-                  <option value="Status">Status</option>
-                </select>
-              </div>
+            <div className="relative w-full sm:w-64 order-last sm:order-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                type="text"
+                placeholder={searchPlaceholder}
+                value={search}
+                onChange={e => onSearchChange(e.target.value)}
+                className="w-full pl-9 pr-4 h-9 rounded-full bg-surface border border-line text-[13px] text-ink focus:border-brand outline-none transition"
+              />
+            </div>
+
+            <button className="shrink-0 w-9 h-9 flex items-center justify-center bg-surface border border-line rounded-full text-muted hover:text-ink transition">
+              <Filter className="w-4 h-4" />
+            </button>
+
+            <div className="hidden sm:block w-px h-6 bg-line mx-1 shrink-0" />
+
+            <DateRangePicker from={from} to={to} onChange={(f, t) => onDateChange(f, t)} />
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[12px] font-medium text-muted">Group by</span>
+              <select
+                value={groupBy}
+                onChange={e => onGroupByChange(e.target.value)}
+                className="h-9 px-3 rounded-[10px] bg-surface border border-line text-[13px] font-medium text-ink outline-none focus:border-brand"
+              >
+                <option value="None">None</option>
+                <option value="Driver">Driver</option>
+                <option value="Date">Date</option>
+                <option value="Status">Status</option>
+              </select>
             </div>
           </div>
-          
+
           {/* Row 2: Secondary Controls */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-[13px] font-medium text-muted">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-[13px] font-medium text-muted whitespace-nowrap">
                 {itemCount} record{itemCount !== 1 ? 's' : ''}
               </span>
-              <button 
+              <button
                 onClick={onRefresh}
-                className="w-8 h-8 rounded-full border border-line bg-surface hover:bg-white text-muted hover:text-ink transition flex items-center justify-center shadow-sm"
+                className="w-8 h-8 shrink-0 rounded-full border border-line bg-surface hover:bg-white text-muted hover:text-ink transition flex items-center justify-center shadow-sm"
                 title="Refresh Data"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-brand' : ''}`} />
               </button>
             </div>
-            
+
             {/* Standardized Export Controls (Icon+Text Pair) */}
-            <div className="flex items-center bg-surface border border-line rounded-[10px] overflow-hidden">
-              <button className="px-3 h-9 text-[12px] font-medium text-ink hover:bg-white transition border-r border-line flex items-center gap-1.5">
+            <div className="flex items-center bg-surface border border-line rounded-[10px] overflow-hidden shrink-0">
+              <button className="whitespace-nowrap px-3 h-9 text-[12px] font-medium text-ink hover:bg-white transition border-r border-line flex items-center gap-1.5">
                 <Download className="w-3.5 h-3.5 text-muted" /> CSV
               </button>
-              <button className="px-3 h-9 text-[12px] font-medium text-ink hover:bg-white transition flex items-center gap-1.5">
+              <button className="whitespace-nowrap px-3 h-9 text-[12px] font-medium text-ink hover:bg-white transition flex items-center gap-1.5">
                 PDF
               </button>
             </div>

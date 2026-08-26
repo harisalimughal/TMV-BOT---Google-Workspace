@@ -158,18 +158,18 @@ export function JobsPage() {
       
       {/* BULK ACTION BAR (Floating) */}
       {selectedRows.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5">
-          <div className="bg-ink text-white rounded-full shadow-2xl px-5 py-3 flex items-center gap-6">
-            <span className="text-[13px] font-bold">
+        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 flex justify-center">
+          <div className="bg-ink text-white rounded-full shadow-2xl px-4 sm:px-5 py-3 flex items-center gap-3 sm:gap-6 max-w-full overflow-x-auto">
+            <span className="text-[13px] font-bold whitespace-nowrap shrink-0">
               {selectedRows.size} job{selectedRows.size > 1 ? 's' : ''} selected
             </span>
-            <div className="h-4 w-px bg-white/20" />
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-white/10 transition flex items-center gap-1.5">
-                <UserPlus className="w-3.5 h-3.5" /> Bulk Reassign
+            <div className="h-4 w-px bg-white/20 shrink-0" />
+            <div className="flex items-center gap-2 shrink-0">
+              <button className="shrink-0 whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-white/10 transition flex items-center gap-1.5">
+                <UserPlus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Bulk Reassign</span>
               </button>
-              <button className="px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-white/10 transition flex items-center gap-1.5">
-                <Download className="w-3.5 h-3.5" /> Export Selection
+              <button className="shrink-0 whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-white/10 transition flex items-center gap-1.5">
+                <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export Selection</span>
               </button>
             </div>
           </div>
@@ -188,80 +188,71 @@ export function JobsPage() {
       </div>
 
       {/* CONSOLIDATED TOOLBAR CARD */}
-      <div className="p-2 bg-white rounded-[16px] shadow-sm border border-transparent flex flex-wrap items-center justify-between gap-4">
-        
-        {/* Left cluster */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center p-1 bg-surface rounded-xl border border-line/50">
-            <button 
-              onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-[8px] transition ${viewMode === 'table' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setViewMode("cards")}
-              className={`p-1.5 rounded-[8px] transition ${viewMode === 'cards' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-          </div>
+      <div className="p-2 bg-white rounded-[16px] shadow-sm border border-transparent flex flex-wrap items-center gap-3">
 
-          <div className="w-px h-6 bg-line mx-1" />
-
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-            <input 
-              type="text" 
-              placeholder="Search ID, customer, route..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 h-10 rounded-xl bg-surface border border-line/50 text-[13px] text-ink focus:border-brand focus:ring-1 focus:ring-brand outline-none transition"
-            />
-          </div>
-          
-          <div className="flex items-center bg-surface p-1 rounded-xl border border-line/50">
-            {["All", "In Progress", "Delivered"].map(status => (
-              <button 
-                key={status}
-                onClick={() => { setStatusFilter(status); setPage(1); }}
-                className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${statusFilter === status ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
-
-          <button className="flex items-center gap-2 h-10 px-4 bg-surface hover:bg-line/30 rounded-xl border border-line/50 text-[13px] font-semibold text-ink transition relative">
-            <Filter className="w-4 h-4 text-muted" /> Filters
-            {/* Mock active filter badge */}
+        <div className="flex items-center p-1 bg-surface rounded-xl border border-line/50 shrink-0">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`p-1.5 rounded-[8px] transition ${viewMode === 'table' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("cards")}
+            className={`p-1.5 rounded-[8px] transition ${viewMode === 'cards' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'}`}
+          >
+            <LayoutGrid className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Right cluster */}
-        <div className="flex items-center gap-3">
-          <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
-          
-          <div className="w-px h-6 bg-line mx-1" />
-          
-          <span className="text-[13px] font-medium text-muted px-2 whitespace-nowrap min-w-[120px] text-right">
-            {isLoading || isFetching ? "Updating..." : `${processedData.length} moves`}
-          </span>
-
-          <button 
-            onClick={() => refetch()}
-            className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface border border-line/50 hover:bg-line/40 text-muted hover:text-ink transition"
-            title="Refresh Data"
-          >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
-          <button 
-            className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface border border-line/50 hover:bg-line/40 text-muted hover:text-ink transition"
-            title="Export CSV"
-          >
-            <Download className="w-4 h-4" />
-          </button>
+        <div className="relative w-full sm:w-64 order-last sm:order-none">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input
+            type="text"
+            placeholder="Search ID, customer, route..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 h-10 rounded-xl bg-surface border border-line/50 text-[13px] text-ink focus:border-brand focus:ring-1 focus:ring-brand outline-none transition"
+          />
         </div>
+
+        <div className="flex items-center bg-surface p-1 rounded-xl border border-line/50 shrink-0">
+          {["All", "In Progress", "Delivered"].map(status => (
+            <button
+              key={status}
+              onClick={() => { setStatusFilter(status); setPage(1); }}
+              className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition ${statusFilter === status ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+
+        <button className="shrink-0 whitespace-nowrap flex items-center gap-2 h-10 px-4 bg-surface hover:bg-line/30 rounded-xl border border-line/50 text-[13px] font-semibold text-ink transition relative">
+          <Filter className="w-4 h-4 text-muted" /> Filters
+        </button>
+
+        <div className="hidden sm:block w-px h-6 bg-line mx-1 shrink-0" />
+
+        <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
+
+        <span className="shrink-0 text-[13px] font-medium text-muted px-2 whitespace-nowrap sm:min-w-[120px] sm:text-right">
+          {isLoading || isFetching ? "Updating..." : `${processedData.length} moves`}
+        </span>
+
+        <button
+          onClick={() => refetch()}
+          className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-surface border border-line/50 hover:bg-line/40 text-muted hover:text-ink transition"
+          title="Refresh Data"
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+        </button>
+        <button
+          className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-surface border border-line/50 hover:bg-line/40 text-muted hover:text-ink transition"
+          title="Export CSV"
+        >
+          <Download className="w-4 h-4" />
+        </button>
       </div>
 
       {/* TABLE CARD */}
@@ -461,7 +452,7 @@ export function JobsPage() {
 
           {/* PAGINATION FOOTER */}
           {paginatedData.length > 0 && (
-            <div className="px-6 py-4 border-t border-line bg-white flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 border-t border-line bg-white flex flex-wrap items-center justify-between gap-3">
                <div className="flex items-center gap-2 text-[13px] text-muted">
                  Show
                  <select 

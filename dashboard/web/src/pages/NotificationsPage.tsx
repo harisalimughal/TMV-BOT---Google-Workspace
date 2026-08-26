@@ -103,7 +103,7 @@ export function NotificationsPage() {
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto">
       {/* PAGE HEADER */}
-      <div className="flex items-center justify-between px-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-2">
         <div className="flex items-center gap-3">
           <Bell className="w-6 h-6 text-brand" />
           <h1 className="text-[20px] font-bold text-ink">Notifications</h1>
@@ -265,9 +265,9 @@ export function NotificationsPage() {
       )}
 
       {!isLoading && !error && filtered.length > 0 && (
-        <div className="flex items-center justify-between px-2 text-[13px] text-muted pb-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2 text-[13px] text-muted pb-8">
           <span>Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length}</span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink shadow-sm">Previous</button>
             <button disabled={page * pageSize >= filtered.length} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-line rounded-[8px] bg-white hover:bg-surface disabled:opacity-50 transition font-medium text-ink shadow-sm">Next</button>
           </div>

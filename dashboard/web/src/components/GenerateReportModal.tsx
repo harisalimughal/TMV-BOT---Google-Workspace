@@ -140,7 +140,7 @@ export function GenerateReportModal({ isOpen, onClose, initialFrom, initialTo }:
                 {/* Report Type */}
                 <div>
                   <label className="block text-[12px] font-semibold text-muted uppercase tracking-wider mb-3">Report Scope</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {REPORT_TYPES.map(type => (
                       <label 
                         key={type}

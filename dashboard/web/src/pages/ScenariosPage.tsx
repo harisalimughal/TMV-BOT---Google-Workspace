@@ -114,25 +114,25 @@ export function ScenariosPage({ kind }: Props) {
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto">
       {/* PAGE HEADER */}
-      <div className="flex items-center justify-between px-2">
-        <h1 className="text-[20px] font-bold text-ink">{config.title}</h1>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-3 px-2">
+        <h1 className="text-[20px] font-bold text-ink truncate">{config.title}</h1>
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {kind === "liability" && (
             <>
-              <button onClick={() => setIsConfigOpen(true)} className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-brand" /> Manage Categories
+              <button onClick={() => setIsConfigOpen(true)} className="shrink-0 whitespace-nowrap h-10 px-2.5 sm:px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-brand" /> <span className="hidden sm:inline">Manage Categories</span>
               </button>
-              <button onClick={() => setIsMobileOpen(true)} className="h-10 px-4 rounded-[12px] bg-[#2563EB] hover:bg-blue-700 text-white text-[13px] font-medium shadow-sm transition flex items-center gap-2">
-                <Smartphone className="w-4 h-4" /> Preview Mobile Form
+              <button onClick={() => setIsMobileOpen(true)} className="shrink-0 whitespace-nowrap h-10 px-2.5 sm:px-4 rounded-[12px] bg-[#2563EB] hover:bg-blue-700 text-white text-[13px] font-medium shadow-sm transition flex items-center gap-2">
+                <Smartphone className="w-4 h-4" /> <span className="hidden sm:inline">Preview Mobile Form</span>
               </button>
-              <div className="w-[1px] h-6 bg-line mx-1" />
+              <div className="hidden sm:block w-[1px] h-6 bg-line mx-1" />
             </>
           )}
           <button
             onClick={() => { window.location.href = `/ops/api/scenarios/${kind}/export.csv`; }}
-            className="h-10 px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
+            className="shrink-0 whitespace-nowrap h-10 px-2.5 sm:px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
           >
-            <Download className="w-4 h-4" /> Export CSV
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export CSV</span>
           </button>
         </div>
       </div>
@@ -395,11 +395,11 @@ export function ScenariosPage({ kind }: Props) {
           
           {/* Pagination Footer Row */}
           {data?.pagination && (
-            <div className="px-6 py-4 border-t border-line bg-white flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 border-t border-line bg-white flex flex-wrap items-center justify-between gap-3">
               <span className="text-[13px] text-muted">
                 Showing {(page - 1) * 25 + 1}-{Math.min(page * 25, data.pagination.total)} of {data.pagination.total} {data.pagination.total === 1 ? "record" : "records"}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button 
                   disabled={page === 1} 
                   onClick={() => setPage(p => p - 1)} 
