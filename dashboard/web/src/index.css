@@ -241,10 +241,31 @@ body {
 
 /* Print Overrides */
 @media print {
+  /* Hide chrome that must never appear on paper */
   aside, header, .no-print, button {
     display: none !important;
   }
-  body * { display: none; } .print-content, .print-content * { display: block; visibility: visible; }
+
+  /* Hide everything via visibility so flex/grid layout is preserved, then
+     selectively reveal only the designated print surface. Using display:none
+     on body * and display:block on descendants breaks flex/grid containers
+     inside PaperDossierReport, causing a blank or garbled PDF. */
+  body > * {
+    visibility: hidden;
+  }
+  .print-content {
+    visibility: visible;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: white;
+    overflow: visible;
+  }
+  .print-content * {
+    visibility: visible;
+  }
+
+  /* Legacy paper-sheet support (other report types that don't use print-content) */
   .paper-sheet, .paper-sheet * {
     visibility: visible;
   }
@@ -259,3 +280,4 @@ body {
     border: none !important;
   }
 }
+

@@ -22,7 +22,6 @@ export interface LiveFleetVehicle {
   /** Small integer scale (device-reported, not standardised) -- higher is better. */
   gpsSignalLevel: number | null;
   gsmSignalLevel: number | null;
-  crashDetected: boolean;
   /** GPS jamming: someone actively blocking this device's signal -- an anti-theft
    * indicator, not a connectivity glitch. */
   jammingDetected: boolean;
@@ -118,7 +117,6 @@ async function getLiveFleet(): Promise<LiveFleetVehicle[]> {
       batteryVoltage: toNumber(params.batv),
       gpsSignalLevel: toNumber(params.gpslev),
       gsmSignalLevel: toNumber(params.gsmlev),
-      crashDetected: params.crash === "1",
       jammingDetected: params.jamming === "1",
       ecoDrivingEvent: params.ecodriving || null,
       ecoDrivingScore: toNumber(params.ecodrivingvalue)

@@ -17,7 +17,6 @@ import {
   Compass,
   RotateCcw,
   WifiOff,
-  AlertTriangle,
   ShieldAlert,
   Zap,
   BatteryMedium,
@@ -50,7 +49,6 @@ interface FleetVehicle {
   batteryVoltage: number | null;
   gpsSignalLevel: number | null;
   gsmSignalLevel: number | null;
-  crashDetected: boolean;
   jammingDetected: boolean;
   ecoDrivingEvent: string | null;
   ecoDrivingScore: number | null;
@@ -127,7 +125,6 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
         batteryVoltage: v.batteryVoltage,
         gpsSignalLevel: v.gpsSignalLevel,
         gsmSignalLevel: v.gsmSignalLevel,
-        crashDetected: v.crashDetected,
         jammingDetected: v.jammingDetected,
         ecoDrivingEvent: v.ecoDrivingEvent,
         ecoDrivingScore: v.ecoDrivingScore
@@ -443,20 +440,17 @@ export function LiveFleetMap({ jobs, onSelectJob }: Props) {
                 </div>
               </div>
 
-              {/* Crash / GPS jamming are security-critical -- surface them above
-                  everything else, not buried in the regular health grid. */}
-              {(activeSelected.crashDetected || activeSelected.jammingDetected) && (
-                <div className="p-2.5 bg-status-red-bg border border-status-red/30 rounded space-y-1">
-                  {activeSelected.crashDetected && (
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-status-red">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Crash detected
-                    </div>
-                  )}
-                  {activeSelected.jammingDetected && (
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-status-red">
-                      <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> GPS jamming detected -- possible tampering
-                    </div>
-                  )}
+              {/* GPS jamming is security-critical -- surface it above everything else,
+                  not buried in the regular health grid. (No crash banner: GPSLive's
+                  "crash" field reads "1" on every device at all times regardless of
+                  what's actually happening, so it's a hardware-capability flag, not a
+                  real event indicator -- showing it as an alert would just be a
+                  permanent false alarm.) */}
+              {activeSelected.jammingDetected && (
+                <div className="p-2.5 bg-status-red-bg border border-status-red/30 rounded">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-status-red">
+                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> GPS jamming detected -- possible tampering
+                  </div>
                 </div>
               )}
 

@@ -215,7 +215,14 @@ export function normalizeDataset(dataset: SheetDataset): NormalizedJob[] {
       evidenceCompleteness: completeness,
       evidenceItems: items,
       clientConfirmedName: signatureDoc?.[SIGNATURES_MAP.customerName] || b[BOOKINGS_MAP.clientConfirmedBy] || undefined,
-      signatureUrl: signatureDoc?.[SIGNATURES_MAP.confirmationText] || undefined,
+      // signatureUrl must be our authenticated proxy endpoint, not the raw Drive webViewLink
+      // stored in "Confirmation Text". The Drive URL is an HTML viewer page that cannot be
+      // rendered as an <img> src. The signature evidence item (added by classifyEvidence above)
+      // already contains the correct thumbProxyUrl -- use it here for the dedicated field too.
+      signatureUrl: (() => {
+        const sigItem = items.find(i => i.category === "Signature" && i.thumbProxyUrl);
+        return sigItem?.thumbProxyUrl || undefined;
+      })(),
       driveFolderId: b[BOOKINGS_MAP.driveFolderId] || undefined,
       driveFolderUrl: b[BOOKINGS_MAP.driveFolderUrl] || undefined,
       activity: activity.sort((a, b) => a.timestamp.localeCompare(b.timestamp)),

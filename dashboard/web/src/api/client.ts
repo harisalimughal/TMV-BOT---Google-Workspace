@@ -228,7 +228,6 @@ export interface LiveFleetVehicle {
   batteryVoltage: number | null;
   gpsSignalLevel: number | null;
   gsmSignalLevel: number | null;
-  crashDetected: boolean;
   jammingDetected: boolean;
   ecoDrivingEvent: string | null;
   ecoDrivingScore: number | null;
