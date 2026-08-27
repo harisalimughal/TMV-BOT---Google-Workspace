@@ -1,6 +1,5 @@
 export enum WorkflowState {
   READY = "READY",
-  WAITING_ON_MY_WAY_MESSAGE = "WAITING_ON_MY_WAY_MESSAGE",
   WAITING_ARRIVAL_PHOTO = "WAITING_ARRIVAL_PHOTO",
   WAITING_ARRIVAL_ISSUES_CHECK = "WAITING_ARRIVAL_ISSUES_CHECK",
   WAITING_ARRIVAL_ISSUES_CHOICE = "WAITING_ARRIVAL_ISSUES_CHOICE",
@@ -13,11 +12,9 @@ export enum WorkflowState {
   WAITING_EMPTY_VAN_ISSUES_CHECK = "WAITING_EMPTY_VAN_ISSUES_CHECK",
   WAITING_EMPTY_VAN_ISSUES_CHOICE = "WAITING_EMPTY_VAN_ISSUES_CHOICE",
   WAITING_EMPTY_VAN_PHOTO = "WAITING_EMPTY_VAN_PHOTO",
-  WAITING_CLIENT_DETAILS = "WAITING_CLIENT_DETAILS",
   WAITING_CLIENT_CONFIRMATION = "WAITING_CLIENT_CONFIRMATION",
   WAITING_REVIEW_CHECK = "WAITING_REVIEW_CHECK",
   WAITING_REVIEW_SEND = "WAITING_REVIEW_SEND",
-  READY_TO_COMPLETE = "READY_TO_COMPLETE",
   COMPLETED = "COMPLETED"
 }
 
@@ -42,7 +39,7 @@ export const PHOTO_STATES = new Set<WorkflowState>([
  */
 export const RESUME_AFTER_ISSUES: Partial<Record<WorkflowState, WorkflowState>> = {
   [WorkflowState.WAITING_ARRIVAL_ISSUES_CHOICE]: WorkflowState.WAITING_LOADED_PHOTO,
-  [WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE]: WorkflowState.WAITING_EMPTY_VAN_PHOTO
+  [WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE]: WorkflowState.WAITING_EXTRA_CHARGES
 };
 
 export function nextAfterPhoto(state: WorkflowState): WorkflowState {
@@ -52,7 +49,7 @@ export function nextAfterPhoto(state: WorkflowState): WorkflowState {
     case WorkflowState.WAITING_LOADED_PHOTO:
       return WorkflowState.IN_PROGRESS;
     case WorkflowState.WAITING_EMPTY_VAN_PHOTO:
-      return WorkflowState.WAITING_CLIENT_DETAILS;
+      return WorkflowState.WAITING_CLIENT_CONFIRMATION;
     default:
       throw new Error(`State ${state} is not a photo state`);
   }

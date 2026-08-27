@@ -142,14 +142,7 @@ async function resolveWorkflowCard(job: Job, confirmationText: string, messageNa
     return workflowCard(job, confirmationText);
   }
 
-  if (state === WorkflowState.WAITING_ON_MY_WAY_MESSAGE) {
-    const [driver, template] = await Promise.all([
-      job.driverInitials ? getDriverByInitials(job.driverInitials) : Promise.resolve(null),
-      getSetting("JOB_STARTED_MESSAGE_TEXT", JOB_STARTED_MESSAGE_TEMPLATE)
-    ]);
-    const onMyWayPreview = renderMessageTemplate(template, job, driver ?? {});
-    return workflowCard(job, confirmationText, { onMyWayPreview });
-  }
+  // WAITING_ON_MY_WAY_MESSAGE removed — job starts directly at arrival photo.
 
   if (state === WorkflowState.WAITING_REVIEW_SEND) {
     const template = await getSetting("REVIEW_REQUEST_EMAIL_TEXT", REVIEW_REQUEST_EMAIL_TEMPLATE);
@@ -437,15 +430,9 @@ export async function handleChatEvent(event: GoogleChatEvent): Promise<ChatResul
             timer.mark("action");
             log.info("card action handled", { job_id: jobId, action: fn, ...timer.fields() });
 
-            // SEND_ON_MY_WAY_MESSAGE's response is the one workflow card that needs a
-            // render-time-only flag (the one-time "message sent" notice) rather than
-            // an async lookup, so it renders directly instead of via resolveWorkflowCard.
-            // Every other response goes through resolveWorkflowCard(), which is also
-            // what keeps the "waiting on the customer to sign" push-forward target
-            // (PendingSignatures) pointed at this exact message.
-            const responseCard = fn === "SEND_ON_MY_WAY_MESSAGE"
-              ? workflowCard(job, confirmationText, { justSentOnMyWayMessage: true })
-              : await resolveWorkflowCard(job, confirmationText, event.message?.name);
+            // All action responses go through resolveWorkflowCard(), which keeps
+            // the PendingSignatures push-forward target pointed at this exact message.
+            const responseCard = await resolveWorkflowCard(job, confirmationText, event.message?.name);
             return { result: updateResponse(responseCard), outcomeState: job.currentState, jobId: job.jobId };
           },
           async () => {

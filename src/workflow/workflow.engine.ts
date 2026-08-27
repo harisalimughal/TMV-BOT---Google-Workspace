@@ -12,14 +12,13 @@ import { enqueueAll } from "../queue/queue.service";
 import { ProcessJobImageTask } from "../queue/queue.types";
 import { WorkflowState, nextAfterPhoto, PHOTO_STATES } from "./workflow.states";
 import {
-  assertState, validateClientDetails, validateCurrency,
+  assertState, validateCurrency,
   validateExtraCharges, validateMinutes, validatePaymentMethod, ValidationError
 } from "./validation.engine";
 import { log, setContext } from "../utils/logger";
 import { equalPence, formatPounds, fromPounds } from "../utils/money";
-import { sendJobCompletionEmail, sendJobStartedEmail, sendReviewRequestEmail } from "../google/gmail";
-import { sendJobStartedSms } from "../integrations/firetext";
-import { JOB_COMPLETION_EMAIL_TEMPLATE, JOB_STARTED_MESSAGE_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../notifications/message";
+import { sendJobCompletionEmail, sendReviewRequestEmail } from "../google/gmail";
+import { JOB_COMPLETION_EMAIL_TEMPLATE, REVIEW_REQUEST_EMAIL_TEMPLATE } from "../notifications/message";
 
 export const CUSTOMER_CONFIRMATION_TEXT =
   "By signing below, you confirm that you have inspected the van, that it is empty, that all items have been delivered, and that no items have been left behind. You also confirm that the removal service has been completed to your satisfaction.";
@@ -207,7 +206,8 @@ export async function handleAction(
     case "FINISH_MOVE": {
       assertState(job.currentState, WorkflowState.IN_PROGRESS);
       const from = job.currentState;
-      job.currentState = WorkflowState.WAITING_EXTRA_CHARGES;
+      // 2nd issues check now runs right after Finish Move, before Extra Charges
+      job.currentState = WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK;
       return saveJob(job, driver, action, from);
     }
 
@@ -336,78 +336,25 @@ export async function handleAction(
       job.paymentMethod = method;
       job.paymentStatus = method === "Invoice" ? "Outstanding" : "Recorded";
       const from = job.currentState;
-      // The second issues checkpoint sits right BEFORE the Empty Van photo now, not
-      // after it -- ISSUES_NONE (or an inline detour's resume) is what actually gets
-      // the driver to WAITING_EMPTY_VAN_PHOTO from here.
-      job.currentState = WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK;
+      // The 2nd issues check was moved to before Extra Charges (after FINISH_MOVE),
+      // so after Payment the next step is the Empty Van photo directly.
+      job.currentState = WorkflowState.WAITING_EMPTY_VAN_PHOTO;
       return saveJob(job, driver, action, from, method, [
         paymentWrite({ jobId, driver: actor, method, amount: job.totalCharges, status: job.paymentStatus }),
         driverFlowWrite({ jobId, driver: actor, field: "Payment Method", value: method, state: job.currentState })
       ]);
     }
 
-    case "SUBMIT_CLIENT_DETAILS": {
-      assertState(job.currentState, WorkflowState.WAITING_CLIENT_DETAILS);
-      const details = validateClientDetails(input.client_name_postcode?.[0] ?? "");
-      job.clientNamePostcode = details;
-      const from = job.currentState;
-      job.currentState = WorkflowState.WAITING_CLIENT_CONFIRMATION;
-      return saveJob(job, driver, action, from, details, [
-        driverFlowWrite({
-          jobId, driver: actor, field: "Client Name Vs Postcode", value: details, state: job.currentState
-        })
-      ]);
-    }
-
-    case "SEND_ON_MY_WAY_MESSAGE": {
-      assertState(job.currentState, WorkflowState.WAITING_ON_MY_WAY_MESSAGE);
-      const from = job.currentState;
-      const template = await getSetting("JOB_STARTED_MESSAGE_TEXT", JOB_STARTED_MESSAGE_TEMPLATE);
-      const extras: SheetWrite[] = [];
-
-      // Each channel is attempted and recorded independently -- one failing must never
-      // block the other or block the driver from moving on to the Arrival step. Only a
-      // channel that actually had somewhere to go gets a row at all (mirrors the
-      // no-target/not-configured no-ops already built into the send functions
-      // themselves), so this never writes a false "Sent" the way the old always-write
-      // background task once did.
-      if (job.customerEmail) {
-        try {
-          await sendJobStartedEmail(job, template, driver);
-          extras.push(activityWrite({
-            jobId, driver: actor, action: "CLIENT_START_EMAIL_SENT", fromState: from, toState: from, detail: job.customerEmail
-          }));
-        } catch (error) {
-          extras.push(activityWrite({
-            jobId, driver: actor, action: "CLIENT_START_EMAIL_FAILED", fromState: from, toState: from,
-            detail: error instanceof Error ? error.message : String(error)
-          }));
-        }
-      }
-      if (job.customerPhone && env.firetextApiKey && env.firetextSenderId) {
-        try {
-          await sendJobStartedSms(job, template, driver);
-          extras.push(activityWrite({
-            jobId, driver: actor, action: "CLIENT_START_SMS_SENT", fromState: from, toState: from, detail: job.customerPhone
-          }));
-        } catch (error) {
-          extras.push(activityWrite({
-            jobId, driver: actor, action: "CLIENT_START_SMS_FAILED", fromState: from, toState: from,
-            detail: error instanceof Error ? error.message : String(error)
-          }));
-        }
-      }
-
-      job.currentState = WorkflowState.WAITING_ARRIVAL_PHOTO;
-      return saveJob(job, driver, action, from, undefined, extras);
-    }
+    // SUBMIT_CLIENT_DETAILS removed — card 8 (Client Postcode) is gone.
+    // SEND_ON_MY_WAY_MESSAGE removed — On My Way step skipped; job starts at arrival photo.
 
     case "ISSUES_NONE":
     case "ISSUES_YES": {
       const from = job.currentState as WorkflowState;
       const noneTarget: Partial<Record<WorkflowState, WorkflowState>> = {
         [WorkflowState.WAITING_ARRIVAL_ISSUES_CHECK]: WorkflowState.WAITING_LOADED_PHOTO,
-        [WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK]: WorkflowState.WAITING_EMPTY_VAN_PHOTO
+        // 2nd checkpoint now sits before Extra Charges — NONE skips straight there
+        [WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK]: WorkflowState.WAITING_EXTRA_CHARGES
       };
       const yesTarget: Partial<Record<WorkflowState, WorkflowState>> = {
         [WorkflowState.WAITING_ARRIVAL_ISSUES_CHECK]: WorkflowState.WAITING_ARRIVAL_ISSUES_CHOICE,
@@ -423,8 +370,19 @@ export async function handleAction(
     case "REVIEW_YES": {
       assertState(job.currentState, WorkflowState.WAITING_REVIEW_CHECK);
       const from = job.currentState;
-      job.currentState = action === "REVIEW_YES" ? WorkflowState.WAITING_REVIEW_SEND : WorkflowState.READY_TO_COMPLETE;
-      return saveJob(job, driver, action, from);
+      if (action === "REVIEW_YES") {
+        // Driver wants to send a review email — go to the email preview card
+        job.currentState = WorkflowState.WAITING_REVIEW_SEND;
+        return saveJob(job, driver, action, from);
+      }
+      // REVIEW_NONE: no review email requested — complete the job immediately
+      if (job.customerEmail) {
+        const completionTemplate = await getSetting("JOB_COMPLETION_EMAIL_TEXT", JOB_COMPLETION_EMAIL_TEMPLATE);
+        sendJobCompletionEmail(job, completionTemplate).catch(err =>
+          log.warn("job completion email failed (non-fatal)", { job_id: jobId, error: String(err) })
+        );
+      }
+      return completeJob(jobId, identifier);
     }
 
     case "SEND_REVIEW_EMAIL": {
@@ -445,8 +403,15 @@ export async function handleAction(
           }));
         }
       }
-      job.currentState = WorkflowState.READY_TO_COMPLETE;
-      return saveJob(job, driver, action, from, undefined, extras);
+      // Commit the review email activity, then complete the job immediately
+      await commitWrites(extras);
+      if (job.customerEmail) {
+        const completionTemplate = await getSetting("JOB_COMPLETION_EMAIL_TEXT", JOB_COMPLETION_EMAIL_TEMPLATE);
+        sendJobCompletionEmail(job, completionTemplate).catch(err =>
+          log.warn("job completion email failed (non-fatal)", { job_id: jobId, error: String(err) })
+        );
+      }
+      return completeJob(jobId, identifier);
     }
 
     case "GO_BACK": {
@@ -458,10 +423,11 @@ export async function handleAction(
     }
 
     case "COMPLETE_JOB": {
-      assertState(job.currentState, WorkflowState.READY_TO_COMPLETE);
+      // Legacy fallback: jobs already sitting at READY_TO_COMPLETE in the sheet
+      // (written by an older version of the app) can still be completed via this action.
+      // New jobs never reach READY_TO_COMPLETE — they complete directly from REVIEW_NONE
+      // or SEND_REVIEW_EMAIL above. The completion gate still runs here.
       await assertCompletionGate(jobId, job);
-      // Best-effort: send job completion email to the customer. Failure here must never
-      // block the driver completing the job — the completion is the critical part.
       if (job.customerEmail) {
         const completionTemplate = await getSetting("JOB_COMPLETION_EMAIL_TEXT", JOB_COMPLETION_EMAIL_TEMPLATE);
         sendJobCompletionEmail(job, completionTemplate).catch(err =>
@@ -482,11 +448,12 @@ export async function handleAction(
  *  claimed), so it always goes back to Extra Charges, the fixed branch point, rather
  *  than trying to reconstruct which path was actually taken. */
 const BACK_TARGET: Partial<Record<WorkflowState, WorkflowState>> = {
-  [WorkflowState.WAITING_EXTRA_CHARGES]: WorkflowState.IN_PROGRESS,
+  // 2nd issues check is now before Extra Charges, so Extra Charges back = issues check
+  [WorkflowState.WAITING_EXTRA_CHARGES]: WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK,
   [WorkflowState.WAITING_OVERTIME]: WorkflowState.WAITING_EXTRA_CHARGES,
   [WorkflowState.WAITING_TOTAL_CHARGES]: WorkflowState.WAITING_EXTRA_CHARGES,
-  [WorkflowState.WAITING_PAYMENT]: WorkflowState.WAITING_TOTAL_CHARGES,
-  [WorkflowState.WAITING_CLIENT_DETAILS]: WorkflowState.WAITING_EMPTY_VAN_PHOTO
+  [WorkflowState.WAITING_PAYMENT]: WorkflowState.WAITING_TOTAL_CHARGES
+  // WAITING_CLIENT_DETAILS removed — that step is gone from the workflow
 };
 
 export class SignatureAlreadyCapturedError extends Error {
@@ -598,7 +565,7 @@ async function assertCompletionGate(jobId: string, job: Job): Promise<void> {
   }
 
   if (!job.paymentMethod) missing.push("payment method");
-  if (!job.clientNamePostcode) missing.push("client name/postcode");
+  // clientNamePostcode check removed — card 8 (Client Postcode) was removed from the workflow
   if (!hasSignature) missing.push("client confirmation");
 
   // Order matters: a hard-missing step is the driver's problem and outranks anything

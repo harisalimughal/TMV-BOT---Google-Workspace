@@ -8,7 +8,7 @@ import { signatureLinkFor } from "./signature.link";
 import { ScenarioFieldSpec, ScenarioKey, ScenarioSpec } from "./scenario.spec";
 import { scenarioLinkFor } from "./scenario.link";
 import type { ScenarioStepView } from "./scenario.engine";
-import { getSettingSync } from "../google/sheets";
+
 
 export type ChatResponse = Record<string, unknown>;
 
@@ -346,13 +346,8 @@ export function tomorrowJobsCard(jobs: Job[], unassignedCount = 0): ChatResponse
 }
 
 export interface WorkflowCardExtras {
-  /** Rendered "I am your driver..." preview text shown on WAITING_ON_MY_WAY_MESSAGE. */
-  onMyWayPreview?: string;
   /** Rendered review-request email preview text shown on WAITING_REVIEW_SEND. */
   reviewEmailPreview?: string;
-  /** Set only right after SEND_ON_MY_WAY_MESSAGE runs, so the Arrival card shows a
-   *  one-time confirmation instead of on every ordinary re-view of that step. */
-  justSentOnMyWayMessage?: boolean;
 }
 
 function backButton(jobId: string): unknown {
@@ -378,20 +373,12 @@ export function workflowCard(
   const id = `workflow-${job.jobId}`;
 
   switch (state) {
-    case WorkflowState.WAITING_ON_MY_WAY_MESSAGE:
-      return card(id, "On my way", "Preview the message to the customer", [
-        { textParagraph: { text: escapeHtml(extras.onMyWayPreview ?? "") } },
-        { buttonList: { buttons: [button("SEND MESSAGE", "SEND_ON_MY_WAY_MESSAGE", job.jobId)] } }
-      ]);
+    // WAITING_ON_MY_WAY_MESSAGE removed — job starts directly at the Arrival photo
 
-    case WorkflowState.WAITING_ARRIVAL_PHOTO: {
-      const widgets: any[] = [];
-      if (extras.justSentOnMyWayMessage) {
-        widgets.push({ textParagraph: { text: "✓ Message sent to the customer." } });
-      }
-      widgets.push({ textParagraph: { text: "Upload at least <b>1 arrival/start photo</b> directly into this Google Chat conversation." } });
-      return card(id, "1. Arrival", "Pictures taken as proof.", widgets);
-    }
+    case WorkflowState.WAITING_ARRIVAL_PHOTO:
+      return card(id, "1. Arrival", "Pictures taken as proof.", [
+        { textParagraph: { text: "Upload at least <b>1 arrival/start photo</b> directly into this Google Chat conversation." } }
+      ]);
 
     case WorkflowState.WAITING_ARRIVAL_ISSUES_CHECK:
       return issuesCheckCard(id, job.jobId, "Any issues on arrival?");
@@ -410,6 +397,13 @@ export function workflowCard(
         { textParagraph: { text: "Carry out the move. When the operational move is finished, continue to charges and completion." } },
         { buttonList: { buttons: [button("START DRIVING", "FINISH_MOVE", job.jobId)] } }
       ]);
+
+    // 2nd issues check now appears here — after Finish Move, before Extra Charges
+    case WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK:
+      return issuesCheckCard(id, job.jobId, "Any issues before we continue?");
+
+    case WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE:
+      return issuesChoiceCard(id, job.jobId);
 
     case WorkflowState.WAITING_EXTRA_CHARGES:
       return card(id, "3. Any Extra charges", "What extra charges if any?", [
@@ -433,23 +427,14 @@ export function workflowCard(
       ]);
 
     case WorkflowState.WAITING_OVERTIME:
+      // Configured charging rule text removed — rate auto-calculated from crew size:
+      //   1 man + van → £45/30 min | 2 men + van → £55/30 min
+      //   3 men + van → £65/30 min | Packing Service → £95/hour
+      // Crew size radio buttons also removed — crew size already known from the booking.
       return card(id, "4. Over Time Charges ?", "Extra time charges ?", [
         { textInput: { name: "overtime_minutes", label: "Overtime minutes", hintText: "Example: 30", type: "SINGLE_LINE" } },
-        {
-          selectionInput: {
-            name: "overtime_crew_size",
-            label: "Crew Size",
-            type: "RADIO_BUTTON",
-            items: [
-              { text: "1 man", value: "1", selected: job.crewSize === 1 },
-              { text: "2 men", value: "2", selected: job.crewSize === 2 || !job.crewSize || job.crewSize === 0 },
-              { text: "3 men", value: "3", selected: job.crewSize === 3 }
-            ]
-          }
-        },
-        { textParagraph: { text: `Configured charging rule: £${getSettingSync("OVERTIME_RATE_PER_30", "55")} per 30 minutes, rounded up, after ${getSettingSync("OVERTIME_GRACE_MINS", "0")} minute grace.` } },
         { buttonList: { buttons: [
-          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_OVERTIME", job.jobId, ["overtime_minutes", "overtime_crew_size"]) } },
+          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_OVERTIME", job.jobId, ["overtime_minutes"]) } },
           backButton(job.jobId)
         ] } }
       ]);
@@ -480,28 +465,13 @@ export function workflowCard(
         ] } }
       ]);
 
-    case WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHECK:
-      return issuesCheckCard(id, job.jobId, "Any issues before we finish unloading?");
-
-    case WorkflowState.WAITING_EMPTY_VAN_ISSUES_CHOICE:
-      return issuesChoiceCard(id, job.jobId);
-
     case WorkflowState.WAITING_EMPTY_VAN_PHOTO:
       return card(id, "7. Empty Van / Unloaded ?", "Van Empty - Photo Taken", [
         { textParagraph: { text: "Upload a photo showing the van is empty/unloaded." } }
       ]);
 
-    case WorkflowState.WAITING_CLIENT_DETAILS:
-      // Client name is already known from the booking (job.customerName, asked once at
-      // booking time) — this step only confirms the postcode/address, so the driver
-      // isn't asked for the name a second time.
-      return card(id, "8. Client Postcode / Address", "Confirm the postcode or address", [
-        { textInput: { name: "client_name_postcode", label: "Postcode or address", value: job.dropoff || "", type: "MULTIPLE_LINE" } },
-        { buttonList: { buttons: [
-          { text: "CONTINUE", type: "FILLED", onClick: { action: action("SUBMIT_CLIENT_DETAILS", job.jobId, ["client_name_postcode"]) } },
-          backButton(job.jobId)
-        ] } }
-      ]);
+    // WAITING_CLIENT_DETAILS removed (card 8 — Client Postcode) — Empty Van photo goes
+    // directly to the customer signature step.
 
     case WorkflowState.WAITING_CLIENT_CONFIRMATION:
       // No manual button here by design: the server proactively pushes the next card
@@ -510,7 +480,7 @@ export function workflowCard(
       // falls back to pushing a small recovery card with its own CHECK AGAIN button
       // instead — the button only ever appears when it's actually needed, not as a
       // permanent fixture on every ordinary view of this card.
-      return card(id, "9. Client Signature", "Customer completion confirmation", [
+      return card(id, "8. Client Signature", "Customer completion confirmation", [
         { textParagraph: { text: escapeHtml(confirmationText) } },
         { textParagraph: { text: "Hand your device to the customer, have them open the link below, sign with a finger or the cursor, and submit." } },
         { buttonList: { buttons: [overlayLinkButton("OPEN SIGNATURE PAD", signatureLinkFor(job.jobId))] } }
@@ -530,13 +500,9 @@ export function workflowCard(
         { buttonList: { buttons: [button("SEND EMAIL", "SEND_REVIEW_EMAIL", job.jobId)] } }
       ]);
 
-    case WorkflowState.READY_TO_COMPLETE:
-      return card(id, "Ready to finish", "All required workflow steps are recorded", [
-        { decoratedText: { topLabel: "Total charges", text: formatPounds(job.totalCharges) } },
-        { decoratedText: { topLabel: "Payment", text: escapeHtml(job.paymentMethod || "Not recorded") } },
-        { textParagraph: { text: "Photos still uploading in the background are checked when you tap below." } },
-        { buttonList: { buttons: [button("FINISH JOB", "COMPLETE_JOB", job.jobId)] } }
-      ]);
+    // READY_TO_COMPLETE removed — job now completes directly from REVIEW_YES/REVIEW_NONE.
+    // Legacy in-flight rows at READY_TO_COMPLETE fall through to the default below
+    // which shows the job card.
 
     case WorkflowState.COMPLETED:
       return card(id, "Job completed", `Job ${job.jobId}`, [

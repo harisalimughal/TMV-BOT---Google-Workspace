@@ -239,7 +239,7 @@ export async function startJob(jobId: string, identifier: string): Promise<Job> 
     // actualStart is no longer set here -- it's set when the Arrival photo actually
     // lands (workflow.engine.ts's handlePhotoStep), since that's the real physical
     // start of the job, not the moment the driver taps a button in the app.
-    job.currentState = WorkflowState.WAITING_ON_MY_WAY_MESSAGE;
+    job.currentState = WorkflowState.WAITING_ARRIVAL_PHOTO;
     if (!job.driverInitials) job.driverInitials = driver.initials;
 
     // §P3-3: the Drive folder is created lazily by the image worker on the first
