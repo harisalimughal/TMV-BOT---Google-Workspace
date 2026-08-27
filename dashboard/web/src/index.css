@@ -253,10 +253,17 @@ body {
   body > * {
     visibility: hidden;
   }
+  /* position: absolute, not fixed -- browsers special-case fixed-position elements
+     during print to repeat identically on every page (like a running header), so a
+     multi-page report wrapped in position:fixed only ever printed its first page.
+     absolute is removed from normal flow the same way, without that repeat-per-page
+     behavior, so page-break-after on the report's own .print-page children works. */
   .print-content {
     visibility: visible;
-    position: fixed;
-    inset: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
     z-index: 99999;
     background: white;
     overflow: visible;

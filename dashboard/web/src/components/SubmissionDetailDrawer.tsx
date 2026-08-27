@@ -252,8 +252,12 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
       </div>
       
          </div>
-      {/* Hidden PDF renderer just for printing */}
-      <div className="hidden print:block print-content fixed inset-0 z-[99999] bg-white overflow-visible">
+      {/* Hidden PDF renderer just for printing. Positioning (absolute, not fixed -- see
+          index.css's .print-content rule) is owned entirely by that CSS class: a fixed
+          position here previously caused only page 1 of a multi-page report to print,
+          since browsers repeat fixed-position elements identically on every printed
+          page instead of letting their content paginate. */}
+      <div className="hidden print:block print-content">
          <PaperDossierReport job={job} isPreview={false} />
       </div>
     </div>

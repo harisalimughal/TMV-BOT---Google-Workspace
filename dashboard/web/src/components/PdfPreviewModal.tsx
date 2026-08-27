@@ -62,8 +62,11 @@ export function PdfPreviewModal({ job, isOpen, onClose, onDownload }: Props) {
           SubmissionDetailDrawer.tsx's working pattern: index.css's @media print rule
           hides body * by default and only re-shows .print-content, so this is the only
           thing that ends up on the printed/saved-as-PDF page, laid out via
-          PaperDossierReport's own isPreview=false print-page/@page CSS. */}
-      <div className="hidden print:block print-content fixed inset-0 z-[99999] bg-white overflow-visible">
+          PaperDossierReport's own isPreview=false print-page/@page CSS.
+          Positioning (absolute, not fixed -- see index.css's .print-content rule) is
+          owned entirely by that CSS class; don't add position utilities here, a fixed
+          position here previously caused only page 1 of a multi-page report to print. */}
+      <div className="hidden print:block print-content">
         <PaperDossierReport job={job} isPreview={false} />
       </div>
     </div>
