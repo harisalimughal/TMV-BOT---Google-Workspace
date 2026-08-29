@@ -55,7 +55,7 @@ export function FinishedJobsPage() {
           <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1); }} />
           <div className="hidden sm:block w-px h-6 bg-line mx-2 shrink-0" />
           <button
-            onClick={() => { window.location.href = "/ops/api/jobs/export.csv?status=COMPLETED"; }}
+            onClick={() => { window.location.href = "/admin/api/jobs/export.csv?status=COMPLETED"; }}
             className="shrink-0 whitespace-nowrap h-10 px-2.5 sm:px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
           >
             <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export </span>CSV

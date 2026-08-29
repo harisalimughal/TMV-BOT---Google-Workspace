@@ -21,7 +21,7 @@ export function dashboardRouter(options: { serveAppShell?: boolean } = {}): Rout
   const { serveAppShell = true } = options;
   const router = Router();
 
-  // Authentication & Rate Limiting guard for all /ops routes
+  // Authentication & Rate Limiting guard for all /admin routes
   router.use(dashboardRateLimit);
   router.use(requireDashboardAuth);
 
@@ -127,9 +127,9 @@ function defaultOpsShell(): string {
 </head>
 <body>
   <div class="card">
-    <h1>TMV Operations Dashboard (/ops)</h1>
+    <h1>TMV Operations Dashboard (/admin)</h1>
     <p>The dashboard API is online and authenticated. Building frontend bundle...</p>
-    <a href="/ops/api/summary">View API Summary JSON &rarr;</a>
+    <a href="/admin/api/summary">View API Summary JSON &rarr;</a>
   </div>
 </body>
 </html>`;

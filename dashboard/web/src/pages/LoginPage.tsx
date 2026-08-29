@@ -26,7 +26,7 @@ export function LoginPage({ onLogin }: Props) {
 
     setIsLoading(true);
     try {
-      const res = await fetch('/ops/api/auth/login', {
+      const res = await fetch('/admin/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password })

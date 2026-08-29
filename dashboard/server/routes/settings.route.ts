@@ -71,7 +71,7 @@ export function settingsRoute(): Router {
     if (!meta) return res.status(404).json({ error: { code: "UNKNOWN_SETTING", message: "Unknown setting." } });
     if (!value) return res.status(400).json({ error: { code: "VALUE_REQUIRED", message: "Value is required." } });
     try {
-      await commitWrites([settingWrite(meta.settingsKey, value, "Edited from /ops")]);
+      await commitWrites([settingWrite(meta.settingsKey, value, "Edited from /admin")]);
       return res.status(200).json({ ok: true });
     } catch (error) {
       log.error("dashboard setting save failed", error, { key });

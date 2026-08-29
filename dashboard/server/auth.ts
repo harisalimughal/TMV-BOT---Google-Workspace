@@ -59,7 +59,7 @@ export function hasValidOpsSession(req: Request): boolean {
 export function issueOpsCookie(res: Response): void {
   const exp = Date.now() + SESSION_TTL_MS;
   const value = `${exp}.${sign(exp)}`;
-  // Path=/ ensures session works across both /ops and /admin
+  // Path=/ ensures session works across both /admin and /admin
   res.setHeader(
     "Set-Cookie",
     [
@@ -79,7 +79,7 @@ export function clearOpsCookie(res: Response): void {
 }
 
 /**
- * In-memory sliding-window rate limiter for /ops routes.
+ * In-memory sliding-window rate limiter for /admin routes.
  */
 export function dashboardRateLimit(req: Request, res: Response, next: NextFunction): void {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
@@ -106,7 +106,7 @@ export function dashboardRateLimit(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Enforces session authentication for /ops endpoints.
+ * Enforces session authentication for /admin endpoints.
  */
 export function requireDashboardAuth(req: Request, res: Response, next: NextFunction): void {
   if (hasValidOpsSession(req)) {

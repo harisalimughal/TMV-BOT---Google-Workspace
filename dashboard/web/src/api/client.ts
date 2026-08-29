@@ -25,7 +25,7 @@ export async function fetchSummary(from?: string, to?: string): Promise<SummaryR
   const params = new URLSearchParams();
   if (from) params.set("from", from);
   if (to) params.set("to", to);
-  const res = await fetch(`/ops/api/summary?${params.toString()}`);
+  const res = await fetch(`/admin/api/summary?${params.toString()}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "no text");
     console.error("fetchSummary failed:", res.status, text);
@@ -41,13 +41,13 @@ export async function fetchJobs(query: Record<string, any> = {}): Promise<JobsRe
       params.set(k, String(v));
     }
   }
-  const res = await fetch(`/ops/api/jobs?${params.toString()}`);
+  const res = await fetch(`/admin/api/jobs?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load jobs");
   return res.json();
 }
 
 export async function fetchJobDetail(jobId: string): Promise<NormalizedJob> {
-  const res = await fetch(`/ops/api/jobs/${encodeURIComponent(jobId)}`);
+  const res = await fetch(`/admin/api/jobs/${encodeURIComponent(jobId)}`);
   if (!res.ok) throw new Error(`Failed to load job ${jobId}`);
   const data = await res.json();
   return data.job;
@@ -57,7 +57,7 @@ export async function fetchDrivers(from?: string, to?: string): Promise<{ driver
   const params = new URLSearchParams();
   if (from) params.set("from", from);
   if (to) params.set("to", to);
-  const res = await fetch(`/ops/api/drivers/summary?${params.toString()}`);
+  const res = await fetch(`/admin/api/drivers/summary?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load drivers summary");
   return res.json();
 }
@@ -66,7 +66,7 @@ export async function fetchFinance(from?: string, to?: string, groupBy = "day"):
   const params = new URLSearchParams({ groupBy });
   if (from) params.set("from", from);
   if (to) params.set("to", to);
-  const res = await fetch(`/ops/api/finance/summary?${params.toString()}`);
+  const res = await fetch(`/admin/api/finance/summary?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load finance summary");
   return res.json();
 }
@@ -83,7 +83,7 @@ export async function fetchExceptions(type?: string, from?: string, to?: string,
   if (from) params.set("from", from);
   if (to) params.set("to", to);
   if (badge) params.set("badge", "true");
-  const res = await fetch(`/ops/api/exceptions?${params.toString()}`);
+  const res = await fetch(`/admin/api/exceptions?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load exceptions");
   return res.json();
 }
@@ -93,7 +93,7 @@ export async function fetchScenarios(kind: string, page = 1): Promise<{
   items: ScenarioItem[];
   pagination: PaginationMeta;
 }> {
-  const res = await fetch(`/ops/api/scenarios/${encodeURIComponent(kind)}?page=${page}`);
+  const res = await fetch(`/admin/api/scenarios/${encodeURIComponent(kind)}?page=${page}`);
   if (!res.ok) throw new Error(`Failed to load scenario ${kind}`);
   return res.json();
 }
@@ -114,13 +114,13 @@ export async function fetchActivity(page = 1, from?: string, to?: string): Promi
   const params = new URLSearchParams({ page: String(page) });
   if (from) params.set("from", from);
   if (to) params.set("to", to);
-  const res = await fetch(`/ops/api/activity?${params.toString()}`);
+  const res = await fetch(`/admin/api/activity?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load activity logs");
   return res.json();
 }
 
 export async function triggerDatasetRefresh(): Promise<void> {
-  const res = await fetch("/ops/api/refresh", { method: "POST" });
+  const res = await fetch("/admin/api/refresh", { method: "POST" });
   if (!res.ok) throw new Error("Failed to refresh dataset");
 }
 
@@ -153,7 +153,7 @@ export interface AddJobPayload {
 /** Creates a real Calendar event (see dashboard/server/routes/jobs.route.ts) --
  *  not a local write, the classic bot's own sync path picks this up. */
 export async function addJob(payload: AddJobPayload): Promise<void> {
-  return postJson("/ops/api/jobs", payload);
+  return postJson("/admin/api/jobs", payload);
 }
 
 export interface SaveDriverPayload {
@@ -174,7 +174,7 @@ export interface SaveDriverPayload {
  * Returns `warning` when the Sheets save succeeded but pwaPassword (a separate system)
  * couldn't be set, so the caller can surface that distinctly from a hard failure. */
 export async function saveDriver(payload: SaveDriverPayload): Promise<{ warning?: string }> {
-  const res = await fetch("/ops/api/drivers", {
+  const res = await fetch("/admin/api/drivers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -193,13 +193,13 @@ export interface EditableSetting {
 }
 
 export async function fetchSettings(): Promise<{ settings: EditableSetting[] }> {
-  const res = await fetch("/ops/api/settings");
+  const res = await fetch("/admin/api/settings");
   if (!res.ok) throw new Error("Failed to load settings");
   return res.json();
 }
 
 export async function saveSetting(key: string, value: string): Promise<void> {
-  return postJson("/ops/api/settings", { key, value });
+  return postJson("/admin/api/settings", { key, value });
 }
 
 export interface NotificationRow {
@@ -217,7 +217,7 @@ export interface NotificationRow {
  *  panel's Notifications tab reads -- not the fabricated per-job hash the old
  *  NotificationsPage.tsx used. */
 export async function fetchNotifications(): Promise<{ rows: NotificationRow[] }> {
-  const res = await fetch("/ops/api/notifications");
+  const res = await fetch("/admin/api/notifications");
   if (!res.ok) throw new Error("Failed to load notifications");
   return res.json();
 }
@@ -246,7 +246,7 @@ export interface LiveFleetVehicle {
 }
 
 export async function fetchLiveFleet(): Promise<{ vehicles: LiveFleetVehicle[]; fetchedAt: string }> {
-  const res = await fetch("/ops/api/fleet/live");
+  const res = await fetch("/admin/api/fleet/live");
   if (!res.ok) throw new Error("Failed to load live fleet positions");
   return res.json();
 }

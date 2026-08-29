@@ -147,7 +147,7 @@ export const env = {
 
   /**
    * Bearer token for the GPSLive fleet-tracking API (api.gpslive.app), generated from
-   * GPSLive's own Settings > API section -- not a Google credential. Used by the /ops
+   * GPSLive's own Settings > API section -- not a Google credential. Used by the /admin
    * Live Fleet map to show real van positions. Blank = the dashboard falls back to
    * showing no live positions rather than failing to boot.
    */

@@ -18,12 +18,12 @@ import { adminRouter } from "./admin/admin.routes";
 // Dashboard router mounted from the isolated dashboard/ directory, built separately
 // (see Dockerfile / package.json's dashboard:build). None of these paths exist until
 // that build has run, so this must never throw at import time -- an unbuilt dashboard
-// is a missing /ops feature, not a reason to take down the whole Chat bot.
+// is a missing /admin feature, not a reason to take down the whole Chat bot.
 const dashboardRouter: ((options?: { serveAppShell?: boolean }) => express.Router) | null = (() => {
   try { return require("../dashboard/dist/dashboard/server/router").dashboardRouter; } catch {}
   try { return require("../dashboard/server/router").dashboardRouter; } catch {}
   try { return require("./dashboard/server/router").dashboardRouter; } catch {}
-  log.warn("dashboard router not found; /ops will 404 until `npm run dashboard:build` (or the Docker image build) has run");
+  log.warn("dashboard router not found; /admin will 404 until `npm run dashboard:build` (or the Docker image build) has run");
   return null;
 })();
 
@@ -87,10 +87,11 @@ app.use("/forms", scenarioRouter());
 // than the driver's opens it (see chat/signature.link.ts).
 app.use("/sign", signatureRouter());
 
-// The classic server-rendered /admin panel has been replaced by the /ops dashboard
-// (see below) -- adminRouter() is deliberately left imported but unmounted, so
-// rolling back is a one-line change (restore `app.use("/admin", adminRouter());`)
-// rather than needing to resurrect deleted code.
+// The classic server-rendered admin panel (adminRouter, below) has been replaced by
+// the modern dashboard, which now also owns the /admin path itself (see below) --
+// adminRouter() is deliberately left imported but unmounted rather than deleted, in
+// case it's ever needed again, but it can no longer be mounted at /admin without
+// colliding with the dashboard; give it a different path if it's ever restored.
 
 app.post("/chat", verifyGoogleChatRequest, async (req, res) => {
   const requestId = req.header("x-cloud-trace-context")?.split("/")[0] || randomUUID();
@@ -149,15 +150,13 @@ app.post("/internal/sync", async (req, res) => {
   });
 });
 
-// /admin is the only public entry point (serves the login page / SPA shell for any
-// unmatched path). /ops stays mounted too, but API-only: the SPA's own fetch() calls
-// and its built asset URLs (Vite's base is "/ops/") are hardcoded to absolute
-// /ops/api/... and /ops/... paths throughout dashboard/web/src -- those must keep
-// resolving regardless of which URL actually loaded the page. /ops itself must not
-// double as a second public login screen, so it gets no SPA-shell fallback.
+// /admin is the dashboard's only mount point -- serves the login page / SPA shell
+// for any unmatched path, plus its API and static assets (Vite's base is "/admin/",
+// and every fetch()/asset URL in dashboard/web/src is hardcoded to /admin/... to
+// match). Previously also mounted (API-only) at /ops; that's gone now, on request --
+// visiting /ops 404s rather than silently still working.
 if (dashboardRouter) {
   app.use("/admin", dashboardRouter({ serveAppShell: true }));
-  app.use("/ops", dashboardRouter({ serveAppShell: false }));
 }
 
 app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {

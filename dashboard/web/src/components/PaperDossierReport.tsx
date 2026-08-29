@@ -124,7 +124,7 @@ export function PaperDossierReport({ job, isPreview = false }: Props) {
         const pageNum = index + 1;
         // thumbProxyUrl first: it's our own authenticated proxy that returns raw image
         // bytes. driveUrl is a Google Drive "view" page, not embeddable as an <img> src.
-        const src = p.fileId ? (p.thumbProxyUrl || `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(p.fileId)}`) : null;
+        const src = p.fileId ? (p.thumbProxyUrl || `/admin/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(p.fileId)}`) : null;
         
         return (
           <Page key={index} page={pageNum} totalPages={totalPages}>

@@ -129,7 +129,7 @@ export function ScenariosPage({ kind }: Props) {
             </>
           )}
           <button
-            onClick={() => { window.location.href = `/ops/api/scenarios/${kind}/export.csv`; }}
+            onClick={() => { window.location.href = `/admin/api/scenarios/${kind}/export.csv`; }}
             className="shrink-0 whitespace-nowrap h-10 px-2.5 sm:px-4 rounded-[12px] border border-line bg-white hover:bg-surface text-ink text-[13px] font-medium shadow-sm transition flex items-center gap-2"
           >
             <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export CSV</span>

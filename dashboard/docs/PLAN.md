@@ -1,4 +1,4 @@
-# TMV Owner Dashboard (/ops) — Architecture Plan & Implementation Blueprint
+# TMV Owner Dashboard (/admin) — Architecture Plan & Implementation Blueprint
 
 **Repository:** `TMV-BOT---Google-Workspace-main`  
 **Author:** AI Pair Programmer  
@@ -20,7 +20,7 @@
 @@ -137,2 +138,4 @@
  });
 +
-+app.use("/ops", dashboardRouter());
++app.use("/admin", dashboardRouter());
  
 ```
 
@@ -63,7 +63,7 @@
 @@ -103,2 +103,7 @@
  TMV_DRIVER_CACHE_TTL_MS=300000
 +
-+# --- TMV Operations Dashboard (/ops) ---
++# --- TMV Operations Dashboard (/admin) ---
 +TMV_DASHBOARD_CACHE_TTL_MS=30000
 +TMV_DASHBOARD_RATE_LIMIT_WINDOW_MS=60000
 +TMV_DASHBOARD_RATE_LIMIT_MAX=120
@@ -267,7 +267,7 @@ Mirroring `assertCompletionGate` in `src/workflow/workflow.engine.ts`:
 
 - **Phase 1 (Read Layer):** `dashboard/server/read/` batched reader with SWR cache and error guards.
 - **Phase 2 (Normalization Layer):** `dashboard/server/normalize/` pure functions, declarative mappings, and Vitest suite.
-- **Phase 3 (API Layer):** `dashboard/server/routes/` and `dashboard/server/router.ts` mounted at `/ops`.
+- **Phase 3 (API Layer):** `dashboard/server/routes/` and `dashboard/server/router.ts` mounted at `/admin`.
 - **Phase 4 (Frontend UI):** `dashboard/web/` React + Vite + Tailwind application with exact design tokens.
 - **Phase 5 (Dashboard Sections):** Overview, Jobs, Finished Jobs, Scenarios, Drivers, Finance, Exceptions, Activity Log, Settings.
 - **Phase 6 (Job Report):** Expandable 9-section A4 paper-shadow report with CSS grid transitions.

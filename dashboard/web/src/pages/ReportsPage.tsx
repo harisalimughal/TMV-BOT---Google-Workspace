@@ -5,12 +5,12 @@ import { sounds } from "../utils/audio";
 export function ReportsPage() {
   const downloadAllJobsCsv = () => {
     sounds.playSuccess();
-    window.location.href = "/ops/api/jobs/export.csv";
+    window.location.href = "/admin/api/jobs/export.csv";
   };
 
   const downloadCompletedJobsCsv = () => {
     sounds.playSuccess();
-    window.location.href = "/ops/api/jobs/export.csv?status=COMPLETED";
+    window.location.href = "/admin/api/jobs/export.csv?status=COMPLETED";
   };
 
   return (

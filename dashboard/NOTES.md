@@ -21,7 +21,7 @@ This document records operational observations, minor discrepancies, and sensibl
 
 4. **Authentication & Session:**
    - Coexists with `/admin` by reusing `requireAdminSession` from `src/admin/admin.auth.ts`.
-   - Added rate limiting specifically for `/ops` routes to prevent request flooding.
+   - Added rate limiting specifically for `/admin` routes to prevent request flooding.
 
 5. **Cloud Run Concurrency Invariant:**
    - Because Cloud Run runs with `--concurrency 1`, all reads use Stale-While-Revalidate caching (default TTL 30s) so that dashboard requests return immediately from memory (<5ms) and background revalidations do not block driver Chat webhook actions.

@@ -27,7 +27,7 @@ export const REVIEW_REQUEST_EMAIL_TEMPLATE =
 
 /**
  * Sent automatically when a job is marked COMPLETED (see workflow.engine.ts's
- * COMPLETE_JOB). Admin-editable via /ops Messaging tab. Falls back to this default
+ * COMPLETE_JOB). Admin-editable via /admin Messaging tab. Falls back to this default
  * until overridden in the Settings sheet.
  */
 export const JOB_COMPLETION_EMAIL_TEMPLATE =

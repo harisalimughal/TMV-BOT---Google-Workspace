@@ -246,9 +246,9 @@ describe("Dataset Normalization & Three-Way Evidence Classifier", () => {
 
     // Thumb proxy URLs
     const arrivalItem = job.evidenceItems.find(e => e.category === "Arrival");
-    expect(arrivalItem?.thumbProxyUrl).toBe("/ops/api/jobs/TMV-TEST001/photos/arrival-img-1");
+    expect(arrivalItem?.thumbProxyUrl).toBe("/admin/api/jobs/TMV-TEST001/photos/arrival-img-1");
 
     const sigItem = job.evidenceItems.find(e => e.category === "Signature");
-    expect(sigItem?.thumbProxyUrl).toBe("/ops/api/jobs/TMV-TEST001/photos/sig-file-abc-123");
+    expect(sigItem?.thumbProxyUrl).toBe("/admin/api/jobs/TMV-TEST001/photos/sig-file-abc-123");
   });
 });

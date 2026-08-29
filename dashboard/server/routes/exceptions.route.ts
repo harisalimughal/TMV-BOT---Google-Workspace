@@ -40,7 +40,7 @@ export function exceptionsRoute(): Router {
           timestamp: ex["Timestamp"] || dataset.fetchedAt,
           customerName: matchingJob?.customerName || "—",
           driverName: matchingJob?.driverName || "—",
-          linkUrl: jobId !== "UNKNOWN" ? `/ops?job=${encodeURIComponent(jobId)}` : "/ops"
+          linkUrl: jobId !== "UNKNOWN" ? `/admin?job=${encodeURIComponent(jobId)}` : "/admin"
         });
       }
 
@@ -57,7 +57,7 @@ export function exceptionsRoute(): Router {
             timestamp: j.actualStart || j.bookedStart,
             customerName: j.customerName,
             driverName: j.driverName,
-            linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+            linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
           });
         } else if (j.delayMinutes > 15) {
           items.push({
@@ -69,7 +69,7 @@ export function exceptionsRoute(): Router {
             timestamp: j.actualStart || j.bookedStart,
             customerName: j.customerName,
             driverName: j.driverName,
-            linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+            linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
           });
         }
 
@@ -86,7 +86,7 @@ export function exceptionsRoute(): Router {
               timestamp: j.updated || j.created,
               customerName: j.customerName,
               driverName: j.driverName,
-              linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+              linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
             });
           }
           if (comp.vanLoaded === "MISSING") {
@@ -99,7 +99,7 @@ export function exceptionsRoute(): Router {
               timestamp: j.updated || j.created,
               customerName: j.customerName,
               driverName: j.driverName,
-              linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+              linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
             });
           }
           if (comp.emptyVan === "MISSING") {
@@ -112,7 +112,7 @@ export function exceptionsRoute(): Router {
               timestamp: j.updated || j.created,
               customerName: j.customerName,
               driverName: j.driverName,
-              linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+              linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
             });
           }
           if (comp.signature === "MISSING") {
@@ -125,7 +125,7 @@ export function exceptionsRoute(): Router {
               timestamp: j.updated || j.created,
               customerName: j.customerName,
               driverName: j.driverName,
-              linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+              linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
             });
           }
         }
@@ -142,7 +142,7 @@ export function exceptionsRoute(): Router {
               timestamp: ev.receivedAt || j.updated,
               customerName: j.customerName,
               driverName: j.driverName,
-              linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+              linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
             });
           }
         }
@@ -158,7 +158,7 @@ export function exceptionsRoute(): Router {
             timestamp: j.updated,
             customerName: j.customerName,
             driverName: j.driverName,
-            linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+            linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
           });
         }
 
@@ -173,7 +173,7 @@ export function exceptionsRoute(): Router {
             timestamp: j.bookedStart,
             customerName: j.customerName,
             driverName: j.driverName,
-            linkUrl: `/ops?job=${encodeURIComponent(j.jobId)}`
+            linkUrl: `/admin?job=${encodeURIComponent(j.jobId)}`
           });
         }
       }

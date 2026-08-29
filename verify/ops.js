@@ -1,7 +1,8 @@
 /**
- * The /ops dashboard, now the primary admin panel (mounted at /admin too -- see
- * src/server.ts). Covers what verify/admin.js used to cover for the classic panel,
- * plus the write-side endpoints this dashboard didn't have until this session: real
+ * The modern dashboard, mounted at /admin (its only mount point -- see src/server.ts;
+ * it used to also be mounted API-only at /ops, which is gone now). Covers what
+ * verify/admin.js used to cover for the classic server-rendered panel, plus the
+ * write-side endpoints this dashboard didn't have until this session: real
  * login/auth gating, Add Job (a real Calendar event, synced back in), Add/Edit/
  * Deactivate Driver (a real Drivers-sheet upsert the bot itself reads), Settings
  * save/read-back, and real (not fabricated) Notifications delivery status.

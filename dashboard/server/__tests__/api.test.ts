@@ -6,18 +6,18 @@ import { dashboardRouter } from "../router";
 function createTestApp() {
   const app = express();
   app.use(express.json());
-  app.use("/ops", dashboardRouter());
+  app.use("/admin", dashboardRouter());
   return app;
 }
 
-describe("Dashboard API & Auth Gates (/ops/api/*)", () => {
-  it("rejects unauthenticated requests to /ops/api/summary with 401", async () => {
+describe("Dashboard API & Auth Gates (/admin/api/*)", () => {
+  it("rejects unauthenticated requests to /admin/api/summary with 401", async () => {
     const app = createTestApp();
     const server = app.listen(0);
     const port = (server.address() as any).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/ops/api/summary`);
+      const res = await fetch(`http://127.0.0.1:${port}/admin/api/summary`);
       expect(res.status).toBe(401);
       const json = await res.json();
       expect(json.error).toBeDefined();
@@ -26,13 +26,13 @@ describe("Dashboard API & Auth Gates (/ops/api/*)", () => {
     }
   });
 
-  it("rejects unauthenticated requests to /ops/api/jobs with 401", async () => {
+  it("rejects unauthenticated requests to /admin/api/jobs with 401", async () => {
     const app = createTestApp();
     const server = app.listen(0);
     const port = (server.address() as any).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/ops/api/jobs`);
+      const res = await fetch(`http://127.0.0.1:${port}/admin/api/jobs`);
       expect(res.status).toBe(401);
     } finally {
       server.close();
@@ -60,7 +60,7 @@ describe("Dashboard API & Auth Gates (/ops/api/*)", () => {
     const cookieHeader = mockRes.headers["set-cookie"]?.split(";")[0];
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/ops/api/jobs/TMV-123/photos/invalid!id!with!bad!chars`, {
+      const res = await fetch(`http://127.0.0.1:${port}/admin/api/jobs/TMV-123/photos/invalid!id!with!bad!chars`, {
         headers: { Cookie: cookieHeader }
       });
       expect(res.status).toBe(400);

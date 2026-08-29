@@ -127,11 +127,11 @@ export function SubmissionDetailDrawer({ job, isOpen, onClose, onNavigate, hasNe
              {photos.map((p, i) => (
                <a 
                  key={i} 
-                 href={p.driveUrl || p.thumbProxyUrl || `/ops/api/jobs/${job.jobId}/photos/${p.fileId}`}
+                 href={p.driveUrl || p.thumbProxyUrl || `/admin/api/jobs/${job.jobId}/photos/${p.fileId}`}
                  target="_blank" rel="noreferrer"
                  className="aspect-square rounded-[12px] bg-surface overflow-hidden border border-line shadow-sm hover:ring-2 hover:ring-brand/50 transition cursor-pointer block relative group"
                >
-                 <img src={p.thumbProxyUrl || `/ops/api/jobs/${job.jobId}/photos/${p.fileId}`} className="w-full h-full object-cover" alt={p.category} />
+                 <img src={p.thumbProxyUrl || `/admin/api/jobs/${job.jobId}/photos/${p.fileId}`} className="w-full h-full object-cover" alt={p.category} />
                  <div className="absolute inset-0 bg-ink/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                     <Maximize2 className="w-5 h-5 text-white" />
                  </div>

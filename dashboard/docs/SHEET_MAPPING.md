@@ -1,12 +1,12 @@
 # TMV Spreadsheet Schema & Mapping Reference
 
-This document provides a comprehensive mapping between the live Google Sheets workbook and the TMV Operations Dashboard (`/ops`).
+This document provides a comprehensive mapping between the live Google Sheets workbook and the TMV Operations Dashboard (`/admin`).
 
 ---
 
 ## 1. Tab Inventory & Status
 
-| Sheet Tab Name | Status | Read in /ops | Notes |
+| Sheet Tab Name | Status | Read in /admin | Notes |
 | :--- | :--- | :--- | :--- |
 | **`Bookings`** | **LIVE** | **YES** | Primary source for all operational jobs |
 | **`Drivers`** | **LIVE** | **YES** | Driver profiles and initials mapping |

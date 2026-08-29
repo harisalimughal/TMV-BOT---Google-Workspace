@@ -22,7 +22,7 @@ export function App() {
 
   // Check auth status on start
   useEffect(() => {
-    fetch("/ops/api/auth/status")
+    fetch("/admin/api/auth/status")
       .then(res => res.json())
       .then(data => setAuthenticated(Boolean(data.authenticated)))
       .catch(() => setAuthenticated(false));
@@ -52,7 +52,7 @@ export function App() {
   };
 
   const handleLogout = async () => {
-    await fetch("/ops/api/auth/logout", { method: "POST" });
+    await fetch("/admin/api/auth/logout", { method: "POST" });
     setAuthenticated(false);
   };
 

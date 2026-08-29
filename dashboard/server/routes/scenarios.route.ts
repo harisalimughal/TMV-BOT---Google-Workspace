@@ -114,11 +114,11 @@ export function scenariosRoute(): Router {
           rawRecord: r,
           photos: photoIds.map(fid => ({
             fileId: fid,
-            thumbUrl: `/ops/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(fid)}`
+            thumbUrl: `/admin/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(fid)}`
           })),
           signature: sigId ? {
             fileId: sigId,
-            thumbUrl: `/ops/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(sigId)}`
+            thumbUrl: `/admin/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(sigId)}`
           } : null
         };
       }).reverse(); // Latest events first

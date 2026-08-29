@@ -16,7 +16,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
-# /ops dashboard server compiles against the same node_modules already installed above
+# /admin dashboard server compiles against the same node_modules already installed above
 # (dashboard/package.json has no lockfile of its own and its only runtime dep, luxon, is
 # already a root dependency). Must land at dashboard/dist/dashboard/server/... to match
 # the require() path server.ts falls back to when dashboard/dist isn't pre-built.

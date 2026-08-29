@@ -1,11 +1,11 @@
-# TMV Operations Dashboard (/ops) — Deployment & Runtime Guide
+# TMV Operations Dashboard (/admin) — Deployment & Runtime Guide
 
 ## 1. Overview & Isolation Guarantee
 
-The **TMV Operations Dashboard** is mounted at `/ops` on the existing Express application. It executes strictly within the same single Node.js runtime container on Cloud Run (`PORT=8080`, concurrency pinned to 1).
+The **TMV Operations Dashboard** is mounted at `/admin` on the existing Express application. It executes strictly within the same single Node.js runtime container on Cloud Run (`PORT=8080`, concurrency pinned to 1).
 
 - **Zero Bot Modifications:** No existing handlers, webhooks, or workflow engine files were altered.
-- **Authentication:** Reuses `requireAdminSession` from `src/admin/admin.auth.ts`. Session cookies issued at `/admin/login` work seamlessly on `/ops`.
+- **Authentication:** Reuses `requireAdminSession` from `src/admin/admin.auth.ts`. Session cookies issued at `/admin/login` work seamlessly on `/admin`.
 - **Read-Only Data Layer:** Strictly no write paths to Google Sheets from the dashboard.
 - **SWR Caching:** Batched reads with in-memory Stale-While-Revalidate caching ensure queries return in <5ms and never delay Google Chat webhooks.
 

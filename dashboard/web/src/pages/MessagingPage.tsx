@@ -44,7 +44,7 @@ function renderPreview(content: string): string {
 
 // The 3 real admin-editable message templates the classic /admin panel's Settings tab
 // exposes (src/admin/admin.routes.ts's EDITABLE_SETTINGS) -- rendered and saved
-// through the same GET/POST /ops/api/settings the driver-facing cards actually read
+// through the same GET/POST /admin/api/settings the driver-facing cards actually read
 // from (via getSetting()), not a disconnected mock with its own invented placeholder
 // syntax and template categories the bot has no capability to send.
 export function MessagingPage() {

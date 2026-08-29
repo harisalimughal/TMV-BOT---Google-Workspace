@@ -50,10 +50,10 @@ function mockCookieRes() {
   };
 }
 
-describe("TMV Dashboard /ops Smoke Test", () => {
+describe("TMV Dashboard /admin Smoke Test", () => {
   const app = express();
   app.use(express.json());
-  app.use("/ops", dashboardRouter());
+  app.use("/admin", dashboardRouter());
   app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
   it("answers healthz endpoint untouched", async () => {
@@ -70,7 +70,7 @@ describe("TMV Dashboard /ops Smoke Test", () => {
     }
   });
 
-  it("serves the dashboard static frontend at /ops", async () => {
+  it("serves the dashboard static frontend at /admin", async () => {
     const server = app.listen(0);
     const port = (server.address() as any).port;
 
@@ -79,7 +79,7 @@ describe("TMV Dashboard /ops Smoke Test", () => {
     const cookieHeader = mockRes.headers["set-cookie"]?.split(";")[0];
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/ops`, {
+      const res = await fetch(`http://127.0.0.1:${port}/admin`, {
         headers: { Cookie: cookieHeader }
       });
       expect(res.status).toBe(200);
@@ -90,7 +90,7 @@ describe("TMV Dashboard /ops Smoke Test", () => {
     }
   });
 
-  it("serves live API summary at /ops/api/summary", async () => {
+  it("serves live API summary at /admin/api/summary", async () => {
     const server = app.listen(0);
     const port = (server.address() as any).port;
 
@@ -99,7 +99,7 @@ describe("TMV Dashboard /ops Smoke Test", () => {
     const cookieHeader = mockRes.headers["set-cookie"]?.split(";")[0];
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/ops/api/summary`, {
+      const res = await fetch(`http://127.0.0.1:${port}/admin/api/summary`, {
         headers: { Cookie: cookieHeader }
       });
       expect(res.status).toBe(200);

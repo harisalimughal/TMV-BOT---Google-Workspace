@@ -416,7 +416,7 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
                 <div key={ev.id || i} className="p-2 bg-surface rounded-[12px] border border-line text-center space-y-2">
                   <span className="text-[11px] font-semibold text-muted block truncate">{ev.category}</span>
                   <ThumbnailPreview
-                    src={ev.fileId ? `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(ev.fileId)}` : undefined}
+                    src={ev.fileId ? `/admin/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(ev.fileId)}` : undefined}
                     alt={`${ev.category} photo`}
                     state={ev.state}
                     size="lg"
@@ -424,7 +424,7 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
                       if (ev.fileId) {
                         setActivePhoto({
                           title: `${job.jobId} - ${ev.category}`,
-                          url: `/ops/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(ev.fileId)}`,
+                          url: `/admin/api/jobs/${encodeURIComponent(job.jobId)}/photos/${encodeURIComponent(ev.fileId)}`,
                           driveUrl: ev.driveUrl
                         });
                       }

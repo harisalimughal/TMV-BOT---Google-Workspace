@@ -1,4 +1,4 @@
-# TMV Operations Dashboard (/ops) — End-to-End Implementation Walkthrough
+# TMV Operations Dashboard (/admin) — End-to-End Implementation Walkthrough
 
 ## Executive Summary
 
@@ -28,7 +28,7 @@ diff --git a/src/server.ts b/src/server.ts
    });
  });
  
-+app.use("/ops", dashboardRouter());
++app.use("/admin", dashboardRouter());
 +
  app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
    log.error("unhandled express error", error);
@@ -90,7 +90,7 @@ diff --git a/.env.example b/.env.example
  TMV_SHEET_CACHE_TTL_MS=10000
  TMV_DRIVER_CACHE_TTL_MS=300000
 +
-+# --- TMV Operations Dashboard (/ops) ---
++# --- TMV Operations Dashboard (/admin) ---
 +# In-memory Stale-While-Revalidate cache TTL for dashboard batch reads (default: 30000ms / 30s)
 +TMV_DASHBOARD_CACHE_TTL_MS=30000
 +# Rate limiting for dashboard API endpoints (sliding window ms and max requests per window)
@@ -105,7 +105,7 @@ diff --git a/.env.example b/.env.example
 ```
 dashboard/
 ├── server/
-│   ├── router.ts                 # Main router mounted at /ops (Auth + Rate limiting)
+│   ├── router.ts                 # Main router mounted at /admin (Auth + Rate limiting)
 │   ├── auth.ts                   # Reuses requireAdminSession from src/admin/admin.auth.ts
 │   ├── read/
 │   │   ├── types.ts              # SheetDataset interfaces
@@ -121,20 +121,20 @@ dashboard/
 │   ├── pdf/
 │   │   └── pdf-generator.ts      # Server-side binary PDF generator for A4 Job Reports
 │   ├── routes/
-│   │   ├── summary.route.ts      # GET /ops/api/summary (KPIs & chart series)
-│   │   ├── jobs.route.ts         # GET /ops/api/jobs, /jobs/:id, /jobs/export.csv, /jobs/:id/report.pdf
-│   │   ├── drivers.route.ts      # GET /ops/api/drivers/summary
-│   │   ├── finance.route.ts      # GET /ops/api/finance/summary
-│   │   ├── exceptions.route.ts   # GET /ops/api/exceptions (Surfaces ExceptionReport tab + QC alerts)
-│   │   ├── scenarios.route.ts    # GET /ops/api/scenarios/:kind (CheckIn, CheckOut, Parking, Liability)
-│   │   ├── activity.route.ts     # GET /ops/api/activity
-│   │   └── photos.route.ts       # GET /ops/api/jobs/:id/photos/:fileId (Drive media proxy)
+│   │   ├── summary.route.ts      # GET /admin/api/summary (KPIs & chart series)
+│   │   ├── jobs.route.ts         # GET /admin/api/jobs, /jobs/:id, /jobs/export.csv, /jobs/:id/report.pdf
+│   │   ├── drivers.route.ts      # GET /admin/api/drivers/summary
+│   │   ├── finance.route.ts      # GET /admin/api/finance/summary
+│   │   ├── exceptions.route.ts   # GET /admin/api/exceptions (Surfaces ExceptionReport tab + QC alerts)
+│   │   ├── scenarios.route.ts    # GET /admin/api/scenarios/:kind (CheckIn, CheckOut, Parking, Liability)
+│   │   ├── activity.route.ts     # GET /admin/api/activity
+│   │   └── photos.route.ts       # GET /admin/api/jobs/:id/photos/:fileId (Drive media proxy)
 │   └── __tests__/
 │       ├── normalize.test.ts     # Timezone, delay banding, Pence reconciliation & evidence classification tests
 │       ├── api.test.ts           # Auth rejection, rate limit, photo proxy security tests
 │       ├── excel.test.ts         # Local dataset loader tests
 │       ├── pdf.test.ts           # Binary PDF generation validation
-│       └── smoke.test.ts         # End-to-end /ops and /healthz coexistence tests
+│       └── smoke.test.ts         # End-to-end /admin and /healthz coexistence tests
 ├── web/
 │   ├── src/
 │   │   ├── components/           # Layout, StatusBadge, EvidenceCompletenessPill, PaperJobReport, PhotoModal, DateRangePicker, SearchFilterBar
@@ -206,7 +206,7 @@ The following updates were added and verified:
   - Implemented proactive push notifications (`createChatMessage`) when admins assign drivers.
   - Added `unassignedCount` warning to `tomorrowJobsCard`.
 - **Wave 3 — Pricing Backend**:
-  - Created `/ops/api/pricing` Settings sheet read/write endpoints.
+  - Created `/admin/api/pricing` Settings sheet read/write endpoints.
   - Integrated React Pricing dashboard to dynamically save rates to the Settings sheet.
   - Dynamically resolved crew/packing rates and grace periods in `workflow.engine.ts`.
 - **Wave 4 — Timed Client Notifications**:
