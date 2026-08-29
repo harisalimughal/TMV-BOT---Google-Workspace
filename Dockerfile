@@ -1,5 +1,14 @@
+# node:24-slim for this stage only, not 22: adding the mongodb driver regenerated
+# package-lock.json under npm 11 (Node 24's bundled npm) locally; npm 10 (Node 22's
+# bundled npm) resolves some of its transitive deps (gcp-metadata, gaxios,
+# google-logging-utils, pulled in via googleapis/google-auth-library) differently and
+# rejects the lockfile as out of sync under `npm ci`. The runtime stage below
+# deliberately stays on node:22-slim -- Node 24's OpenSSL fails the TLS handshake
+# against MongoDB Atlas from inside a container (see tmv-pwa's Dockerfile, which hit
+# the identical pair of issues first). None of the runtime deps have native bindings,
+# so copying node_modules built under 24 into a 22 runtime is safe.
 # ---- build ----
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 WORKDIR /app
 COPY package*.json ./
 # npm ci, not npm install: the lockfile is present and builds must be reproducible.
