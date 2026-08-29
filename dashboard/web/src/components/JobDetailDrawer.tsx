@@ -17,7 +17,7 @@ import {
   ChevronRight,
   Info
 } from "lucide-react";
-import { NormalizedJob } from "../types";
+import { NormalizedJob, DriverSummaryItem } from "../types";
 import { formatLondonDateTime } from "../utils/date";
 import { JobStatusBadge } from "./StatusBadge";
 import { DelayBandBadge } from "./StatusBadge";
@@ -26,15 +26,19 @@ import { PaperDossierReport } from "./PaperDossierReport";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { PhotoModal } from "./PhotoModal";
 import { ThumbnailPreview } from "./ThumbnailPreview";
-import { getDrivers, resolveDriver, formatVanReg } from "../utils/drivers";
+import { resolveDriver, formatVanReg, getAvatarColor } from "../utils/drivers";
+import { fetchDrivers, reassignJob } from "../api/client";
 
 interface Props {
   job: NormalizedJob;
   isOpen: boolean;
   onClose: () => void;
+  /** Called after a successful reassign so the page behind the drawer (its own jobs
+   * list query) can refetch -- this drawer only owns its own local `job` state. */
+  onUpdated?: () => void;
 }
 
-export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
+export function JobDetailDrawer({ job: initialJob, isOpen, onClose, onUpdated }: Props) {
   const [job, setJob] = useState<NormalizedJob>(initialJob);
   const [copiedId, setCopiedId] = useState(false);
   const [activePhoto, setActivePhoto] = useState<{title: string, url: string, driveUrl?: string} | null>(null);
@@ -49,8 +53,16 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
     crew: ""
   });
 
-  // Reassign Mode State
+  // Reassign Mode State -- real roster (not utils/drivers.ts's old localStorage mock)
+  // and a real backend call, see handleReassign below.
   const [isReassigning, setIsReassigning] = useState(false);
+  const [roster, setRoster] = useState<DriverSummaryItem[]>([]);
+  const [reassigning, setReassigning] = useState(false);
+
+  useEffect(() => {
+    if (!isReassigning || roster.length) return;
+    fetchDrivers().then(({ drivers }) => setRoster(drivers.filter(d => d.active))).catch(() => {});
+  }, [isReassigning, roster.length]);
 
   // Timeline State
   const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
@@ -125,16 +137,19 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
     showToast("Job Details Updated");
   };
 
-  const handleReassign = (driverCode: string) => {
-    const newDriver = getDrivers().find(d => d.code === driverCode);
-    if (newDriver) {
-      setJob({
-        ...job,
-        driverName: newDriver.name,
-        driverInitials: newDriver.code
-      });
+  const handleReassign = async (driverInitials: string) => {
+    if (reassigning) return;
+    setReassigning(true);
+    try {
+      const result = await reassignJob(job.jobId, driverInitials);
+      setJob({ ...job, driverName: result.driverName, driverInitials: result.driverInitials });
       setIsReassigning(false);
-      showToast(`Reassigned to ${newDriver.name} — notified`);
+      showToast(`Reassigned to ${result.driverName}`);
+      onUpdated?.();
+    } catch (error: any) {
+      showToast(error?.message || "Couldn't reassign this job. Try again.");
+    } finally {
+      setReassigning(false);
     }
   };
 
@@ -288,17 +303,19 @@ export function JobDetailDrawer({ job: initialJob, isOpen, onClose }: Props) {
              <div className="bg-white p-4 rounded-[16px] border border-brand shadow-sm animate-in fade-in slide-in-from-top-2">
                <h4 className="text-[13px] font-bold text-ink mb-3">Reassign Driver</h4>
                <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                 {getDrivers().map(d => (
-                   <button 
-                     key={d.code}
-                     onClick={() => handleReassign(d.code)}
-                     className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-surface border border-transparent hover:border-line transition text-left"
+                 {roster.length === 0 && <div className="text-[12px] text-muted p-2">Loading drivers…</div>}
+                 {roster.map(d => (
+                   <button
+                     key={d.initials}
+                     disabled={reassigning}
+                     onClick={() => handleReassign(d.initials)}
+                     className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-surface border border-transparent hover:border-line transition text-left disabled:opacity-50"
                    >
                      <div className="flex items-center gap-3">
-                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] ${d.color}`}>{d.code}</div>
+                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] ${getAvatarColor(d.initials)}`}>{d.initials}</div>
                        <div>
-                         <div className="text-[13px] font-bold text-ink">{d.name}</div>
-                         <div className="text-[11px] font-mono text-muted uppercase">{formatVanReg(d.vehicleReg)}</div>
+                         <div className="text-[13px] font-bold text-ink">{d.fullName}</div>
+                         <div className="text-[11px] font-mono text-muted uppercase">{formatVanReg(d.vanRegistration || "")}</div>
                        </div>
                      </div>
                      <span className="text-[11px] font-bold text-brand hover:underline">Select</span>

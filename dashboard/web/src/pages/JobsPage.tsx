@@ -504,6 +504,7 @@ export function JobsPage() {
           job={drawerJob}
           isOpen={!!drawerJob}
           onClose={() => setDrawerJob(null)}
+          onUpdated={() => refetch()}
         />
       )}
 

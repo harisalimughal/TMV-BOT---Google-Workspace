@@ -53,6 +53,17 @@ export async function fetchJobDetail(jobId: string): Promise<NormalizedJob> {
   return data.job;
 }
 
+export async function reassignJob(jobId: string, driverInitials: string): Promise<{ ok: true; driverInitials: string; driverName: string }> {
+  const res = await fetch(`/admin/api/jobs/${encodeURIComponent(jobId)}/reassign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ driverInitials })
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body?.error?.message || "Failed to reassign driver");
+  return body;
+}
+
 export async function fetchDrivers(from?: string, to?: string): Promise<{ drivers: DriverSummaryItem[] }> {
   const params = new URLSearchParams();
   if (from) params.set("from", from);

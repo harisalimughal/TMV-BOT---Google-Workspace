@@ -1,17 +1,60 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { DateTime } from "luxon";
 import { env } from "../../../src/config/env";
 import { getDriverByInitials } from "../../../src/google/sheets";
 import { createCalendarEvent } from "../../../src/google/calendar";
 import { parseCalendarEvent, syncBookingsForDate } from "../../../src/jobs/booking.service";
+import { activityCollection, jobsCollection } from "../../../src/db/mongo";
 import { log } from "../../../src/utils/logger";
 import { formatGBP, toPounds } from "../../../src/utils/money";
-import { normalizeDataset } from "../normalize/normalize";
+import { normalizeMongoDataset } from "../normalize/normalize-mongo";
 import { formatLondonDate } from "../normalize/timezone";
 import { NormalizedJob } from "../normalize/types";
 import { generateJobPdf } from "../pdf/pdf-generator";
-import { sheetCache } from "../read/cache";
-import { readDataset } from "../read/sheet-reader";
+import { readMongoDataset } from "../read/mongo-reader";
+
+/** Same hash tmv-pwa's booking.service.ts uses (jobIdForEvent) -- must match exactly so
+ * this dashboard's immediate Mongo write and tmv-pwa's own next sync pass agree on the
+ * job's _id instead of creating two documents for the same Calendar event. */
+function jobIdForEvent(eventId: string): string {
+  return `TMV-${crypto.createHash("sha1").update(eventId).digest("hex").slice(0, 10).toUpperCase()}`;
+}
+
+interface NewJobFields {
+  driverInitials: string; customerName: string; customerEmail: string; customerPhone: string;
+  pickup: string; dropoff: string; crewSize: number; price: number; paidOnline: boolean;
+  bookedStart: string; bookedFinish: string;
+}
+
+async function upsertMongoJobFromCalendarEvent(calendarEventId: string, fields: NewJobFields): Promise<void> {
+  const jobs = await jobsCollection();
+  const jobId = jobIdForEvent(calendarEventId);
+  const now = new Date().toISOString();
+  const bookedMinutes = Math.max(0, Math.round(
+    (new Date(fields.bookedFinish).getTime() - new Date(fields.bookedStart).getTime()) / 60_000
+  ));
+  await jobs.updateOne(
+    { _id: jobId } as any,
+    {
+      $setOnInsert: {
+        _id: jobId, jobId, calendarEventId,
+        driverInitials: fields.driverInitials, customerName: fields.customerName,
+        customerEmail: fields.customerEmail, customerPhone: fields.customerPhone,
+        pickup: fields.pickup, dropoff: fields.dropoff, crewSize: fields.crewSize,
+        basePrice: fields.price, paidOnline: fields.paidOnline,
+        bookedStart: fields.bookedStart, bookedFinish: fields.bookedFinish,
+        actualStart: "", actualFinish: "", bookedMinutes, actualMinutes: 0, differenceMinutes: 0,
+        delayStatus: "Waiting", extraCharges: [], overtimeMinutes: 0, overtimeCharge: 0,
+        totalCharges: fields.price, paymentMethod: "",
+        paymentStatus: fields.paidOnline ? "Paid Online" : "Pending",
+        clientNamePostcode: "", clientConfirmedBy: "", signatureUrl: "",
+        status: "READY", currentState: "READY", createdAt: now, updatedAt: now
+      }
+    } as any,
+    { upsert: true }
+  );
+}
 
 function escapeCsvField(val: unknown): string {
   if (val === null || val === undefined) return "";
@@ -141,17 +184,30 @@ export function jobsRoute(): Router {
     }
 
     try {
-      await createCalendarEvent({
+      const event = await createCalendarEvent({
         summary: title,
         description,
         start: { dateTime: startDt.toISO()! },
         end: { dateTime: finishDt.toISO()! }
       });
-      // Sync immediately so the new job shows up in the dashboard without waiting on
-      // the throttled background sync, and invalidate this dashboard's own separate
-      // SWR cache so the next read doesn't serve a pre-sync snapshot for up to 30s.
+      // Sync immediately so the new job shows up in this (Sheets-backed) dashboard
+      // view without waiting on the throttled background sync.
       await syncBookingsForDate(startDt);
-      sheetCache.invalidate();
+
+      // Also write a matching job straight into Mongo -- tmv-pwa's own background
+      // sync (its copy of booking.service.ts) would pick this Calendar event up
+      // within its own sync interval anyway, but that's up to a couple of minutes;
+      // this makes the new job appear immediately here (this dashboard is now
+      // Mongo-backed, see normalize-mongo.ts) instead of waiting on it. Same jobId
+      // hash tmv-pwa's sync uses, so its next pass recognises this as the same job
+      // and just leaves it alone rather than creating a duplicate.
+      if (event.id) {
+        await upsertMongoJobFromCalendarEvent(event.id, {
+          driverInitials, customerName, customerEmail, customerPhone, pickup, dropoff,
+          crewSize, price, paidOnline, bookedStart: startDt.toISO()!, bookedFinish: finishDt.toISO()!
+        }).catch(err => log.warn("failed to mirror new job into Mongo (tmv-pwa's own sync will pick it up shortly)", { error: String(err) }));
+      }
+
       return res.status(200).json({ ok: true });
     } catch (error) {
       log.error("dashboard add job failed", error);
@@ -159,11 +215,55 @@ export function jobsRoute(): Router {
     }
   });
 
+  // Reassigns a job's driver -- writes straight to Mongo (the live source of truth for
+  // job state now that drivers work from tmv-pwa, not Sheets/Chat). Replaces the old
+  // JobDetailDrawer "Reassign" feature, which only ever updated local React state and
+  // never actually persisted anything (see JobDetailDrawer.tsx's git history).
+  router.post("/:jobId/reassign", async (req, res) => {
+    const jobId = String(req.params.jobId || "").trim();
+    const driverInitials = String(req.body?.driverInitials ?? "").trim().toUpperCase();
+
+    if (!driverInitials) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "A driver must be selected." } });
+    }
+    if (!/^[A-Z]{1,5}$/.test(driverInitials)) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "Driver initials must be 1-5 letters." } });
+    }
+
+    const driver = await getDriverByInitials(driverInitials);
+    if (!driver) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: `No driver with initials "${driverInitials}" in the Drivers sheet.` } });
+    }
+    if (!driver.active) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: `Driver "${driverInitials}" exists but is marked inactive.` } });
+    }
+
+    try {
+      const jobs = await jobsCollection();
+      const existing = await jobs.findOne({ _id: jobId } as any);
+      if (!existing) {
+        return res.status(404).json({ error: { code: "JOB_NOT_FOUND", message: `Job ${jobId} not found.` } });
+      }
+      const fromInitials = existing.driverInitials || "Unassigned";
+      await jobs.updateOne({ _id: jobId } as any, { $set: { driverInitials, updatedAt: new Date().toISOString() } });
+
+      await (await activityCollection()).insertOne({
+        jobId, driver: "admin dashboard", action: "REASSIGNED",
+        detail: `${fromInitials} -> ${driverInitials}`, timestamp: new Date().toISOString()
+      });
+
+      return res.status(200).json({ ok: true, driverInitials, driverName: driver.fullName });
+    } catch (error) {
+      log.error("dashboard reassign driver failed", error, { job_id: jobId });
+      return res.status(500).json({ error: { code: "REASSIGN_FAILED", message: "Failed to reassign driver." } });
+    }
+  });
+
   // Export CSV of filtered jobs
   router.get("/export.csv", async (req, res) => {
     try {
-      const dataset = await readDataset();
-      let jobs = normalizeDataset(dataset);
+      const dataset = await readMongoDataset();
+      let jobs = await normalizeMongoDataset(dataset);
       jobs = applyFilters(jobs, req.query);
 
       const headers = [
@@ -234,8 +334,8 @@ export function jobsRoute(): Router {
   router.get("/:jobId", async (req, res) => {
     try {
       const jobId = String(req.params.jobId || "").trim();
-      const dataset = await readDataset();
-      const jobs = normalizeDataset(dataset);
+      const dataset = await readMongoDataset();
+      const jobs = await normalizeMongoDataset(dataset);
       const job = jobs.find(j => j.jobId.toUpperCase() === jobId.toUpperCase());
 
       if (!job) {
@@ -261,8 +361,8 @@ export function jobsRoute(): Router {
   router.get("/:jobId/report.pdf", async (req, res) => {
     try {
       const jobId = String(req.params.jobId || "").trim();
-      const dataset = await readDataset();
-      const jobs = normalizeDataset(dataset);
+      const dataset = await readMongoDataset();
+      const jobs = await normalizeMongoDataset(dataset);
       const job = jobs.find(j => j.jobId.toUpperCase() === jobId.toUpperCase());
 
       if (!job) {
@@ -287,8 +387,8 @@ export function jobsRoute(): Router {
   // Paginated & Filtered Jobs List
   router.get("/", async (req, res) => {
     try {
-      const dataset = await readDataset();
-      let jobs = normalizeDataset(dataset);
+      const dataset = await readMongoDataset();
+      let jobs = await normalizeMongoDataset(dataset);
 
       // Filters
       jobs = applyFilters(jobs, req.query);

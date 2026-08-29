@@ -3,8 +3,6 @@ import path from "node:path";
 import fs from "node:fs";
 import { checkAdminPassword } from "../../src/admin/admin.auth";
 import { clearOpsCookie, dashboardRateLimit, hasValidOpsSession, issueOpsCookie, requireDashboardAuth } from "./auth";
-import { sheetCache } from "./read/cache";
-import { readDataset } from "./read/sheet-reader";
 import { activityRoute } from "./routes/activity.route";
 import { driversRoute } from "./routes/drivers.route";
 import { exceptionsRoute } from "./routes/exceptions.route";
@@ -12,7 +10,6 @@ import { financeRoute } from "./routes/finance.route";
 import { fleetRoute } from "./routes/fleet.route";
 import { jobsRoute } from "./routes/jobs.route";
 import { notificationsRoute } from "./routes/notifications.route";
-import { photosRoute } from "./routes/photos.route";
 import { scenariosRoute } from "./routes/scenarios.route";
 import { settingsRoute } from "./routes/settings.route";
 import { summaryRoute } from "./routes/summary.route";
@@ -50,7 +47,6 @@ export function dashboardRouter(options: { serveAppShell?: boolean } = {}): Rout
 
   api.use("/summary", summaryRoute());
   api.use("/jobs", jobsRoute());
-  api.use("/jobs", photosRoute());
   api.use("/drivers", driversRoute());
   api.use("/finance", financeRoute());
   api.use("/exceptions", exceptionsRoute());
@@ -60,23 +56,14 @@ export function dashboardRouter(options: { serveAppShell?: boolean } = {}): Rout
   api.use("/settings", settingsRoute());
   api.use("/notifications", notificationsRoute());
 
-  // Force cache refresh endpoint
+  // Kept for the frontend's existing "Refresh" button -- a no-op now rather than
+  // removed outright. Mongo reads (jobs/evidence/activity/scenario_submissions) have
+  // no cache to invalidate, unlike the old Sheets-backed sheetCache this used to
+  // clear; the Drivers-roster lookup still goes through Sheets (see
+  // normalize-mongo.ts) and has its own short TTL (env.driverCacheTtlMs) that clears
+  // itself quickly regardless.
   api.post("/refresh", async (_req: Request, res: Response) => {
-    try {
-      sheetCache.invalidate();
-      const dataset = await readDataset({ forceRefresh: true });
-      res.status(200).json({
-        ok: true,
-        meta: {
-          fetchedAt: dataset.fetchedAt,
-          durationMs: dataset.durationMs
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: { code: "REFRESH_FAILED", message: "Failed to force refresh dataset." }
-      });
-    }
+    res.status(200).json({ ok: true, meta: { fetchedAt: new Date().toISOString() } });
   });
 
   router.use("/api", api);

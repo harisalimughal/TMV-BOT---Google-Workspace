@@ -1,69 +1,59 @@
 import { Router } from "express";
-import { env } from "../../../src/config/env";
-import { listObjects, SHEETS } from "../../../src/google/sheets";
+import { activityCollection, jobsCollection } from "../../../src/db/mongo";
 import { log } from "../../../src/utils/logger";
 
-const NOTIFY_ACTIONS = new Set([
-  "CLIENT_START_EMAIL_SENT", "CLIENT_START_EMAIL_FAILED", "CLIENT_START_SMS_SENT", "CLIENT_START_SMS_FAILED"
-]);
+const NOTIFY_ACTIONS = new Set(["CLIENT_REVIEW_EMAIL_SENT", "CLIENT_REVIEW_EMAIL_FAILED"]);
 
-/**
- * Whether the "on my way" email/SMS actually reached the customer for a given job --
- * ported verbatim from src/admin/admin.routes.ts's notifyStatus/NOTIFY_ACTIONS. See
- * that file for the full reasoning; this is the same real ActivityLog-backed
- * classification, not the fabricated per-job hash the old NotificationsPage.tsx used.
- */
 function notifyStatus(
-  hasTarget: boolean, configured: boolean, sentRow: Record<string, string> | undefined, failedRow: Record<string, string> | undefined
+  hasTarget: boolean, sentRow: { detail?: string; timestamp: string } | undefined, failedRow: { detail?: string; timestamp: string } | undefined
 ): { state: "sent" | "failed" | "pending" | "skipped" | "disabled"; detail: string; at: string } {
   if (!hasTarget) return { state: "skipped", detail: "", at: "" };
-  if (!configured && !sentRow) return { state: "disabled", detail: "", at: "" };
-  if (sentRow) return { state: "sent", detail: sentRow["Detail"] || "", at: sentRow["Timestamp"] || "" };
-  if (failedRow) return { state: "failed", detail: failedRow["Detail"] || "", at: failedRow["Timestamp"] || "" };
+  if (sentRow) return { state: "sent", detail: sentRow.detail || "", at: sentRow.timestamp || "" };
+  if (failedRow) return { state: "failed", detail: failedRow.detail || "", at: failedRow.timestamp || "" };
   return { state: "pending", detail: "", at: "" };
 }
 
+/**
+ * Real ActivityLog-backed delivery status for the customer review-request email --
+ * the only customer notification tmv-pwa's workflow (workflow.engine.ts's
+ * SEND_REVIEW_EMAIL) currently records an activity entry for. The old Chat bot's
+ * "on my way" email/SMS notification isn't part of tmv-pwa's workflow (dropped when
+ * that step was simplified, see tmv-pwa's workflow.engine.ts comments), so this no
+ * longer has anything to report for those -- shows "skipped" rather than fabricating
+ * a status. SMS was never wired into tmv-pwa either.
+ */
 export function notificationsRoute(): Router {
   const router = Router();
 
   router.get("/", async (_req, res) => {
     try {
-      const [bookings, activity] = await Promise.all([
-        listObjects(SHEETS.BOOKINGS, 0),
-        listObjects(SHEETS.ACTIVITY, 0)
+      const [jobs, activity] = await Promise.all([
+        jobsCollection().then(c => c.find({ actualStart: { $ne: "" } }).toArray()),
+        activityCollection().then(c => c.find({}).toArray())
       ]);
 
-      const latestByJobAction = new Map<string, Record<string, string>>();
+      const latestByJobAction = new Map<string, { detail?: string; timestamp: string }>();
       for (const row of activity) {
-        if (!NOTIFY_ACTIONS.has(row["Action"])) continue;
-        latestByJobAction.set(`${row["Job ID"]}::${row["Action"]}`, row);
+        if (!NOTIFY_ACTIONS.has(row.action)) continue;
+        latestByJobAction.set(`${row.jobId}::${row.action}`, { detail: row.detail, timestamp: row.timestamp });
       }
 
-      const smsConfigured = Boolean(env.firetextApiKey && env.firetextSenderId);
-
-      const rows = bookings
-        .filter(b => b["Actual Start"])
-        .map(b => {
-          const jobId = b["Job ID"];
+      const rows = jobs
+        .map(job => {
           const email = notifyStatus(
-            Boolean(b["Customer Email"]), true,
-            latestByJobAction.get(`${jobId}::CLIENT_START_EMAIL_SENT`),
-            latestByJobAction.get(`${jobId}::CLIENT_START_EMAIL_FAILED`)
-          );
-          const sms = notifyStatus(
-            Boolean(b["Phone"]), smsConfigured,
-            latestByJobAction.get(`${jobId}::CLIENT_START_SMS_SENT`),
-            latestByJobAction.get(`${jobId}::CLIENT_START_SMS_FAILED`)
+            Boolean(job.customerEmail),
+            latestByJobAction.get(`${job.jobId}::CLIENT_REVIEW_EMAIL_SENT`),
+            latestByJobAction.get(`${job.jobId}::CLIENT_REVIEW_EMAIL_FAILED`)
           );
           return {
-            jobId,
-            customerName: b["Customer"] || "",
-            customerEmail: b["Customer Email"] || "",
-            customerPhone: b["Phone"] || "",
-            driverInitials: b["Driver Initials"] || "",
-            actualStart: b["Actual Start"] || "",
+            jobId: job.jobId,
+            customerName: job.customerName || "",
+            customerEmail: job.customerEmail || "",
+            customerPhone: job.customerPhone || "",
+            driverInitials: job.driverInitials || "",
+            actualStart: job.actualStart || "",
             email,
-            sms
+            sms: { state: "skipped" as const, detail: "", at: "" }
           };
         })
         .sort((a, b) => (b.actualStart || "").localeCompare(a.actualStart || ""));

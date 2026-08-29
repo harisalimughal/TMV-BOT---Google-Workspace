@@ -1,20 +1,7 @@
 import { Router } from "express";
-import { SCHEMA, SHEETS } from "../../../src/google/sheets";
-import { readDataset } from "../read/sheet-reader";
+import { scenarioSubmissionsCollection, ScenarioSubmissionDoc } from "../../../src/db/mongo";
 
-const SCENARIO_SHEET_MAP: Record<string, string> = {
-  checkin: "checkIn",
-  checkout: "checkOut",
-  parking: "parking",
-  liability: "liability"
-};
-
-const SCENARIO_SCHEMA_SHEET: Record<string, string> = {
-  checkin: SHEETS.STORAGE_CHECK_IN,
-  checkout: SHEETS.STORAGE_CHECK_OUT,
-  parking: SHEETS.PARKING_LIABILITY,
-  liability: SHEETS.LIABILITY_REPORT
-};
+const VALID_KINDS = new Set(["checkin", "checkout", "parking", "liability"]);
 
 function escapeCsvField(val: unknown): string {
   if (val === null || val === undefined) return "";
@@ -24,36 +11,37 @@ function escapeCsvField(val: unknown): string {
   return str;
 }
 
-function extractDriveIds(pipeUrls?: string): string[] {
-  if (!pipeUrls) return [];
-  return pipeUrls
-    .split("|")
-    .map(u => u.trim().match(/\/d\/([A-Za-z0-9_-]+)/)?.[1])
-    .filter((id): id is string => Boolean(id));
-}
-
+/**
+ * Check In / Check Out / Parking Liability / Liability Report submissions -- read
+ * from tmv-pwa's scenario_submissions Mongo collection (see tmv-pwa/backend/src/
+ * jobs/scenario.service.ts, the only writer) instead of the 4 dedicated Sheets tabs
+ * (StorageCheckIn/StorageCheckOut/ParkingLiability/LiabilityReport) the old Chat-bot
+ * scenario wizard used to write. Photos/signature are Cloudinary URLs already --
+ * directly usable as an <img> src, no authenticated proxy needed.
+ */
 export function scenariosRoute(): Router {
   const router = Router();
 
-  // Full-table export (every row, not just the current page) -- matches the classic
-  // /admin panel's generic table export, which ScenariosPage.tsx's Export CSV button
-  // otherwise has no real endpoint to call.
   router.get("/:kind/export.csv", async (req, res) => {
     try {
       const kind = String(req.params.kind || "").toLowerCase();
-      const datasetKey = SCENARIO_SHEET_MAP[kind];
-      const schemaSheet = SCENARIO_SCHEMA_SHEET[kind];
-      if (!datasetKey) {
+      if (!VALID_KINDS.has(kind)) {
         return res.status(404).json({ error: { code: "SCENARIO_NOT_FOUND", message: `Unknown scenario kind: ${kind}` } });
       }
 
-      const dataset = await readDataset();
-      const rows = ((dataset as any)[datasetKey] as Record<string, string>[]) || [];
-      const columns = SCHEMA[schemaSheet] ?? (rows[0] ? Object.keys(rows[0]) : []);
+      const col = await scenarioSubmissionsCollection();
+      const rows = await col.find({ scenario: kind as ScenarioSubmissionDoc["scenario"] }).toArray();
+
+      const fieldNames = [...new Set(rows.flatMap(r => Object.keys(r.fields)))];
+      const columns = ["Job ID", "Driver", "Submitted", ...fieldNames, "Photo URLs", "Signature URL"];
 
       const csvContent = "﻿" + [
         columns.map(escapeCsvField).join(","),
-        ...rows.map(row => columns.map(c => escapeCsvField(row[c])).join(","))
+        ...rows.map(r => [
+          r.jobId, r.driver, r.submittedAt,
+          ...fieldNames.map(f => r.fields[f] ?? ""),
+          r.photoUrls.join(" | "), r.signatureUrl
+        ].map(escapeCsvField).join(","))
       ].join("\r\n");
 
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -67,63 +55,43 @@ export function scenariosRoute(): Router {
   router.get("/:kind", async (req, res) => {
     try {
       const kind = String(req.params.kind || "").toLowerCase();
-      const datasetKey = SCENARIO_SHEET_MAP[kind];
-      if (!datasetKey) {
+      if (!VALID_KINDS.has(kind)) {
         return res.status(404).json({ error: { code: "SCENARIO_NOT_FOUND", message: `Unknown scenario kind: ${kind}` } });
       }
 
-      const dataset = await readDataset();
-      const rawRows = ((dataset as any)[datasetKey] as Record<string, string>[]) || [];
+      const col = await scenarioSubmissionsCollection();
+      const rows = await col.find({ scenario: kind as ScenarioSubmissionDoc["scenario"] }).sort({ submittedAt: 1 }).toArray();
 
-      // Calculate occurrence count per Job ID to distinguish multiple events
       const jobCounts = new Map<string, number>();
-      for (const r of rawRows) {
-        const jId = (r["Job ID"] || "").trim().toUpperCase();
-        if (jId) jobCounts.set(jId, (jobCounts.get(jId) || 0) + 1);
-      }
-
-      // Track running event index per job ID
+      for (const r of rows) jobCounts.set(r.jobId, (jobCounts.get(r.jobId) || 0) + 1);
       const jobRunningIndex = new Map<string, number>();
 
-      // Format rows with thumbnail proxies and event labeling
-      const formattedRows = rawRows.map((r, index) => {
-        const jobId = (r["Job ID"] || "").trim();
-        const jIdKey = jobId.toUpperCase();
-        const totalEventsForJob = jobCounts.get(jIdKey) || 1;
-        const currentEventIdx = (jobRunningIndex.get(jIdKey) || 0) + 1;
-        jobRunningIndex.set(jIdKey, currentEventIdx);
-
-        const photoIds = extractDriveIds(r["Photo URLs"]);
-        const sigId = extractDriveIds(r["Signature URL"])[0];
+      const formattedRows = rows.map((r, index) => {
+        const totalEventsForJob = jobCounts.get(r.jobId) || 1;
+        const currentEventIdx = (jobRunningIndex.get(r.jobId) || 0) + 1;
+        jobRunningIndex.set(r.jobId, currentEventIdx);
 
         return {
           id: `${kind}-${index}`,
-          jobId: jobId || "UNASSIGNED",
+          jobId: r.jobId || "UNASSIGNED",
           eventLabel: totalEventsForJob > 1 ? `Event ${currentEventIdx} of ${totalEventsForJob}` : undefined,
           totalEventsForJob,
           eventIndex: currentEventIdx,
-          timestamp: r["Timestamp"] || r["Date"] || "",
-          driver: r["Driver"] || "—",
-          clientName: r["Client Name"] || r["Client Full Name"] || "—",
-          clientPhone: r["Client Phone"] || "",
-          clientEmail: r["Client Email"] || "",
-          containerNumber: r["Container Number"] || "—",
-          address: r["Address"] || "",
-          damageCategories: r["Damage Categories"] || "",
-          clientPresent: r["Client Present"] || r["Client Present At Dropoff"] || "—",
-          rawRecord: r,
-          photos: photoIds.map(fid => ({
-            fileId: fid,
-            thumbUrl: `/admin/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(fid)}`
-          })),
-          signature: sigId ? {
-            fileId: sigId,
-            thumbUrl: `/admin/api/jobs/${encodeURIComponent(jobId || "TEMP")}/photos/${encodeURIComponent(sigId)}`
-          } : null
+          timestamp: r.submittedAt,
+          driver: r.driver || "—",
+          clientName: r.fields.client_name || "—",
+          clientPhone: r.fields.client_phone || "",
+          clientEmail: r.fields.client_email || "",
+          containerNumber: r.fields.container_number || "—",
+          address: r.fields.address || "",
+          damageCategories: r.fields.damage_categories || "",
+          clientPresent: r.fields.client_present || "—",
+          rawRecord: r.fields,
+          photos: r.photoUrls.map(url => ({ fileId: url, thumbUrl: url })),
+          signature: r.signatureUrl ? { fileId: r.signatureUrl, thumbUrl: r.signatureUrl } : null
         };
       }).reverse(); // Latest events first
 
-      // Pagination
       const page = Math.max(1, Number(req.query.page) || 1);
       const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
       const total = formattedRows.length;
@@ -133,21 +101,11 @@ export function scenariosRoute(): Router {
       return res.status(200).json({
         kind,
         items,
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages,
-          hasMore: page < totalPages
-        },
-        meta: {
-          fetchedAt: dataset.fetchedAt
-        }
+        pagination: { page, pageSize, total, totalPages, hasMore: page < totalPages },
+        meta: { fetchedAt: new Date().toISOString() }
       });
     } catch (error) {
-      return res.status(500).json({
-        error: { code: "SCENARIOS_FETCH_FAILED", message: "Failed to fetch scenario data." }
-      });
+      return res.status(500).json({ error: { code: "SCENARIOS_FETCH_FAILED", message: "Failed to fetch scenario data." } });
     }
   });
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { addPence, formatGBP, pence, toPounds } from "../../../src/utils/money";
-import { normalizeDataset } from "../normalize/normalize";
-import { readDataset } from "../read/sheet-reader";
+import { normalizeMongoDataset } from "../normalize/normalize-mongo";
+import { readMongoDataset } from "../read/mongo-reader";
 
 export function summaryRoute(): Router {
   const router = Router();
@@ -11,8 +11,8 @@ export function summaryRoute(): Router {
       const from = typeof req.query.from === "string" ? req.query.from : undefined;
       const to = typeof req.query.to === "string" ? req.query.to : undefined;
 
-      const dataset = await readDataset();
-      let jobs = normalizeDataset(dataset);
+      const dataset = await readMongoDataset();
+      let jobs = await normalizeMongoDataset(dataset);
 
       // Date filtering
       if (from) {

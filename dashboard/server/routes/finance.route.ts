@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { addPence, formatGBP, pence, toPounds } from "../../../src/utils/money";
-import { normalizeDataset } from "../normalize/normalize";
-import { readDataset } from "../read/sheet-reader";
+import { normalizeMongoDataset } from "../normalize/normalize-mongo";
+import { readMongoDataset } from "../read/mongo-reader";
 
 export function financeRoute(): Router {
   const router = Router();
@@ -12,8 +12,8 @@ export function financeRoute(): Router {
       const to = typeof req.query.to === "string" ? req.query.to : undefined;
       const groupBy = req.query.groupBy === "month" ? "month" : req.query.groupBy === "week" ? "week" : "day";
 
-      const dataset = await readDataset();
-      let jobs = normalizeDataset(dataset);
+      const dataset = await readMongoDataset();
+      let jobs = await normalizeMongoDataset(dataset);
 
       if (from) jobs = jobs.filter(j => (j.actualStart || j.bookedStart) >= from);
       if (to) jobs = jobs.filter(j => (j.actualStart || j.bookedStart) <= to);

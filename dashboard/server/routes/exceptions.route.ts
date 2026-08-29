@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { normalizeDataset } from "../normalize/normalize";
-import { readDataset } from "../read/sheet-reader";
+import { normalizeMongoDataset } from "../normalize/normalize-mongo";
+import { readMongoDataset } from "../read/mongo-reader";
 
 export function exceptionsRoute(): Router {
   const router = Router();
@@ -11,8 +11,8 @@ export function exceptionsRoute(): Router {
       const from = typeof req.query.from === "string" ? req.query.from : undefined;
       const to = typeof req.query.to === "string" ? req.query.to : undefined;
 
-      const dataset = await readDataset();
-      const jobs = normalizeDataset(dataset);
+      const dataset = await readMongoDataset();
+      const jobs = await normalizeMongoDataset(dataset);
 
       const items: Array<{
         id: string;
@@ -26,18 +26,20 @@ export function exceptionsRoute(): Router {
         linkUrl: string;
       }> = [];
 
-      // 1. Unhandled errors from ExceptionReport sheet
+      // 1. Unhandled errors from the exceptions collection (see
+      // tmv-pwa/backend/src/jobs/booking.service.ts's reconcileDisappeared, the only
+      // writer)
       for (let i = 0; i < dataset.exceptions.length; i++) {
         const ex = dataset.exceptions[i];
-        const jobId = ex["Job ID"] || "UNKNOWN";
+        const jobId = ex.jobId || "UNKNOWN";
         const matchingJob = jobs.find(j => j.jobId === jobId);
         items.push({
-          id: `sheet-ex-${i}`,
+          id: `ex-${i}`,
           jobId,
-          type: ex["Type"] || "SYSTEM_EXCEPTION",
+          type: ex.type || "SYSTEM_EXCEPTION",
           severity: "CRITICAL",
-          detail: ex["Detail"] || "Recorded system exception",
-          timestamp: ex["Timestamp"] || dataset.fetchedAt,
+          detail: ex.detail || "Recorded system exception",
+          timestamp: ex.timestamp || dataset.fetchedAt,
           customerName: matchingJob?.customerName || "—",
           driverName: matchingJob?.driverName || "—",
           linkUrl: jobId !== "UNKNOWN" ? `/admin?job=${encodeURIComponent(jobId)}` : "/admin"

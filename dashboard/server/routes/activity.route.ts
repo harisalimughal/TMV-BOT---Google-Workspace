@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { readDataset } from "../read/sheet-reader";
+import { activityCollection } from "../../../src/db/mongo";
 import { toUtcIso } from "../normalize/timezone";
 
 export function activityRoute(): Router {
@@ -10,17 +10,17 @@ export function activityRoute(): Router {
       const from = typeof req.query.from === "string" ? req.query.from : undefined;
       const to = typeof req.query.to === "string" ? req.query.to : undefined;
 
-      const dataset = await readDataset();
-      let list = dataset.activity.map((a, i) => ({
+      const rows = await (await activityCollection()).find({}).toArray();
+      let list = rows.map((a, i) => ({
         id: `act-${i}`,
-        timestamp: toUtcIso(a["Timestamp"]),
-        jobId: a["Job ID"] || "—",
-        driver: a["Driver"] || "Not recorded",
-        action: a["Action"] || "",
-        fromState: a["From State"] || undefined,
-        toState: a["To State"] || undefined,
-        detail: a["Detail"] || undefined
-      })).reverse(); // Latest first
+        timestamp: toUtcIso(a.timestamp),
+        jobId: a.jobId || "—",
+        driver: a.driver || "Not recorded",
+        action: a.action || "",
+        fromState: a.fromState || undefined,
+        toState: a.toState || undefined,
+        detail: a.detail || undefined
+      })).sort((a, b) => a.timestamp.localeCompare(b.timestamp)).reverse(); // Latest first
 
       if (from) list = list.filter(a => a.timestamp >= from);
       if (to) list = list.filter(a => a.timestamp <= to);
@@ -41,7 +41,7 @@ export function activityRoute(): Router {
           hasMore: page < totalPages
         },
         meta: {
-          fetchedAt: dataset.fetchedAt
+          fetchedAt: new Date().toISOString()
         }
       });
     } catch (error) {
