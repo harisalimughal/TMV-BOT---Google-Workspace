@@ -47,10 +47,16 @@ export function LoginPage({ onLogin }: Props) {
   return (
     <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center p-4 sm:p-8 font-sans">
 
-      {/* LOGO */}
+      {/* LOGO -- the real brand mark, not the generic "MV" letter badge. tmv-logo.png
+          (not tmv-new-logo.png, which is letterboxed with black bars) is the clean
+          square source, same asset tmv-pwa's own login screen uses. */}
       <div className="mb-8 flex items-center justify-center">
-        <div className="w-12 h-12 bg-brand rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
-          <span className="text-white font-bold text-2xl tracking-tighter" style={{ fontFamily: 'monospace' }}>MV</span>
+        <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-lg p-2">
+          <img
+            src={`${import.meta.env.BASE_URL}tmv-logo.png`}
+            alt="The Man Van"
+            className="w-full h-full object-contain"
+          />
         </div>
       </div>
 
