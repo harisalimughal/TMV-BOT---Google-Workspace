@@ -2,6 +2,8 @@ import { Router } from "express";
 import { commitWrites, driverWrite } from "../../../src/google/sheets";
 import { addPence, formatGBP, pence, toPounds } from "../../../src/utils/money";
 import { log } from "../../../src/utils/logger";
+import { env } from "../../../src/config/env";
+import { setDriverPassword } from "../../../src/db/driver-account.service";
 import { DRIVERS_MAP } from "../normalize/mapping";
 import { normalizeDataset } from "../normalize/normalize";
 import { sheetCache } from "../read/cache";
@@ -14,6 +16,12 @@ export function driversRoute(): Router {
   // the same email upserts the existing row -- this one endpoint naturally covers
   // add and edit. "Remove" is a soft-deactivate (active: false), matching how Active
   // already works everywhere else -- no real Sheets row is ever deleted.
+  //
+  // pwaPassword is optional and separate from everything else here: it sets the
+  // driver's login for the tmv-pwa driver app (a different project/database, see
+  // src/db/). Leaving it blank on an edit keeps whatever password is already set --
+  // this endpoint should never require re-entering a password just to change a phone
+  // number.
   router.post("/", async (req, res) => {
     const body = req.body ?? {};
     const initials = String(body.initials ?? "").trim().toUpperCase();
@@ -24,18 +32,41 @@ export function driversRoute(): Router {
     const active = body.active !== false;
     const phone = String(body.phone ?? "").trim();
     const vanRegistration = String(body.vanRegistration ?? "").trim();
+    const pwaPassword = String(body.pwaPassword ?? "").trim();
 
     if (!initials || !fullName || !email) {
       return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "Initials, full name and email are required." } });
     }
+    if (pwaPassword && pwaPassword.length < 8) {
+      return res.status(400).json({ error: { code: "VALIDATION_FAILED", message: "Driver app password must be at least 8 characters." } });
+    }
     try {
       await commitWrites([driverWrite({ initials, fullName, email, chatUserName, active, role, phone, vanRegistration })]);
       sheetCache.invalidate();
-      return res.status(200).json({ ok: true });
     } catch (error) {
       log.error("dashboard add/edit driver failed", error);
       return res.status(500).json({ error: { code: "DRIVER_SAVE_FAILED", message: "Failed to save driver." } });
     }
+
+    if (pwaPassword) {
+      if (!env.mongoUri) {
+        return res.status(200).json({
+          ok: true,
+          warning: "Driver saved, but the app password could not be set: MONGODB_URI is not configured."
+        });
+      }
+      try {
+        await setDriverPassword(email, pwaPassword);
+      } catch (error) {
+        log.error("setting driver PWA password failed", error);
+        return res.status(200).json({
+          ok: true,
+          warning: "Driver saved, but the app password could not be set. Please try again."
+        });
+      }
+    }
+
+    return res.status(200).json({ ok: true });
   });
 
   router.get("/summary", async (req, res) => {

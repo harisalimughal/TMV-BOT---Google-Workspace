@@ -34,6 +34,17 @@ function boolEnv(name: string, fallback: boolean): boolean {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: numberEnv("PORT", 8080),
+  /**
+   * Only used by the admin dashboard's Add/Edit Driver flow, to set a driver's PWA
+   * login password (tmv-pwa reads the same driver_accounts collection). Deliberately
+   * optional, unlike tmv-pwa's own MONGODB_URI which is required there -- this whole
+   * app must keep working exactly as it does today even before Mongo is set up, since
+   * setting a PWA password is a new, separate concern from anything this app already
+   * depends on. Blank = the password field in Add/Edit Driver just fails clearly if
+   * used, everything else in the dashboard is unaffected.
+   */
+  mongoUri: process.env.MONGODB_URI?.trim() || "",
+  mongoDbName: process.env.MONGODB_DB_NAME?.trim() || "tmv_pwa",
   spreadsheetId: required("GOOGLE_SHEETS_SPREADSHEET_ID"),
   calendarId: process.env.GOOGLE_CALENDAR_ID?.trim() || "primary",
   driveRootFolderId: required("GOOGLE_DRIVE_ROOT_FOLDER_ID"),

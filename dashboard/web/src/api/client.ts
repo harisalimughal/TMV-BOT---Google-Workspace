@@ -165,11 +165,23 @@ export interface SaveDriverPayload {
   active?: boolean;
   phone?: string;
   vanRegistration?: string;
+  /** Sets/resets the driver's tmv-pwa app login. Leave blank on an edit to keep
+   * whatever password is already set. */
+  pwaPassword?: string;
 }
 
-/** Upserts a Drivers-sheet row, keyed on email -- add and edit both go through this. */
-export async function saveDriver(payload: SaveDriverPayload): Promise<void> {
-  return postJson("/ops/api/drivers", payload);
+/** Upserts a Drivers-sheet row, keyed on email -- add and edit both go through this.
+ * Returns `warning` when the Sheets save succeeded but pwaPassword (a separate system)
+ * couldn't be set, so the caller can surface that distinctly from a hard failure. */
+export async function saveDriver(payload: SaveDriverPayload): Promise<{ warning?: string }> {
+  const res = await fetch("/ops/api/drivers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || "Request failed");
+  return { warning: data?.warning };
 }
 
 export interface EditableSetting {

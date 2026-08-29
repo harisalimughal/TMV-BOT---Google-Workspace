@@ -23,11 +23,13 @@
     "node": ">=20"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "google-auth-library": "^9.15.1",
     "googleapis": "^144.0.0",
-    "luxon": "^3.5.0"
+    "luxon": "^3.5.0",
+    "mongodb": "^7.6.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

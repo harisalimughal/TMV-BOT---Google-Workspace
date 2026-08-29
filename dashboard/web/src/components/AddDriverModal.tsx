@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { fetchDrivers, saveDriver } from "../api/client";
 import { DriverSummaryItem } from "../types";
 
@@ -18,8 +18,10 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [active, setActive] = useState(true);
+  const [pwaPassword, setPwaPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [saveWarning, setSaveWarning] = useState("");
 
   // Real roster (see dashboard/server/routes/drivers.route.ts) -- used to catch a
   // duplicate initials before the write, mirroring what driverWrite()'s Email-keyed
@@ -44,7 +46,9 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
       setPhone("");
       setActive(true);
     }
+    setPwaPassword("");
     setSaveError("");
+    setSaveWarning("");
   }, [driverToEdit, isOpen]);
 
   if (!isOpen) return null;
@@ -60,21 +64,33 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
   const isCodeTaken = roster.some(d =>
     d.initials === code.toUpperCase() && (!driverToEdit || driverToEdit.initials !== code.toUpperCase())
   );
+  const passwordTooShort = pwaPassword.length > 0 && pwaPassword.length < 8;
 
   const handleSubmit = async () => {
     setSaveError("");
+    setSaveWarning("");
     setIsSaving(true);
     try {
-      await saveDriver({
+      const result = await saveDriver({
         initials: code.toUpperCase(),
         fullName: name,
         email,
         active,
         phone,
-        vanRegistration: vehicleReg
+        vanRegistration: vehicleReg,
+        // Omitted (not sent empty) when blank, so editing a driver without touching
+        // this field never resets/clears their existing app password.
+        ...(pwaPassword ? { pwaPassword } : {})
       });
       queryClient.invalidateQueries({ queryKey: ["drivers_summary"] });
-      onClose();
+      if (result.warning) {
+        // Stay open so the warning is actually seen -- the Sheets save did succeed,
+        // this isn't a failure, but silently closing would hide that the password
+        // part didn't take.
+        setSaveWarning(result.warning);
+      } else {
+        onClose();
+      }
     } catch (err: any) {
       setSaveError(err?.message || "Failed to save driver.");
     } finally {
@@ -145,13 +161,35 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
 
             <div className="col-span-2">
               <label className="block text-[12px] font-semibold text-muted uppercase tracking-wider mb-1.5">Phone Number</label>
-              <input 
-                type="tel" 
+              <input
+                type="tel"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 className="w-full h-11 px-3 rounded-[12px] border border-line bg-surface text-[14px] text-ink outline-none focus:border-brand focus:bg-white transition"
                 placeholder="07..."
               />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-[12px] font-semibold text-muted uppercase tracking-wider mb-1.5">
+                Driver App Password
+              </label>
+              <input
+                type="password"
+                value={pwaPassword}
+                onChange={e => setPwaPassword(e.target.value)}
+                className={`w-full h-11 px-3 rounded-[12px] border ${passwordTooShort ? 'border-status-red focus:border-status-red' : 'border-line focus:border-brand'} bg-surface text-[14px] text-ink outline-none focus:bg-white transition`}
+                placeholder={driverToEdit ? "Leave blank to keep current password" : "Set a password (min 8 characters)"}
+                autoComplete="new-password"
+              />
+              {passwordTooShort ? (
+                <span className="text-[11px] text-status-red mt-1 block">Must be at least 8 characters.</span>
+              ) : (
+                <span className="text-[11px] text-muted mt-1 block">
+                  Login for the driver mobile app (separate from Google Chat).
+                  {driverToEdit ? " Leave blank to keep their current password unchanged." : ""}
+                </span>
+              )}
             </div>
 
             <div className="col-span-2 mt-4 pt-4 border-t border-line">
@@ -188,17 +226,33 @@ export function AddDriverModal({ isOpen, onClose, driverToEdit }: Props) {
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {saveError}
             </p>
           )}
+          {saveWarning && (
+            <p className="text-[12px] text-amber-700 font-medium mb-3 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {saveWarning}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-3">
-            <button onClick={onClose} disabled={isSaving} className="px-4 py-2 rounded-[12px] text-[13px] font-semibold text-muted hover:text-ink transition disabled:opacity-50">
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSaving || isCodeTaken || !name || !code || !email}
-              className="px-6 py-2 rounded-[12px] bg-[#2563EB] disabled:bg-[#93C5FD] disabled:cursor-not-allowed hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition"
-            >
-              {isSaving ? "Saving…" : driverToEdit ? "Save Changes" : "Add Driver"}
-            </button>
+            {saveWarning ? (
+              <button
+                onClick={onClose}
+                className="px-6 py-2 rounded-[12px] bg-[#2563EB] hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Done
+              </button>
+            ) : (
+              <>
+                <button onClick={onClose} disabled={isSaving} className="px-4 py-2 rounded-[12px] text-[13px] font-semibold text-muted hover:text-ink transition disabled:opacity-50">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSaving || isCodeTaken || passwordTooShort || !name || !code || !email}
+                  className="px-6 py-2 rounded-[12px] bg-[#2563EB] disabled:bg-[#93C5FD] disabled:cursor-not-allowed hover:bg-blue-700 text-white text-[13px] font-semibold shadow-sm transition"
+                >
+                  {isSaving ? "Saving…" : driverToEdit ? "Save Changes" : "Add Driver"}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
