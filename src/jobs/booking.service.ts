@@ -187,10 +187,22 @@ export async function syncBookingsForDate(date = DateTime.now().setZone(env.time
 
   // A booking that was on this date and is no longer returned has been moved or
   // deleted. Anything not yet started is cancelled; anything started is escalated.
-  const dateKey = start.toFormat("yyyy-LL-dd");
+  //
+  // "On this date" is checked by properly parsing bookedStart and comparing its
+  // calendar day *in env.timezone*, not by string-prefix-matching the raw stored
+  // value against a "yyyy-LL-dd" key -- bookedStart is stored verbatim from whatever
+  // offset Google Calendar's API happens to return for this calendar (observed: some
+  // events come back "+05:00", not this app's own Europe/London), so a bare string
+  // like "2026-08-31T01:41:00+05:00" can represent an instant that's actually Aug 30
+  // in London. A naive .startsWith(dateKey) check missed that a job WAS still on
+  // Calendar for its real day, instead running it through the wrong day's pass --
+  // where it legitimately isn't present -- and auto-cancelling a live booking that
+  // was never actually gone. Same bug found and fixed live in tmv-pwa's copy of this
+  // file first (a real assigned job got silently cancelled the moment a sync ran).
   for (const existing of existingJobs) {
     if (seenEventIds.has(existing.calendarEventId)) continue;
-    if (!existing.bookedStart.startsWith(dateKey)) continue;
+    const existingDay = DateTime.fromISO(existing.bookedStart, { setZone: true }).setZone(env.timezone);
+    if (!existingDay.isValid || !existingDay.hasSame(date, "day")) continue;
     if (existing.status === JobStatus.COMPLETED || existing.status === JobStatus.CANCELLED) continue;
     writes.push(...reconcileDisappeared(existing, "no longer present in Calendar for this date"));
   }
